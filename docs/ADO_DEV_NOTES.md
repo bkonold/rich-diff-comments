@@ -247,6 +247,65 @@ The restore flow is one-shot per pending navigation: open only the documented
 the rendered container. Unknown menu DOM fails safely and is exposed through
 `ADORC_probe.viewMode()`.
 
+**TreeEx recycles connected row elements during virtualization.** Live testing
+on a large PR showed the same generated row element being reused for different
+`data-row-index` values while the file-tree scroller moved. A remembered
+descriptor can therefore still name the requested Markdown file while its
+connected `row` now represents an unrelated folder. This was observed as every
+navigation landing on an extensionless `openapi/2026-06-01-preview` directory.
+Remembered entries are path snapshots only: activation requires the matched row
+index to be present in the current paint, and the row is revalidated immediately
+before each click, Enter, or double-click gesture.
+
+**An exact materialized row can require press events, not only `click()`.** A
+live probe reconstructed the correct deeply nested Markdown leaf at score 240,
+yet click-only activation left the route unchanged and forced the rejected URL
+fallback. Activation now targets the freshly revalidated cell with a complete
+pointer/mouse press-release-click sequence before trying keyboard and
+double-click fallbacks. This accommodates TreeEx consumers that select or
+activate from `pointerdown` / `mousedown`.
+
+**Some legacy TreeEx rows ignore all browser-synthesized events.** The exact
+row can remain selected visually while every dispatched pointer, mouse, and
+keyboard event is untrusted and therefore produces no route transition. Before
+attempting a page reload, the adapter now discovers the current React props on
+the freshly revalidated row/cell and invokes its active click/press callback.
+This preserves ADO's own SPA navigation closure and avoids guessing another URL.
+The private React path is deliberately last-resort and is skipped when no
+current handler is discoverable.
+
+The handler is not necessarily stored on the row itself. TreeEx can delegate
+selection to a parent table/tree host, so callback discovery walks the bounded
+DOM ancestry and emulates pointer-down, mouse-down, and click bubbling with the
+exact leaf cell retained as `event.target`.
+
+**Commit the exact fallback URL before reloading.** Live testing also showed the
+legacy PR viewer restoring its previously selected folder during a direct
+`location.assign()` to another file. The page visibly refreshed, but its
+`?path=` returned to the old extensionless folder. The fallback now constructs
+a clean same-PR URL. Further testing confirmed that pasting this exact URL into
+the address bar works while script-driven assignment and replace/reload are
+rewritten. The fallback therefore submits a plain browser-level GET form to the
+PR path with only `path` and `_a=files`, matching a direct document navigation
+instead of notifying ADO's SPA router first. A short-lived session marker
+verifies that ADO retained the requested path; if ADO still rejects it, the
+pending sidebar jump is released instead of repeatedly pinning navigation.
+
+**Cross-file sidebar cards must be real links when the leaf is not currently
+materialized.** Live testing confirmed both a manual native-tree click and an
+address-bar navigation succeed, while every delayed script-created navigation
+is restored to ADO's previously selected folder. Changes, Threads, and Outline
+destinations therefore carry clean same-PR `href` values. A trusted user click
+uses the browser's default link navigation after synchronously saving the
+pending destination. If an exact native row is already visible, the handler
+still prevents the link default and uses the faster SPA path.
+
+ADO's document-level router also intercepts ordinary same-tab anchors and can
+restore the prior folder. Cross-file sidebar links therefore use `_top` and are
+never prevented merely because an exact virtual row is visible. Only same-file
+cards stay in-page. This forces browser navigation semantics from the trusted
+click rather than re-entering TreeEx or the delegated SPA link handler.
+
 ## Changes tab — source diff, not DOM markers
 
 ADO Preview renders only the final document. Unlike GitHub rich diff, it does

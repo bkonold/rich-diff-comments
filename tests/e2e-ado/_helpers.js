@@ -30,6 +30,7 @@ const SOURCE_COMMIT = 'c'.repeat(40);
 const COMMON_COMMIT = 'a'.repeat(40);
 const FAKE_PR_PATH = `/${ORG}/${PROJECT_NAME}/_git/${REPO_NAME}/pullrequest/${PR_ID}`;
 const FAKE_PR_URL = `https://dev.azure.com${FAKE_PR_PATH}?_a=files&path=${encodeURIComponent(fixtureData.DESIGN_PATH)}`;
+const FAKE_PR_FILES_URL = `https://dev.azure.com${FAKE_PR_PATH}?_a=files`;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -101,6 +102,7 @@ async function installAdoRoutes(page, options) {
     }, opts.baseSources || {}),
     sourceDelays: Object.assign({}, opts.sourceDelays || {}),
     sourceFailures: Object.assign({}, opts.sourceFailures || {}),
+    inventoryDelay: Number(opts.inventoryDelay || 0),
     nextThreadId: 1000,
   };
 
@@ -147,6 +149,9 @@ async function installAdoRoutes(page, options) {
 
     const projectPrPath = `/${ORG}/${PROJECT_ID}/_apis/git/repositories/${REPO_ID}/pullRequests/${PR_ID}`;
     if (method === 'GET' && url.pathname === `${projectPrPath}/iterations`) {
+      if (state.inventoryDelay > 0) {
+        await new Promise((resolve) => setTimeout(resolve, state.inventoryDelay));
+      }
       return fulfillJson(route, {
         count: 2,
         value: [
@@ -317,7 +322,7 @@ async function setupAdoExtensionPage(page, options) {
   page.on('console', (message) => logs.push(message.text()));
   page.on('pageerror', (error) => pageErrors.push(String(error.message || error)));
 
-  await page.goto(FAKE_PR_URL, { waitUntil: 'domcontentloaded' });
+  await page.goto(opts.initialUrl || FAKE_PR_URL, { waitUntil: 'domcontentloaded' });
   await page.addStyleTag({ path: path.join(EXT_ROOT, 'styles.css') });
   await page.evaluate(() => {
     localStorage.setItem('adrc-sidebar-state-v1', JSON.stringify({
@@ -331,6 +336,16 @@ async function setupAdoExtensionPage(page, options) {
       height: 620,
     }));
   });
+  if (opts.hideInitialPreview) {
+    await page.evaluate((keepPath) => {
+      const url = new URL(location.href);
+      if (!keepPath) url.searchParams.delete('path');
+      history.replaceState({}, '', url.href);
+      window.__ADO_FIXTURE__.preview.style.display = 'none';
+      window.__ADO_FIXTURE__.preview.innerHTML = '';
+      document.querySelector('.fixture-view-mode').textContent = 'Inline';
+    }, opts.keepInitialPathWithoutPreview === true);
+  }
   await injectAdoExtension(page);
 
   if (opts.waitForReady !== false) {
@@ -355,10 +370,12 @@ module.exports = {
   EXT_ROOT,
   CONTENT_SCRIPTS,
   FAKE_PR_URL,
+  FAKE_PR_FILES_URL,
   FAKE_PR_PATH,
   TARGET_COMMIT,
   SOURCE_COMMIT,
   COMMON_COMMIT,
+  injectAdoExtension,
   setupAdoExtensionPage,
   waitForAdoReady,
   waitForOutlineReady,

@@ -6,10 +6,132 @@ const {
   waitForAdoReady,
   userThreadCount,
   SOURCE_COMMIT,
+  FAKE_PR_FILES_URL,
+  injectAdoExtension,
 } = require('./_helpers');
 const fixtures = require('./fixtures/sources');
 
 test.describe('ADO SPA lifecycle and cross-file navigation', () => {
+  test('shows the sidebar immediately on Files and opens the first Markdown Preview', async ({ page }) => {
+    const { server } = await setupAdoExtensionPage(page, {
+      initialUrl: FAKE_PR_FILES_URL,
+      hideInitialPreview: true,
+      inventoryDelay: 1500,
+      waitForReady: false,
+    });
+
+    await expect(page.locator('.adrc-sidebar')).toBeVisible({ timeout: 500 });
+    await expect(page.locator('.adrc-sidebar-setup')).toBeVisible();
+    await expect(page.locator('.adrc-sidebar-setup-message')).toHaveText('Finding changed Markdown files…');
+    await expect(page.locator('.adrc-sidebar-open-preview')).toBeDisabled();
+    const startup = await page.evaluate(() => window.ADORC_probe.startup());
+    expect(startup.milliseconds.shell).toBeLessThan(200);
+    expect(startup.milliseconds.inventory).toBeNull();
+
+    await expect(page.locator('.adrc-sidebar-open-preview')).toBeEnabled({ timeout: 4000 });
+    await page.locator('.adrc-sidebar-open-preview').click();
+    await waitForAdoReady(page, fixtures.DESIGN_PATH, userThreadCount(server.threads));
+    expect(new URL(page.url()).searchParams.get('path')).toBe(fixtures.DESIGN_PATH);
+    await expect(page.locator('.markdown-preview-container h1')).toContainText('Design Review');
+    await expect(page.locator('.adrc-sidebar-setup')).toBeHidden();
+  });
+
+  test('immediate sidebar stays hidden outside the PR Files tab', async ({ page }) => {
+    await setupAdoExtensionPage(page);
+    await page.evaluate(() => {
+      const url = new URL(location.href);
+      url.searchParams.set('_a', 'overview');
+      url.searchParams.delete('path');
+      history.pushState({}, '', url.href);
+    });
+    await expect(page.locator('.adrc-sidebar')).toBeHidden({ timeout: 1500 });
+    await expect(page.locator('.adrc-sidebar-launcher')).toBeHidden();
+  });
+
+  test('Preview action switches the selected Markdown file from Inline to Preview', async ({ page }) => {
+    const { server } = await setupAdoExtensionPage(page, {
+      hideInitialPreview: true,
+      keepInitialPathWithoutPreview: true,
+      waitForReady: false,
+    });
+    await expect(page.locator('.adrc-sidebar')).toBeVisible({ timeout: 500 });
+    await expect(page.locator('.adrc-sidebar-open-preview')).toHaveText('Open Preview', { timeout: 4000 });
+    await page.locator('.adrc-sidebar-open-preview').click();
+    await waitForAdoReady(page, fixtures.DESIGN_PATH, userThreadCount(server.threads));
+    await expect(page.locator('.markdown-preview-container h1')).toContainText('Design Review');
+    expect((await page.evaluate(() => window.ADORC_probe.viewMode())).currentMode).toBe('preview');
+  });
+
+  test('book shortcut opens Outline and explains Markdown Preview restoration', async ({ page }) => {
+    const { server } = await setupAdoExtensionPage(page, {
+      hideInitialPreview: true,
+      keepInitialPathWithoutPreview: true,
+      waitForReady: false,
+    });
+
+    await page.locator('.adrc-sidebar-outline-shortcut').click();
+    await expect(page.locator('.adrc-sidebar-tab[data-tab="outline"]'))
+      .toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('.adrc-sidebar-setup-message'))
+      .toContainText('to Markdown Preview');
+    await expect(page.locator('.adrc-sidebar-open-preview')).toHaveText('Opening Preview…');
+
+    await waitForAdoReady(page, fixtures.DESIGN_PATH, userThreadCount(server.threads));
+    await expect(page.locator('.adrc-sidebar-setup')).toBeHidden();
+    expect((await page.evaluate(() => window.ADORC_probe.viewMode())).currentMode).toBe('preview');
+  });
+
+  test('orphaned Markdown pending jump releases the Preview action', async ({ page }) => {
+    await setupAdoExtensionPage(page);
+    await page.evaluate((stalePath) => {
+      sessionStorage.setItem('adrc-pending-outline-jump-v1', JSON.stringify({
+        key: null,
+        path: stalePath,
+        requirePreview: true,
+        expiresAt: Date.now() + 90000,
+      }));
+      window.__ADO_FIXTURE__.preview.style.display = 'none';
+      window.__ADO_FIXTURE__.preview.innerHTML = '';
+      document.querySelector('.fixture-view-mode').textContent = 'Inline';
+    }, fixtures.OTHER_PATH);
+
+    await expect(page.locator('.adrc-sidebar-open-preview')).toHaveText('Open Preview', { timeout: 2000 });
+    expect((await page.evaluate(() => window.ADORC_probe.viewMode())).pendingOutlineJump).toBeNull();
+  });
+
+  test('current-file source failure keeps the sidebar visible with a Retry action', async ({ page }) => {
+    const { server } = await setupAdoExtensionPage(page, {
+      sourceFailures: { [fixtures.DESIGN_PATH]: 503 },
+      waitForReady: false,
+    });
+    await expect(page.locator('.adrc-sidebar')).toBeVisible({ timeout: 500 });
+    await expect(page.locator('.adrc-sidebar-open-preview')).toHaveText('Retry', { timeout: 4000 });
+    await expect(page.locator('.adrc-sidebar-setup-message')).toContainText('Could not prepare');
+    const startup = await page.evaluate(() => window.ADORC_probe.startup());
+    expect(startup.previewStatus).toBe('error');
+    expect(startup.previewError).toContain('503');
+
+    delete server.sourceFailures[fixtures.DESIGN_PATH];
+    await page.locator('.adrc-sidebar-open-preview').click();
+    await waitForAdoReady(page, fixtures.DESIGN_PATH, userThreadCount(server.threads));
+    await expect(page.locator('.adrc-sidebar-setup')).toBeHidden();
+    expect((await page.evaluate(() => window.ADORC_probe.startup())).previewStatus).toBe('ready');
+  });
+
+  test('Files-page setup explains when the pull request has no changed Markdown', async ({ page }) => {
+    await setupAdoExtensionPage(page, {
+      initialUrl: FAKE_PR_FILES_URL,
+      hideInitialPreview: true,
+      prChanges: [],
+      waitForReady: false,
+    });
+
+    await expect(page.locator('.adrc-sidebar')).toBeVisible({ timeout: 500 });
+    await expect(page.locator('.adrc-sidebar-setup-message'))
+      .toHaveText('No changed Markdown file is available in this pull request.', { timeout: 4000 });
+    await expect(page.locator('.adrc-sidebar-open-preview')).toBeDisabled();
+  });
+
   test('opens a cross-file thread through the native tree row without reloading or leaving Preview', async ({ page }) => {
     const { server } = await setupAdoExtensionPage(page);
     await page.evaluate(() => { window.__initialAdoPreview = window.__ADO_FIXTURE__.preview; });
@@ -29,6 +151,263 @@ test.describe('ADO SPA lifecycle and cross-file navigation', () => {
     expect(mode.previewVisible).toBe(true);
     expect(mode.pendingThreadJump).toBeNull();
     expect(mode.currentMode).toBe('preview');
+  });
+
+  test('tree diagnostics distinguish duplicate basenames by reconstructed aria-level path', async ({ page }) => {
+    await setupAdoExtensionPage(page);
+    await page.evaluate(() => {
+      const tree = document.querySelector('.fixture-tree');
+      const rows = [
+        ['probe-public', 'public', 1, true],
+        ['probe-cu-cli', 'cu-cli', 2, true],
+        ['probe-nested-security', 'SECURITY.md', 3, null],
+        ['probe-root-security', 'SECURITY.md', 1, null],
+        ['probe-unrelated', 'unrelated.md', 1, null],
+      ];
+      rows.forEach(([id, label, level, expanded]) => {
+        const row = document.createElement('div');
+        row.id = id;
+        row.className = 'bolt-tree-row';
+        row.setAttribute('role', 'treeitem');
+        row.setAttribute('aria-level', String(level));
+        if (expanded != null) row.setAttribute('aria-expanded', String(expanded));
+        row.innerHTML = `<div class="bolt-tree-cell"><div class="bolt-table-cell-content"><span class="bolt-list-cell-text">${label}</span></div></div>`;
+        tree.appendChild(row);
+      });
+    });
+
+    const root = await page.evaluate(() => window.ADORC_probe.fileTargets('/SECURITY.md'));
+    const nested = await page.evaluate(() => window.ADORC_probe.fileTargets('/public/cu-cli/SECURITY.md'));
+    const missing = await page.evaluate(() => window.ADORC_probe.fileTargets('/issues/missing.md'));
+    expect(root.map((entry) => entry.rowId)).toEqual(['probe-root-security']);
+    expect(nested.map((entry) => entry.rowId)).toEqual(['probe-nested-security']);
+    expect(missing).toEqual([]);
+  });
+
+  test('an unmaterialized file row falls back to the exact same-PR route', async ({ page }) => {
+    const { server } = await setupAdoExtensionPage(page);
+    await page.evaluate(() => document.querySelector('#tree-other')?.remove());
+
+    await Promise.all([
+      page.waitForURL((url) => url.searchParams.get('path') === fixtures.OTHER_PATH),
+      page.evaluate((path) => { void window.ADORC_probe.openFile(path); }, fixtures.OTHER_PATH),
+    ]);
+    expect(new URL(page.url()).searchParams.get('path')).toBe(fixtures.OTHER_PATH);
+    await expect.poll(() => server.pageLoads).toBe(2);
+    expect(server.pageLoads).toBe(2);
+  });
+
+  test('a pending change resumes after the exact-route reload fallback', async ({ page }) => {
+    const { server } = await setupAdoExtensionPage(page);
+    await page.evaluate(() => document.querySelector('#tree-other')?.remove());
+
+    await Promise.all([
+      page.waitForURL((url) => url.searchParams.get('path') === fixtures.OTHER_PATH),
+      page.locator(`.adrc-sidebar-change-card[data-path="${fixtures.OTHER_PATH}"]`).click(),
+    ]);
+    await page.evaluate(() => {
+      window.__ADO_FIXTURE__.preview.style.display = 'none';
+      window.__ADO_FIXTURE__.preview.innerHTML = '';
+      document.querySelector('.fixture-view-mode').textContent = 'Inline';
+    });
+    await injectAdoExtension(page);
+    await waitForAdoReady(page, fixtures.OTHER_PATH, userThreadCount(server.threads));
+    await expect(page.locator('.markdown-preview-container .adrc-change-target-pulse')).toHaveCount(1);
+    expect((await page.evaluate(() => window.ADORC_probe.viewMode())).currentMode).toBe('preview');
+    expect((await page.evaluate(() => window.ADORC_probe.viewMode())).pendingChangeJump).toBeNull();
+    expect(server.pageLoads).toBe(2);
+  });
+
+  test('a superseded tree lookup cannot reload or override the newer target', async ({ page }) => {
+    const { server } = await setupAdoExtensionPage(page);
+    await page.evaluate(({ first, second }) => {
+      const staleRow = document.querySelector('#tree-other');
+      staleRow.replaceWith(staleRow.cloneNode(true));
+      void window.ADORC_probe.openFile(first);
+      setTimeout(() => { void window.ADORC_probe.openFile(second); }, 50);
+    }, { first: fixtures.OTHER_PATH, second: fixtures.NEW_PATH });
+
+    await expect.poll(() => new URL(page.url()).searchParams.get('path'))
+      .toBe(fixtures.NEW_PATH);
+    await page.waitForTimeout(2100);
+    expect(new URL(page.url()).searchParams.get('path')).toBe(fixtures.NEW_PATH);
+    expect(server.pageLoads).toBe(1);
+  });
+
+  test('activates an exact TreeEx row whose consumer listens on mouse press', async ({ page }) => {
+    const { server } = await setupAdoExtensionPage(page);
+    await page.evaluate((path) => {
+      const staleRow = document.querySelector('#tree-other');
+      const row = staleRow.cloneNode(true);
+      staleRow.replaceWith(row);
+      row.addEventListener('mousedown', () => window.__ADO_FIXTURE__.openPath(path), { once: true });
+    }, fixtures.OTHER_PATH);
+
+    await page.evaluate((path) => window.ADORC_probe.openFile(path), fixtures.OTHER_PATH);
+    await expect.poll(() => new URL(page.url()).searchParams.get('path'))
+      .toBe(fixtures.OTHER_PATH);
+    expect(server.pageLoads).toBe(1);
+  });
+
+  test('bubbles through current React TreeEx callbacks when untrusted DOM gestures are ignored', async ({ page }) => {
+    const { server } = await setupAdoExtensionPage(page);
+    await page.evaluate((path) => {
+      const staleRow = document.querySelector('#tree-other');
+      const row = staleRow.cloneNode(true);
+      staleRow.replaceWith(row);
+      row.closest('.fixture-tree').__reactProps$fixture = {
+        onClick: (event) => {
+          if (event.target.closest('[role="treeitem"]') === row) {
+            window.__ADO_FIXTURE__.openPath(path);
+          }
+        }
+      };
+    }, fixtures.OTHER_PATH);
+
+    await page.evaluate((path) => window.ADORC_probe.openFile(path), fixtures.OTHER_PATH);
+    await expect.poll(() => new URL(page.url()).searchParams.get('path'), { timeout: 6000 })
+      .toBe(fixtures.OTHER_PATH);
+    expect(server.pageLoads).toBe(1);
+  });
+
+  test('a native tree click cancels a slow pending sidebar navigation', async ({ page }) => {
+    const { server } = await setupAdoExtensionPage(page);
+    await page.evaluate(() => {
+      // Strip the fixture's activation listener so the extension remains in
+      // its native activation retry window until the reviewer chooses a file.
+      const staleRow = document.querySelector('#tree-other');
+      staleRow.replaceWith(staleRow.cloneNode(true));
+    });
+
+    await page.locator(`.adrc-sidebar-change-card[data-path="${fixtures.OTHER_PATH}"]`).click();
+    await page.waitForTimeout(100);
+    await page.locator('#tree-deleted').click();
+
+    await expect.poll(() => new URL(page.url()).searchParams.get('path'))
+      .toBe(fixtures.DELETED_PATH);
+    await expect(page.locator('.adrc-sidebar-setup')).toBeVisible();
+    await expect(page.locator('.adrc-sidebar-open-preview')).toHaveText('Open Markdown Preview');
+    expect((await page.evaluate(() => window.ADORC_probe.viewMode())).pendingChangeJump).toBeNull();
+
+    // The canceled activation must not later win its retry race or invoke the
+    // exact-route reload fallback for the stale sidebar target.
+    await page.waitForTimeout(4500);
+    expect(new URL(page.url()).searchParams.get('path')).toBe(fixtures.DELETED_PATH);
+    expect(server.pageLoads).toBe(1);
+  });
+
+  test('expands an exact collapsed ancestor before activating its file', async ({ page }) => {
+    const { server } = await setupAdoExtensionPage(page);
+    await page.evaluate((path) => {
+      const existing = document.querySelector('#tree-other');
+      existing.setAttribute('aria-level', '2');
+      existing.removeAttribute('aria-label');
+      const tree = document.querySelector('.fixture-tree');
+      const folder = document.createElement('div');
+      folder.id = 'tree-docs-folder';
+      folder.className = 'bolt-tree-row';
+      folder.setAttribute('role', 'treeitem');
+      folder.setAttribute('aria-level', '1');
+      folder.setAttribute('aria-expanded', 'false');
+      folder.innerHTML = '<div class="bolt-tree-cell"><div class="bolt-table-cell-content"><span class="bolt-tree-expand-button">›</span><span class="bolt-list-cell-text">docs</span></div></div>';
+      folder.querySelector('.bolt-tree-expand-button').addEventListener('click', () => {
+        folder.setAttribute('aria-expanded', 'true');
+        folder.after(existing);
+      });
+      tree.insertBefore(folder, existing);
+      existing.remove();
+    }, fixtures.OTHER_PATH);
+
+    const before = await page.evaluate((path) => window.ADORC_probe.fileTree(path), fixtures.OTHER_PATH);
+    expect(before.ancestor, JSON.stringify(before, null, 2)).not.toBeNull();
+    expect(before.ancestor.rowId).toBe('tree-docs-folder');
+    expect(before.ancestor?.reconstructedPath).toBe('/docs');
+
+    await page.evaluate((path) => { void window.ADORC_probe.openFile(path); }, fixtures.OTHER_PATH);
+    await expect.poll(() => new URL(page.url()).searchParams.get('path')).toBe(fixtures.OTHER_PATH);
+    await expect(page.locator('#tree-docs-folder')).toHaveAttribute('aria-expanded', 'true');
+    expect(server.pageLoads).toBe(1);
+  });
+
+  test('materializes an offscreen virtualized tree row before using the reload fallback', async ({ page }) => {
+    const { server } = await setupAdoExtensionPage(page);
+    await page.evaluate((targetPath) => {
+      document.querySelector('#tree-other')?.remove();
+      const tree = document.querySelector('.fixture-tree');
+      const scroller = document.createElement('div');
+      scroller.id = 'virtual-tree-scroller';
+      scroller.style.cssText = 'position:relative;height:72px;overflow-y:auto;overflow-x:hidden;';
+      const canvas = document.createElement('div');
+      canvas.style.cssText = 'position:relative;height:1152px;';
+      scroller.appendChild(canvas);
+      tree.appendChild(scroller);
+
+      const targetIndex = 30;
+      const render = () => {
+        const start = Math.max(0, Math.floor(scroller.scrollTop / 32));
+        canvas.replaceChildren();
+        for (let index = start; index < Math.min(36, start + 4); index++) {
+          const row = document.createElement('div');
+          const isTarget = index === targetIndex;
+          row.id = `virtual-row-${index}`;
+          row.className = 'bolt-tree-row single-click-activation';
+          row.setAttribute('role', 'treeitem');
+          row.setAttribute('aria-level', '1');
+          row.setAttribute('data-row-index', String(index));
+          row.style.cssText = `position:absolute;left:0;right:0;top:${index * 32}px;height:32px;`;
+          const label = isTarget ? targetPath.replace(/^\//, '') : `virtual/file-${index}.md`;
+          row.innerHTML = `<div class="bolt-tree-cell"><div class="bolt-table-cell-content"><span class="bolt-list-cell-text">${label}</span></div></div>`;
+          if (isTarget) row.addEventListener('click', () => window.__ADO_FIXTURE__.openPath(targetPath));
+          canvas.appendChild(row);
+        }
+      };
+      scroller.addEventListener('scroll', render);
+      render();
+    }, fixtures.OTHER_PATH);
+
+    await page.evaluate((path) => { void window.ADORC_probe.openFile(path); }, fixtures.OTHER_PATH);
+    await expect.poll(() => new URL(page.url()).searchParams.get('path')).toBe(fixtures.OTHER_PATH);
+    await waitForAdoReady(page, fixtures.OTHER_PATH, userThreadCount(server.threads));
+    expect(server.pageLoads).toBe(1);
+    await expect(page.locator('#virtual-row-30')).toHaveCount(1);
+  });
+
+  test('a recycled connected tree row cannot redirect navigation to a folder', async ({ page }) => {
+    const { server } = await setupAdoExtensionPage(page);
+    const recycledFolder = '/public/sdk/resources/openapi/2026-06-01-preview';
+    await page.evaluate(({ targetPath, folderPath }) => {
+      const original = document.querySelector('#tree-other');
+      const row = original.cloneNode(true);
+      original.replaceWith(row);
+      row.setAttribute('data-row-index', '30');
+      row.addEventListener('click', () => {
+        // Model TreeEx retaining the same connected element while assigning it
+        // to a different virtual index immediately after the first gesture.
+        row.id = 'recycled-folder-row';
+        row.setAttribute('data-row-index', '31');
+        row.setAttribute('aria-expanded', 'false');
+        row.setAttribute('aria-label', folderPath);
+        row.querySelector('.bolt-table-cell-content').textContent = '2026-06-01-preview';
+      }, { once: true });
+      window.__recycledFolderActivated = false;
+      const redirectToFolder = () => {
+        window.__recycledFolderActivated = true;
+        sessionStorage.setItem('fixture-recycled-folder-activated', '1');
+        history.pushState({}, '', location.pathname + '?_a=files&path=' + encodeURIComponent(folderPath));
+      };
+      row.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') redirectToFolder();
+      });
+      row.addEventListener('dblclick', redirectToFolder);
+      window.__recycledTargetPath = targetPath;
+    }, { targetPath: fixtures.OTHER_PATH, folderPath: recycledFolder });
+
+    await page.evaluate((path) => { void window.ADORC_probe.openFile(path); }, fixtures.OTHER_PATH);
+    await expect.poll(() => new URL(page.url()).searchParams.get('path'), { timeout: 7000 })
+      .toBe(fixtures.OTHER_PATH);
+    expect(new URL(page.url()).searchParams.get('path')).not.toBe(recycledFolder);
+    expect(await page.evaluate(() => sessionStorage.getItem('fixture-recycled-folder-activated'))).toBeNull();
+    expect(server.pageLoads).toBe(2);
   });
 
   test('reinitializes a reused Preview container without stale buttons, badges, headings, or duplicate sidebars', async ({ page }) => {

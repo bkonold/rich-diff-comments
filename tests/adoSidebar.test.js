@@ -32,6 +32,12 @@ test('ADO manifest loads shared sidebar and Changes helpers before content.js', 
   assert.ok(sidebarIndex < contentIndex, 'Sidebar helpers must load before content.js');
   assert.ok(outlineIndex < contentIndex, 'Outline helpers must load before content.js');
   assert.ok(changesIndex < contentIndex, 'Changes helpers must load before content.js');
+  assert.equal(manifest.content_scripts[0].run_at, 'document_end', 'ADO sidebar should mount as soon as the DOM is ready');
+});
+
+test('ADO exposes a runtime revision for live loaded-script verification', () => {
+  assert.match(content, /const RUNTIME_REVISION = '2026-09-03-top-links-r9'/);
+  assert.match(content, /revision: RUNTIME_REVISION/);
 });
 
 test('ADO sidebar renders Changes, Threads, Outline tabs in GitHub parity order', () => {
@@ -50,13 +56,14 @@ test('ADO sidebar renders Changes, Threads, Outline tabs in GitHub parity order'
 });
 
 test('ADO Changes loads the latest PR inventory and compares target/head sources with bounded concurrency', () => {
-  assert.match(content, /adapter\.resolveIds\(ctx\)\.then\(\(\) => adapter\.getPullRequest\(ctx\)\)/);
+  assert.match(content, /resolveIdsOnce\(\)\.then\(\(\) => withTimeout\(/);
+  assert.match(content, /adapter\.getPullRequest\(ctx\)/);
   assert.match(content, /lastMergeTargetCommit/);
   assert.match(content, /versionType:\s*'commit'/);
   assert.match(content, /function getBaseFileSource\(filePath\)/);
   assert.match(content, /adapter\.listPullRequestChanges\(ctx\)/);
   assert.match(content, /adapter\.normalizePullRequestChange\(entry\)/);
-  assert.match(content, /mapWithConcurrency\([\s\S]*?prMarkdownChanges,[\s\S]*?4,/);
+  assert.match(content, /const queue = prMarkdownChanges[\s\S]*?mapWithConcurrency\(queue, 4,/);
   assert.match(content, /GRDC\.buildPrChangeStops\(change, baseSource, headSource/);
   assert.match(content, /changeHeadSourcePromises/);
   assert.match(content, /changeBaseSourcePromises/);
@@ -131,7 +138,7 @@ test('ADO collapsed sidebar hides body/tabs but keeps both header nav clusters r
   const collapsedBody = ruleBody('.adrc-sidebar-collapsed .adrc-sidebar-body');
   const collapsedTabs = ruleBody('.adrc-sidebar-collapsed .adrc-sidebar-tabs');
   assert.match(collapsed, /height\s*:\s*42px\s*!important/);
-  assert.match(collapsed, /width\s*:\s*480px\s*!important/);
+  assert.match(collapsed, /width\s*:\s*520px\s*!important/);
   assert.match(collapsedBody, /display\s*:\s*none/);
   assert.match(collapsedTabs, /display\s*:\s*none/);
   assert.doesNotMatch(css, /\.adrc-sidebar-collapsed\s+\.adrc-sidebar-header\s*\{[^}]*display\s*:\s*none/);
@@ -140,6 +147,10 @@ test('ADO collapsed sidebar hides body/tabs but keeps both header nav clusters r
 });
 
 test('ADO header exposes scoped Changes and Threads nav controls with live counters', () => {
+  assert.match(content, /SIDEBAR_HAMBURGER_SVG/);
+  assert.match(content, /SIDEBAR_BOOK_SVG/);
+  assert.match(content, /class="adrc-sidebar-icon adrc-sidebar-outline-shortcut"/);
+  assert.match(content, /showOutlineAndEnsurePreview/);
   assert.match(content, /class="adrc-sidebar-nav-cluster adrc-sidebar-changes-nav"/);
   assert.match(content, /class="adrc-sidebar-nav-cluster adrc-sidebar-thread-nav"/);
   assert.match(content, /class="[^"]*adrc-sidebar-prev-change[^"]*"/);
@@ -222,6 +233,11 @@ test('ADO Threads pane supports persisted unresolved filtering', () => {
   assert.match(content, /aria-pressed/);
 });
 
+test('ADO Threads pane includes only Markdown review destinations', () => {
+  assert.match(content, /function normalizeSidebarThread\(thread\)[\s\S]*?GRDC\.isMarkdownPath\(path\)[\s\S]*?if \(!markdownPath\) return null/);
+  assert.match(content, /function readPendingThreadJump\(\)[\s\S]*?GRDC\.isMarkdownPath\(pending\.path\)[\s\S]*?if \(!pending \|\| !markdownPath/);
+});
+
 test('ADO cross-file thread navigation stores and resumes a pending jump', () => {
   assert.match(content, /SIDEBAR_PENDING_THREAD_KEY/);
   assert.match(content, /sessionStorage\.setItem\(SIDEBAR_PENDING_THREAD_KEY/);
@@ -235,7 +251,19 @@ test('ADO cross-file change navigation stores a stable key and resumes against t
   assert.match(content, /function continuePendingChangeNavigation\(\)/);
   assert.match(content, /function resumePendingChangeJump\(attempt\)/);
   assert.match(content, /sidebarChangeStops\.findIndex\(\(stop\) => stop\.key === pending\.key\)/);
+  assert.match(content, /readPendingChangeJump\(\)\?\.key \|\|/);
+  assert.match(content, /if \(readPendingChangeJump\(\)\) return/);
   assert.match(content, /function scrollToCurrentChange\(index\)/);
+});
+
+test('ADO route remaps reuse thread inventory while mutations force a refresh', () => {
+  assert.match(content, /loadSidebarThreadInventory\(\{ force: options\?\.forceInventory === true \}\)/);
+  assert.match(content, /sidebarThreadItems\.map\(\(item\) => item\.thread\)/);
+  assert.match(content, /refreshThreadBadges\(\{ forceInventory: true \}\)/);
+  assert.match(content, /renderPath !== currentFilePathCached/);
+  assert.match(content, /if \(readPendingThreadJump\(\)\) return/);
+  assert.match(content, /generation === sidebarThreadsLoadGeneration/);
+  assert.match(content, /loadSidebarThreadInventory\(\)\.catch\(\(\) => \{ \/\* warning already logged \*\/ \}\)/);
 });
 
 test('ADO cross-file thread navigation explicitly restores Markdown Preview', () => {
@@ -258,22 +286,102 @@ test('ADO Preview restoration is one-shot and exposes view-mode diagnostics', ()
   assert.match(content, /if \(previewRestoreState\.phase !== 'selecting'\)/);
   assert.match(content, /viewMode\(\)/);
   assert.match(content, /visibleMenuOptions/);
+  assert.match(content, /PREVIEW_RESTORE_RETRY_MS = 10000/);
+  assert.match(content, /PREVIEW_RESTORE_MAX_RETRIES = 2/);
+  assert.match(content, /PREVIEW_RESTORE_MAX_TOTAL_MS = 20000/);
+  assert.match(content, /previewRestoreState\.gaveUp = true/);
+  assert.match(content, /Switching \$\{pending\.path\} to Markdown Preview/);
+  assert.match(content, /PENDING_NAVIGATION_TTL_MS = 90000/);
 });
 
-test('ADO cross-file thread navigation activates a scored native tree row without URL fallback', () => {
+test('ADO cross-file navigation requires exact tree paths and uses a same-PR fallback', () => {
   assert.match(content, /function findBestAdoFileTreeTarget\(path\)/);
+  assert.match(content, /function getAdoFileTreeEntries\(\)/);
   assert.match(content, /\[role="treeitem"\]/);
   assert.match(content, /\.bolt-tree-row/);
   assert.match(content, /\.bolt-tree-cell \.bolt-table-cell-content/);
-  assert.match(content, /fileTarget\.target\.click\(\)/);
+  assert.match(content, /GRDC\.buildAdoTreePathEntries/);
+  assert.match(content, /GRDC\.adoTreeEntryMatchesPath/);
+  assert.match(content, /GRDC\.findDeepestAdoTreeAncestor/);
+  assert.match(content, /\.bolt-tree-expand-button/);
+  assert.match(content, /function dispatchAdoTreeActivation\(target\)/);
+  assert.match(content, /new PointerEvent\('pointerdown'/);
+  assert.match(content, /new MouseEvent\('mousedown'/);
+  assert.match(content, /dispatchAdoTreeActivation\(currentTarget\.target\)/);
+  assert.match(content, /function invokeAdoReactTreeActivation\(fileTarget\)/);
+  assert.match(content, /Object\.getOwnPropertyNames\(element\)/);
+  assert.match(content, /invokeAdoReactTreeActivation\(currentTarget\)/);
+  assert.match(content, /function navigateToExactAdoFileRoute\(path\)/);
+  assert.match(content, /rememberExactRouteFallback\(normalizedPath\)/);
+  assert.match(content, /form\.method = 'GET'/);
+  assert.match(content, /HTMLFormElement\.prototype\.submit\.call\(form\)/);
+  assert.match(content, /function exactAdoFileHref\(path\)/);
+  assert.match(content, /card\.href = exactAdoFileHref\(item\.path\)/);
+  assert.match(content, /card\.target = '_top'/);
+  assert.match(content, /card\.href = exactAdoFileHref\(stop\.path\)/);
+  assert.match(content, /fileButton\.href = exactAdoFileHref\(entry\.path\)/);
+  assert.match(content, /function reconcileExactRouteFallback\(\)/);
+  assert.match(content, /using exact same-PR route fallback/);
   assert.match(content, /repos-changes-viewer/);
   assert.doesNotMatch(content, /const fileLink = links\.find/);
-  assert.doesNotMatch(content, /window\.location\.assign/);
-  assert.doesNotMatch(content, /fileTarget\.link\.click/);
+  assert.doesNotMatch(content, /labels\.some\(\(label\) => label === basename\)/);
+  assert.doesNotMatch(content, /score \+= 30(?!0)/);
+});
+
+test('ADO scans virtualized native tree rows before the exact-route fallback', () => {
+  assert.match(content, /function materializeAdoFileTreePath\(path, sequence\)/);
+  assert.match(content, /entry\.row\?\.isConnected && findScrollContainer\(entry\.row\) === scroller/);
+  assert.match(content, /Array\.from\(remembered\.values\(\)\)\.sort\(\(a, b\) => a\.rowIndex - b\.rowIndex\)/);
+  assert.match(content, /through materialized native ADO tree row/);
+  assert.match(content, /function activateAdoFileTreeTarget\(fileTarget, path, sequence\)/);
+  assert.match(content, /function currentAdoFileTreeTarget\(fileTarget, path\)/);
+  assert.match(content, /expectedIndex !== currentIndex/);
+  assert.match(content, /currentExact = exact && liveEntries\.find/);
+  assert.match(content, /!entry\.folder && GRDC\.adoTreeEntryMatchesPath\(entry, path\)/);
+  assert.match(content, /currentTarget\.row\.dispatchEvent\(new KeyboardEvent/);
+  assert.match(content, /new KeyboardEvent\('keydown'/);
+  assert.match(content, /new MouseEvent\('dblclick'/);
+  assert.doesNotMatch(content, /const target = exactLink \|\|/);
+});
+
+test('ADO mounts a Files-page sidebar before Preview and offers bounded progressive startup', () => {
+  const mountIndex = content.indexOf('ensureFilesPageShell();');
+  const observerIndex = content.indexOf('const mo = new MutationObserver');
+  assert.ok(mountIndex >= 0, 'Expected immediate sidebar mount');
+  assert.ok(observerIndex > mountIndex, 'Sidebar shell should mount before waiting for Preview mutations');
+  assert.match(content, /function isAdoFilesRoute\(\)/);
+  assert.match(content, /function ensureFilesPageShell\(\)[\s\S]*?buildSidebarPanel\(\);[\s\S]*?loadSidebarThreadInventory\(\)[\s\S]*?refreshChangesSidebar\(\);/);
+  assert.ok((content.match(/ensureFilesPageShell\(\);/g) || []).length >= 2, 'Expected initial and SPA-route shell checks');
+  assert.match(content, /adrc-sidebar-route-hidden/);
+  assert.match(content, /class="adrc-sidebar-setup"/);
+  assert.match(content, /class="adrc-sidebar-open-preview"/);
+  assert.match(content, /function openMarkdownPreviewFromSidebar\(\)/);
+  assert.match(content, /function ensurePrChangesInventory\(\)/);
+  assert.match(content, /prOutlinePromise = ensurePrChangesInventory\(\)/);
+  assert.match(content, /Analyzing Markdown files/);
+  assert.match(content, /Loading pull request outline… \$\{entries\.length\}\/\$\{prMarkdownChanges\.length\} files/);
+  assert.match(content, /ADO_REQUEST_TIMEOUT_MS = 30000/);
+  assert.match(content, /_pullRequestPromise = null;[\s\S]*?throw err/);
+  assert.match(content, /_sourceBranchPromise = null;[\s\S]*?throw err/);
+  assert.match(content, /_targetVersionPromise = null;[\s\S]*?throw err/);
+  assert.match(content, /startup\(\)/);
+  assert.match(css, /\.adrc-sidebar-setup/);
+  assert.match(css, /\.adrc-sidebar-open-preview/);
+});
+
+test('ADO native tree clicks supersede pending sidebar navigation', () => {
+  assert.match(content, /function cancelPendingNavigationOnNativeTreeClick\(event\)/);
+  assert.match(content, /if \(!event\.isTrusted \|\| event\.button !== 0\) return/);
+  assert.match(content, /const row = event\.target\?\.closest\?\.\('\[role="treeitem"\], \.bolt-tree-row'\)/);
+  assert.match(content, /adoFileNavigationSequence\+\+/);
+  assert.match(content, /clearPendingThreadJump\(\);[\s\S]*?clearPendingChangeJump\(\);[\s\S]*?clearPendingOutlineJump\(\);/);
+  assert.match(content, /document\.addEventListener\('click', cancelPendingNavigationOnNativeTreeClick, true\)/);
+  assert.match(content, /adoFileNavigationTargetPath = ''/);
+  assert.match(content, /sameAdoFilePath\(pending\.path, adoFileNavigationTargetPath\)/);
 });
 
 test('ADO `b` shortcut opens the integrated Outline tab without hijacking editors', () => {
-  assert.match(content, /function showOutlinePanel\(\)\s*\{\s*showSidebar\('outline'\)/);
+  assert.match(content, /function showOutlinePanel\(\)\s*\{\s*showOutlineAndEnsurePreview\(\)/);
   assert.match(content, /tag === 'INPUT' \|\| tag === 'TEXTAREA' \|\| tag === 'SELECT'/);
   assert.match(content, /label\.addEventListener\('click', \(\) => navigateToOutlineTarget/);
   assert.match(content, /function scrollToLiveOutlineHeading\(heading\)[\s\S]*?revealChangedBlock\(heading\.el\)[\s\S]*?scrollToWithStickyOffset\(heading\.el\)/);
@@ -305,6 +413,7 @@ test('ADO Outline cross-file rows preserve Preview and resume by stable heading 
   assert.match(content, /function continuePendingOutlineNavigation\(\)/);
   assert.match(content, /function resumePendingOutlineJump\(attempt\)/);
   assert.match(content, /outlineHeadings\.find\(\(heading\) => heading\.key === pending\.key\)/);
+  assert.match(content, /openAdoFilePath\(target\.path\)/);
 });
 
 test('ADO Outline has per-row and bulk fold controls backed by stable source keys', () => {
@@ -313,6 +422,7 @@ test('ADO Outline has per-row and bulk fold controls backed by stable source key
   assert.match(content, />Fold H2</);
   assert.match(content, />Fold H3</);
   assert.match(content, />Expand all</);
+  assert.match(content, /if \(readPendingThreadJump\(\)\) return/);
   assert.match(content, /function setOutlineHeadingCollapsed\(heading, collapsed\)/);
   assert.match(content, /function foldOutlineAtLevel\(level\)/);
   assert.match(content, /function expandAllOutlineSections\(\)/);

@@ -19,6 +19,30 @@ function requestsEndingWith(server, suffix) {
 }
 
 test.describe('ADO PR-wide Changes', () => {
+  test('publishes completed file changes while a slow Markdown file is still loading', async ({ page }) => {
+    await setupAdoExtensionPage(page, {
+      waitForReady: false,
+      sourceDelays: {
+        [`${SOURCE_COMMIT}:${fixtures.OTHER_PATH}`]: 2500,
+        [`${COMMON_COMMIT}:${fixtures.OTHER_PATH}`]: 2500,
+      },
+    });
+
+    await expect(page.locator(`.adrc-sidebar-change-card[data-path="${fixtures.DESIGN_PATH}"]`).first())
+      .toBeVisible({ timeout: 2000 });
+    const during = await page.evaluate(() => window.ADORC_probe.startup());
+    expect(during.changesStatus).toBe('loading');
+    expect(during.analyzedFiles).toBeGreaterThan(0);
+    expect(during.analyzedFiles).toBeLessThan(during.markdownFiles);
+    await expect(page.locator('.adrc-sidebar-changes-summary')).toContainText('files analyzed');
+
+    await expect.poll(
+      () => page.evaluate(() => window.ADORC_probe.startup().changesStatus),
+      { timeout: 8000 }
+    ).toBe('ready');
+    await expect(page.locator('.adrc-sidebar-change-card')).toHaveCount(EXPECTED_STOP_COUNT);
+  });
+
   test('loads the latest cumulative inventory and groups every Markdown lifecycle', async ({ page }) => {
     const { server, pageErrors } = await setupAdoExtensionPage(page);
     const state = await page.evaluate(() => window.ADORC_probe.changes());
@@ -83,6 +107,49 @@ test.describe('ADO PR-wide Changes', () => {
     await expect(page.locator('.markdown-preview-container .adrc-change-target-pulse')).toHaveCount(1);
     await expect(page.locator('.adrc-sidebar-changes-count span')).toHaveText(`1/1 (${EXPECTED_STOP_COUNT})`);
     expect((await page.evaluate(() => window.ADORC_probe.viewMode())).pendingChangeJump).toBeNull();
+  });
+
+  test('cross-file navigation preserves the selected change and reuses PR-wide catalogs', async ({ page }) => {
+    const { server } = await setupAdoExtensionPage(page);
+    const before = {
+      iterations: requestsEndingWith(server, '/iterations').length,
+      changes: requestsEndingWith(server, '/iterations/2/changes').length,
+      threads: requestsEndingWith(server, '/threads').length,
+      items: requestsEndingWith(server, '/items').length,
+    };
+    await page.evaluate(() => {
+      const setup = document.querySelector('.adrc-sidebar-setup');
+      window.__firstRunSetupFlashedDuringNavigation = false;
+      window.__setupFlashObserver = new MutationObserver(() => {
+        const message = setup?.querySelector('.adrc-sidebar-setup-message')?.textContent || '';
+        if (!setup?.hidden && /Open a changed Markdown file/.test(message)) {
+          window.__firstRunSetupFlashedDuringNavigation = true;
+        }
+      });
+      window.__setupFlashObserver.observe(setup, {
+        attributes: true,
+        childList: true,
+        characterData: true,
+        subtree: true,
+        attributeFilter: ['hidden']
+      });
+    });
+
+    const selected = page.locator(
+      `.adrc-sidebar-change-card[data-path="${fixtures.RENAMED_PATH}"]`
+    ).last();
+    await selected.click();
+    await waitForAdoReady(page, fixtures.RENAMED_PATH, userThreadCount(server.threads));
+    await expect.poll(() => page.evaluate(() => window.ADORC_probe.sidebar().activeChangeIndex))
+      .toBe(EXPECTED_STOP_COUNT - 1);
+    await expect(page.locator('.markdown-preview-container .adrc-change-target-pulse')).toHaveCount(1);
+
+    expect(await page.evaluate(() => window.__firstRunSetupFlashedDuringNavigation)).toBe(false);
+    expect(server.pageLoads).toBe(1);
+    expect(requestsEndingWith(server, '/iterations')).toHaveLength(before.iterations);
+    expect(requestsEndingWith(server, '/iterations/2/changes')).toHaveLength(before.changes);
+    expect(requestsEndingWith(server, '/threads')).toHaveLength(before.threads);
+    expect(requestsEndingWith(server, '/items')).toHaveLength(before.items);
   });
 
   test('NEW FILE is one summary card and opens at the top of its Preview', async ({ page }) => {
