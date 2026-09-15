@@ -291,20 +291,31 @@ instead of notifying ADO's SPA router first. A short-lived session marker
 verifies that ADO retained the requested path; if ADO still rejects it, the
 pending sidebar jump is released instead of repeatedly pinning navigation.
 
-**Cross-file sidebar cards must be real links when the leaf is not currently
-materialized.** Live testing confirmed both a manual native-tree click and an
-address-bar navigation succeed, while every delayed script-created navigation
-is restored to ADO's previously selected folder. Changes, Threads, and Outline
-destinations therefore carry clean same-PR `href` values. A trusted user click
-uses the browser's default link navigation after synchronously saving the
-pending destination. If an exact native row is already visible, the handler
-still prevents the link default and uses the faster SPA path.
+**2026-09-04 live result: the GET fallback is not stable during ADO startup.**
+The new document initially loaded with the requested Markdown `?path=`, then
+ADO's PR viewer rewrote it during hydration to its previously selected
+extensionless directory (`openapi/2026-06-01-preview`). The subsequent
+`Failed to fetch` inventory errors are consistent with requests being aborted
+by that full-document navigation; they are symptoms, not evidence that MSAL or
+the REST endpoints initiated the redirect. The browser's permissions-policy
+`unload` warnings are emitted by ADO bundles and are unrelated.
 
-ADO's document-level router also intercepts ordinary same-tab anchors and can
-restore the prior folder. Cross-file sidebar links therefore use `_top` and are
-never prevented merely because an exact virtual row is visible. Only same-file
-cards stay in-page. This forces browser navigation semantics from the trusted
-click rather than re-entering TreeEx or the delegated SPA link handler.
+The experimental runtime now keeps a bounded trace in session storage so it
+survives this document replacement. `ADORC_probe.navigationTraceText()` reports
+the initiating sidebar surface, exact TreeEx candidate/activation method,
+fallback submission, each document ID, route rewrites, automatic Preview-mode
+clicks, pending-jump state, and inventory/catalog restart or reuse. Use
+`copy(ADORC_probe.navigationTraceText())` immediately after one reproduction;
+clear earlier attempts first with `ADORC_probe.clearNavigationTrace()`.
+
+**Cross-file sidebar cards remain real links, but the current experiment routes
+their ordinary clicks through one observable path.** Changes, Threads, and
+Outline destinations retain clean same-PR `href` values and `_top` as a manual
+fallback, while the click handler prevents the default and calls the shared
+native-tree-first router. This makes the initiating surface and every fallback
+decision traceable. Live testing of this unified-router experiment still ended
+at ADO's previously selected directory, disproving the hypothesis that the
+sidebar anchor's default navigation alone caused the issue.
 
 ## Changes tab — source diff, not DOM markers
 

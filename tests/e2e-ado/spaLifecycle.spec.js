@@ -12,6 +12,30 @@ const {
 const fixtures = require('./fixtures/sources');
 
 test.describe('ADO SPA lifecycle and cross-file navigation', () => {
+  test('navigation diagnostics are bounded and do not navigate or refetch', async ({ page }) => {
+    const { server } = await setupAdoExtensionPage(page);
+    const before = {
+      href: page.url(),
+      pageLoads: server.pageLoads,
+      requests: server.requests.length,
+    };
+
+    const trace = await page.evaluate(() => {
+      for (let index = 0; index < 220; index++) {
+        window.ADORC_probe.markNavigationTrace('bounded-test', { index });
+      }
+      return window.ADORC_probe.navigationTrace();
+    });
+
+    expect(trace.limit).toBe(180);
+    expect(trace.entries).toHaveLength(180);
+    expect(trace.entries.at(-1).event).toBe('probe.bounded-test');
+    expect(trace.entries.at(-1).details.index).toBe(219);
+    expect(page.url()).toBe(before.href);
+    expect(server.pageLoads).toBe(before.pageLoads);
+    expect(server.requests).toHaveLength(before.requests);
+  });
+
   test('shows the sidebar immediately on Files and opens the first Markdown Preview', async ({ page }) => {
     const { server } = await setupAdoExtensionPage(page, {
       initialUrl: FAKE_PR_FILES_URL,
@@ -195,6 +219,11 @@ test.describe('ADO SPA lifecycle and cross-file navigation', () => {
     expect(new URL(page.url()).searchParams.get('path')).toBe(fixtures.OTHER_PATH);
     await expect.poll(() => server.pageLoads).toBe(2);
     expect(server.pageLoads).toBe(2);
+    await injectAdoExtension(page);
+    const trace = await page.evaluate(() => window.ADORC_probe.navigationTrace());
+    expect(new Set(trace.entries.map((entry) => entry.documentId)).size).toBeGreaterThan(1);
+    expect(trace.entries.some((entry) => entry.event === 'fallback.submitted')).toBe(true);
+    expect(trace.entries.filter((entry) => entry.event === 'document.loaded').length).toBeGreaterThan(1);
   });
 
   test('a pending change resumes after the exact-route reload fallback', async ({ page }) => {

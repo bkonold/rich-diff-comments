@@ -36,8 +36,20 @@ test('ADO manifest loads shared sidebar and Changes helpers before content.js', 
 });
 
 test('ADO exposes a runtime revision for live loaded-script verification', () => {
-  assert.match(content, /const RUNTIME_REVISION = '2026-09-03-top-links-r9'/);
+  assert.match(content, /const RUNTIME_REVISION = '2026-09-04-navigation-trace-r11'/);
   assert.match(content, /revision: RUNTIME_REVISION/);
+});
+
+test('ADO exposes a bounded navigation trace that survives exact-route reloads', () => {
+  assert.match(content, /const NAVIGATION_TRACE_KEY = 'adrc-navigation-trace-v1'/);
+  assert.match(content, /const NAVIGATION_TRACE_LIMIT = 180/);
+  assert.match(content, /sessionStorage\.setItem\(NAVIGATION_TRACE_KEY/);
+  assert.match(content, /navigationTrace\(\) \{/);
+  assert.match(content, /navigationTraceText\(\) \{/);
+  assert.match(content, /clearNavigationTrace\(\) \{/);
+  assert.match(content, /recordNavigationTrace\('fallback\.submitted'/);
+  assert.match(content, /recordNavigationTrace\('fallback\.rejected'/);
+  assert.match(content, /recordNavigationTrace\('route\.changed'/);
 });
 
 test('ADO sidebar renders Changes, Threads, Outline tabs in GitHub parity order', () => {
@@ -383,7 +395,7 @@ test('ADO native tree clicks supersede pending sidebar navigation', () => {
 test('ADO `b` shortcut opens the integrated Outline tab without hijacking editors', () => {
   assert.match(content, /function showOutlinePanel\(\)\s*\{\s*showOutlineAndEnsurePreview\(\)/);
   assert.match(content, /tag === 'INPUT' \|\| tag === 'TEXTAREA' \|\| tag === 'SELECT'/);
-  assert.match(content, /label\.addEventListener\('click', \(\) => navigateToOutlineTarget/);
+  assert.match(content, /label\.addEventListener\('click', \(event\) => \{[\s\S]*?event\.preventDefault\(\);[\s\S]*?navigateToOutlineTarget\(target\);/);
   assert.match(content, /function scrollToLiveOutlineHeading\(heading\)[\s\S]*?revealChangedBlock\(heading\.el\)[\s\S]*?scrollToWithStickyOffset\(heading\.el\)/);
 });
 
@@ -413,7 +425,7 @@ test('ADO Outline cross-file rows preserve Preview and resume by stable heading 
   assert.match(content, /function continuePendingOutlineNavigation\(\)/);
   assert.match(content, /function resumePendingOutlineJump\(attempt\)/);
   assert.match(content, /outlineHeadings\.find\(\(heading\) => heading\.key === pending\.key\)/);
-  assert.match(content, /openAdoFilePath\(target\.path\)/);
+  assert.match(content, /openAdoFilePath\(target\.path, \{ source: 'outline\.target' \}\)/);
 });
 
 test('ADO Outline has per-row and bulk fold controls backed by stable source keys', () => {
