@@ -596,6 +596,11 @@ outside Azure DevOps' virtualized materialized range.
   Prevent default only for same-file scrolling.
 - Retain the exact-route reload only as a final safety fallback when the native
   tree cannot expose the requested file at all.
+- Before that final document reload, preserve a bounded, short-lived snapshot
+  of the PR-wide Changes, Threads, and Outline catalogs in session storage.
+  Restore it only for the pending exact-route navigation so the new document
+  remaps the active Preview without repeating every file's source comparison;
+  never persist raw Markdown source in the snapshot.
 - Keep the Threads catalog scoped to `.md` / `.markdown` files, matching the
   GitHub extension's rendered-review sidebar. Azure DevOps returns threads for
   every file type, but a non-Markdown thread has no Preview destination for

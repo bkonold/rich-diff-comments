@@ -36,7 +36,7 @@ test('ADO manifest loads shared sidebar and Changes helpers before content.js', 
 });
 
 test('ADO exposes a runtime revision for live loaded-script verification', () => {
-  assert.match(content, /const RUNTIME_REVISION = '2026-09-04-navigation-trace-r11'/);
+  assert.match(content, /const RUNTIME_REVISION = '2026-09-15-fallback-catalog-cache-r12'/);
   assert.match(content, /revision: RUNTIME_REVISION/);
 });
 
@@ -50,6 +50,21 @@ test('ADO exposes a bounded navigation trace that survives exact-route reloads',
   assert.match(content, /recordNavigationTrace\('fallback\.submitted'/);
   assert.match(content, /recordNavigationTrace\('fallback\.rejected'/);
   assert.match(content, /recordNavigationTrace\('route\.changed'/);
+});
+
+test('ADO preserves compact PR catalogs across an exact-route document fallback', () => {
+  assert.match(content, /const PR_SESSION_CATALOG_CACHE_KEY = 'adrc-pr-session-catalog-v1'/);
+  assert.match(content, /function persistPrSessionCatalogSnapshot\(reason\)/);
+  assert.match(content, /function restorePrSessionCatalogSnapshot\(\)/);
+  assert.match(content, /persistPrSessionCatalogSnapshot\('exact-route-fallback'\)/);
+  assert.match(content, /restorePrSessionCatalogSnapshot\(\);\s*ensureFilesPageShell\(\);/);
+  assert.match(content, /prChangesInventoryPromise = Promise\.resolve\(prMarkdownChanges\)/);
+  assert.match(content, /prChangesPromise = Promise\.resolve\(sidebarChangeStops\)/);
+  assert.match(content, /prOutlinePromise = Promise\.resolve\(prOutlineCatalog\)/);
+  assert.match(content, /sidebarThreadsLoadPromise = Promise\.resolve\(snapshot\.threads\)/);
+  assert.match(content, /snapshot\.threads = null;[\s\S]*?snapshot\.outline = null;[\s\S]*?snapshot\.changes = null;/);
+  assert.match(content, /baseLines: stop\.hunk\.baseLines\?\.length \? \[''\] : \[\]/);
+  assert.match(content, /headLines: stop\.hunk\.headLines\?\.length \? \[''\] : \[\]/);
 });
 
 test('ADO sidebar renders Changes, Threads, Outline tabs in GitHub parity order', () => {

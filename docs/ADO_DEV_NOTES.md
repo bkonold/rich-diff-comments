@@ -317,6 +317,25 @@ decision traceable. Live testing of this unified-router experiment still ended
 at ADO's previously selected directory, disproving the hypothesis that the
 sidebar anchor's default navigation alone caused the issue.
 
+**A last-resort document navigation must carry the PR-wide catalogs across the
+reload.** In-memory promises correctly deduplicate normal SPA file switches,
+but the exact-route GET fallback creates a new JavaScript document and therefore
+used to repeat changed-file discovery, every head/base source comparison, the
+PR-wide Outline build, and thread discovery. Immediately before submitting the
+fallback, the extension now writes a short-lived, PR-scoped session snapshot of
+the normalized Markdown inventory, compact Changes stops, DOM-free Outline, and
+thread data. The next document restores it only while the exact-route marker is
+pending, then fetches just the active file source needed for line mapping.
+
+The snapshot deliberately excludes raw Markdown source and stores only a
+presence marker for each diff hunk's base/head lines. It expires with the
+90-second navigation window, is capped at 1.5 million serialized characters,
+and progressively drops thread, Outline, then detailed Changes data while
+retaining lightweight file/version inventory whenever possible. Failure is
+non-fatal: navigation still completes and the new document falls back to the
+normal service requests. Trace events `catalog-cache.saved`,
+`catalog-cache.restored`, and `catalog-cache.skipped` expose which path ran.
+
 ## Changes tab — source diff, not DOM markers
 
 ADO Preview renders only the final document. Unlike GitHub rich diff, it does

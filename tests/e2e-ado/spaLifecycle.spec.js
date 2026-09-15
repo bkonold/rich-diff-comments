@@ -228,6 +228,15 @@ test.describe('ADO SPA lifecycle and cross-file navigation', () => {
 
   test('a pending change resumes after the exact-route reload fallback', async ({ page }) => {
     const { server } = await setupAdoExtensionPage(page);
+    const countRequests = (suffix) => server.requests.filter((request) =>
+      request.method === 'GET' && request.pathname.endsWith(suffix)
+    ).length;
+    const before = {
+      iterations: countRequests('/iterations'),
+      changes: countRequests('/iterations/2/changes'),
+      threads: countRequests('/threads'),
+      items: countRequests('/items'),
+    };
     await page.evaluate(() => document.querySelector('#tree-other')?.remove());
 
     await Promise.all([
@@ -245,6 +254,15 @@ test.describe('ADO SPA lifecycle and cross-file navigation', () => {
     expect((await page.evaluate(() => window.ADORC_probe.viewMode())).currentMode).toBe('preview');
     expect((await page.evaluate(() => window.ADORC_probe.viewMode())).pendingChangeJump).toBeNull();
     expect(server.pageLoads).toBe(2);
+    expect(countRequests('/iterations')).toBe(before.iterations);
+    expect(countRequests('/iterations/2/changes')).toBe(before.changes);
+    expect(countRequests('/threads')).toBe(before.threads);
+    // The new document remaps only its active Preview source. It must not
+    // download both source versions for every Markdown file again.
+    expect(countRequests('/items')).toBe(before.items + 1);
+    const trace = await page.evaluate(() => window.ADORC_probe.navigationTrace());
+    expect(trace.entries.some((entry) => entry.event === 'catalog-cache.saved')).toBe(true);
+    expect(trace.entries.some((entry) => entry.event === 'catalog-cache.restored')).toBe(true);
   });
 
   test('a superseded tree lookup cannot reload or override the newer target', async ({ page }) => {

@@ -14,7 +14,7 @@
   'use strict';
 
   const LOG = '[ADRC]';
-  const RUNTIME_REVISION = '2026-09-04-navigation-trace-r11';
+  const RUNTIME_REVISION = '2026-09-15-fallback-catalog-cache-r12';
   const adapter = (typeof window !== 'undefined' && window.ADORC) || null;
   const startupTiming = {
     scriptLoadedAt: performance.now(),
@@ -1585,7 +1585,9 @@
   const SIDEBAR_PENDING_CHANGE_KEY = 'adrc-pending-change-jump-v1';
   const SIDEBAR_PENDING_OUTLINE_KEY = 'adrc-pending-outline-jump-v1';
   const EXACT_ROUTE_FALLBACK_KEY = 'adrc-exact-route-fallback-v1';
+  const PR_SESSION_CATALOG_CACHE_KEY = 'adrc-pr-session-catalog-v1';
   const PENDING_NAVIGATION_TTL_MS = 90000;
+  const PR_SESSION_CATALOG_CACHE_MAX_CHARS = 1500000;
   const SIDEBAR_MIN_WIDTH = 520;
   const SIDEBAR_MIN_HEIGHT = 180;
   const SIDEBAR_DEFAULT_WIDTH = 520;
@@ -1599,6 +1601,7 @@
   let sidebarThreadItems = [];
   let sidebarThreadsLoadPromise = null;
   let sidebarThreadsLoadGeneration = 0;
+  let sidebarThreadsReady = false;
   let sidebarActiveThreadId = null;
   // Stable, DOM-free PR-wide cards. Live target elements are resolved from
   // `currentLineToBlock` only when a card belongs to the active Preview.
@@ -1610,6 +1613,7 @@
   let changesGeneration = 0;
   let changesAnalyzedFiles = 0;
   let prChangesInventoryPromise = null;
+  let prChangesInventoryReady = false;
   let prChangesPromise = null;
   let prChangesIterationId = null;
   let prMarkdownChanges = [];
@@ -2046,7 +2050,9 @@
       return;
     }
     if (action === 'retry-inventory') {
+      clearPrSessionCatalogSnapshot();
       prChangesInventoryPromise = null;
+      prChangesInventoryReady = false;
       prChangesPromise = null;
       refreshChangesSidebar();
       ensurePrOutlineCatalog();
@@ -2518,7 +2524,10 @@
   }
 
   function loadSidebarThreadInventory(options) {
-    if (options?.force === true) sidebarThreadsLoadPromise = null;
+    if (options?.force === true) {
+      sidebarThreadsLoadPromise = null;
+      sidebarThreadsReady = false;
+    }
     if (sidebarThreadsLoadPromise) {
       recordNavigationTrace('threads.reused', { generation: sidebarThreadsLoadGeneration });
       return sidebarThreadsLoadPromise;
@@ -2533,12 +2542,18 @@
       ))
       .then((data) => {
         const threads = ((data && data.value) || []).filter((thread) => !adapter.isSystemThread(thread));
-        if (generation === sidebarThreadsLoadGeneration) setSidebarThreads(threads);
+        if (generation === sidebarThreadsLoadGeneration) {
+          sidebarThreadsReady = true;
+          setSidebarThreads(threads);
+        }
         recordNavigationTrace('threads.ready', { generation, count: threads.length });
         return threads;
       })
       .catch((err) => {
-        if (generation === sidebarThreadsLoadGeneration) sidebarThreadsLoadPromise = null;
+        if (generation === sidebarThreadsLoadGeneration) {
+          sidebarThreadsLoadPromise = null;
+          sidebarThreadsReady = false;
+        }
         recordNavigationTrace('threads.failed', { generation, error: String(err?.message || err) });
         console.warn(`${LOG} sidebar thread inventory unavailable:`, err);
         throw err;
@@ -3795,6 +3810,11 @@
     const url = new URL(window.location.pathname, window.location.origin);
     url.searchParams.set('path', normalizedPath);
     url.searchParams.set('_a', 'files');
+    // The fallback below replaces the entire document, so ordinary in-memory
+    // promises cannot survive it. Preserve only compact, DOM-free catalogs;
+    // raw Markdown source is deliberately excluded. The target document can
+    // then remap its one active file without repeating PR-wide source work.
+    persistPrSessionCatalogSnapshot('exact-route-fallback');
     rememberExactRouteFallback(normalizedPath);
     console.log(`${LOG} using exact same-PR route fallback`, {
       requestedPath: normalizedPath,
@@ -4124,6 +4144,234 @@
     }
   }
 
+  function prSessionCatalogIdentity() {
+    return [
+      window.location.origin,
+      ctx.org || '',
+      ctx.projectName || '',
+      ctx.repoName || '',
+      ctx.prId == null ? '' : String(ctx.prId)
+    ].join('|');
+  }
+
+  function compactPersistedChangeStop(stop) {
+    if (!stop || typeof stop !== 'object') return null;
+    const compact = {
+      key: stop.key,
+      stopType: stop.stopType,
+      lifecycle: stop.lifecycle,
+      kind: stop.kind,
+      label: stop.label == null ? null : stop.label,
+      path: stop.path,
+      oldPath: stop.oldPath,
+      line: Number.isFinite(stop.line) ? stop.line : null,
+      endLine: Number.isFinite(stop.endLine) ? stop.endLine : null,
+      snippet: stop.snippet || '',
+      error: stop.error || null
+    };
+    if (stop.hunk) {
+      compact.hunk = {
+        baseStart: stop.hunk.baseStart,
+        baseEnd: stop.hunk.baseEnd,
+        headStart: stop.hunk.headStart,
+        headEnd: stop.hunk.headEnd,
+        kind: stop.hunk.kind,
+        // Mapping only needs to know whether each side contains lines. Do not
+        // persist the changed source text that generated the sidebar snippet.
+        baseLines: stop.hunk.baseLines?.length ? [''] : [],
+        headLines: stop.hunk.headLines?.length ? [''] : []
+      };
+    }
+    return compact;
+  }
+
+  function compactPersistedOutlineEntry(entry) {
+    if (!entry || typeof entry !== 'object' || !entry.path) return null;
+    return {
+      path: entry.path,
+      lifecycle: entry.lifecycle,
+      status: entry.status,
+      error: entry.error || '',
+      headings: (Array.isArray(entry.headings) ? entry.headings : []).map((heading) => ({
+        id: heading.id,
+        key: heading.key || heading.id,
+        level: heading.level,
+        text: heading.text,
+        line: heading.line,
+        file: heading.file || entry.path
+      }))
+    };
+  }
+
+  function clearPrSessionCatalogSnapshot() {
+    try { sessionStorage.removeItem(PR_SESSION_CATALOG_CACHE_KEY); } catch (_) {}
+  }
+
+  /**
+   * Preserve expensive PR-wide catalogs immediately before the exact-route
+   * fallback replaces the document. This is intentionally session-only,
+   * short-lived, and excludes raw Markdown sources. If the payload approaches
+   * browser storage limits, optional thread/outline data is dropped before the
+   * Changes catalog; failure is always safe and merely falls back to refetching.
+   */
+  function persistPrSessionCatalogSnapshot(reason) {
+    const hasReadyCatalog = prChangesInventoryReady || sidebarThreadsReady ||
+      sidebarChangesStatus === 'ready' || prOutlineStatus === 'ready';
+    if (!hasReadyCatalog) return false;
+    const snapshot = {
+      version: 1,
+      identity: prSessionCatalogIdentity(),
+      savedAt: Date.now(),
+      expiresAt: Date.now() + PENDING_NAVIGATION_TTL_MS,
+      reason: reason || 'navigation',
+      context: {
+        repoId: ctx.repoId || null,
+        projectId: ctx.projectId || null
+      },
+      inventory: prChangesInventoryReady ? {
+        iterationId: prChangesIterationId,
+        markdownChanges: prMarkdownChanges,
+        fileOrder: prMarkdownFileOrder,
+        headVersion: prChangesHeadVersion,
+        baseVersion: prChangesBaseVersion
+      } : null,
+      changes: sidebarChangesStatus === 'ready' ? {
+        stops: sidebarChangeStops.map(compactPersistedChangeStop).filter(Boolean),
+        analyzedFiles: changesAnalyzedFiles
+      } : null,
+      outline: prOutlineStatus === 'ready' ? {
+        entries: Array.from(prOutlineCatalog.values())
+          .map(compactPersistedOutlineEntry)
+          .filter(Boolean)
+      } : null,
+      threads: sidebarThreadsReady
+        ? sidebarThreadItems.map((item) => item?.thread).filter(Boolean)
+        : null
+    };
+
+    try {
+      let serialized = JSON.stringify(snapshot);
+      if (serialized.length > PR_SESSION_CATALOG_CACHE_MAX_CHARS) {
+        snapshot.threads = null;
+        serialized = JSON.stringify(snapshot);
+      }
+      if (serialized.length > PR_SESSION_CATALOG_CACHE_MAX_CHARS) {
+        snapshot.outline = null;
+        serialized = JSON.stringify(snapshot);
+      }
+      if (serialized.length > PR_SESSION_CATALOG_CACHE_MAX_CHARS) {
+        snapshot.changes = null;
+        serialized = JSON.stringify(snapshot);
+      }
+      if (serialized.length > PR_SESSION_CATALOG_CACHE_MAX_CHARS) {
+        recordNavigationTrace('catalog-cache.skipped', {
+          reason: 'size',
+          characters: serialized.length
+        });
+        return false;
+      }
+      sessionStorage.setItem(PR_SESSION_CATALOG_CACHE_KEY, serialized);
+      recordNavigationTrace('catalog-cache.saved', {
+        reason: snapshot.reason,
+        characters: serialized.length,
+        inventory: !!snapshot.inventory,
+        changes: !!snapshot.changes,
+        outline: !!snapshot.outline,
+        threads: !!snapshot.threads
+      });
+      return true;
+    } catch (err) {
+      recordNavigationTrace('catalog-cache.skipped', {
+        reason: String(err?.message || err).slice(0, 160)
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Restore a snapshot only while an exact-route fallback is pending. Normal
+   * reloads still obtain authoritative service data, while the document hop
+   * used solely to reach another file keeps the session catalogs warm.
+   */
+  function restorePrSessionCatalogSnapshot() {
+    if (!readExactRouteFallback()) return false;
+    let snapshot = null;
+    try {
+      snapshot = JSON.parse(sessionStorage.getItem(PR_SESSION_CATALOG_CACHE_KEY) || 'null');
+    } catch (_) {
+      clearPrSessionCatalogSnapshot();
+      return false;
+    }
+    if (!snapshot || snapshot.version !== 1 ||
+        snapshot.identity !== prSessionCatalogIdentity() ||
+        !Number.isFinite(snapshot.expiresAt) || snapshot.expiresAt < Date.now()) {
+      clearPrSessionCatalogSnapshot();
+      return false;
+    }
+
+    if (snapshot.context?.repoId) ctx.repoId = snapshot.context.repoId;
+    if (snapshot.context?.projectId) ctx.projectId = snapshot.context.projectId;
+
+    if (snapshot.inventory && Array.isArray(snapshot.inventory.markdownChanges)) {
+      prChangesIterationId = Number.isFinite(Number(snapshot.inventory.iterationId))
+        ? Number(snapshot.inventory.iterationId)
+        : null;
+      prMarkdownChanges = snapshot.inventory.markdownChanges;
+      prMarkdownFileOrder = Array.isArray(snapshot.inventory.fileOrder)
+        ? snapshot.inventory.fileOrder
+        : prMarkdownChanges.map((change) => change.path);
+      prChangesHeadVersion = snapshot.inventory.headVersion || null;
+      prChangesBaseVersion = snapshot.inventory.baseVersion || null;
+      prChangesInventoryReady = true;
+      prChangesInventoryPromise = Promise.resolve(prMarkdownChanges);
+      startupTiming.inventoryReadyAt = performance.now();
+    }
+
+    if (snapshot.changes && Array.isArray(snapshot.changes.stops)) {
+      sidebarChangeStops = snapshot.changes.stops;
+      changesAnalyzedFiles = Number.isFinite(Number(snapshot.changes.analyzedFiles))
+        ? Number(snapshot.changes.analyzedFiles)
+        : prMarkdownChanges.length;
+      sidebarChangesStatus = 'ready';
+      sidebarChangesError = '';
+      const pendingKey = readPendingChangeJump()?.key;
+      sidebarActiveChangeIndex = pendingKey
+        ? sidebarChangeStops.findIndex((stop) => stop.key === pendingKey)
+        : (sidebarChangeStops.length > 0 ? 0 : -1);
+      prChangesPromise = Promise.resolve(sidebarChangeStops);
+      startupTiming.changesReadyAt = performance.now();
+    }
+
+    if (snapshot.outline && Array.isArray(snapshot.outline.entries)) {
+      prOutlineCatalog = new Map(snapshot.outline.entries
+        .filter((entry) => entry?.path)
+        .map((entry) => [entry.path, entry]));
+      prOutlineStatus = 'ready';
+      prOutlineError = '';
+      prOutlinePromise = Promise.resolve(prOutlineCatalog);
+      outlineActiveId = readPendingOutlineJump()?.key || null;
+      startupTiming.outlineReadyAt = performance.now();
+    }
+
+    if (Array.isArray(snapshot.threads)) {
+      sidebarThreadsReady = true;
+      setSidebarThreads(snapshot.threads);
+      sidebarThreadsLoadPromise = Promise.resolve(snapshot.threads);
+      sidebarActiveThreadId = readPendingThreadJump()?.id || null;
+    }
+
+    recordNavigationTrace('catalog-cache.restored', {
+      ageMs: Date.now() - snapshot.savedAt,
+      inventory: prChangesInventoryReady,
+      changes: sidebarChangesStatus === 'ready',
+      outline: prOutlineStatus === 'ready',
+      threads: sidebarThreadsReady,
+      detailComplete: sidebarChangesStatus === 'ready' &&
+        prOutlineStatus === 'ready' && sidebarThreadsReady
+    });
+    return true;
+  }
+
   /**
    * Fetch the lightweight changed-file inventory independently from per-file
    * source analysis. This makes the Files-page setup action available as soon
@@ -4170,6 +4418,7 @@
         (fileRank.get(a.path) ?? Number.MAX_SAFE_INTEGER) -
         (fileRank.get(b.path) ?? Number.MAX_SAFE_INTEGER)
       );
+      prChangesInventoryReady = true;
       startupTiming.inventoryReadyAt = performance.now();
       recordNavigationTrace('inventory.ready', {
         iterationId: prChangesIterationId,
@@ -4178,6 +4427,7 @@
       updateSidebarSetupState();
       return prMarkdownChanges;
     })().catch((err) => {
+      prChangesInventoryReady = false;
       sidebarChangesStatus = 'error';
       sidebarChangesError = String(err && (err.message || err)).slice(0, 200);
       prChangesInventoryPromise = null;
@@ -4202,6 +4452,8 @@
       });
       return prChangesPromise;
     }
+    sidebarChangesStatus = 'loading';
+    sidebarChangesError = '';
     const requestVersion = ++changesGeneration;
     recordNavigationTrace('changes.started', { generation: requestVersion });
     const priorKey = readPendingChangeJump()?.key ||
@@ -5230,6 +5482,7 @@
     ensurePrOutlineCatalog();
   }
 
+  restorePrSessionCatalogSnapshot();
   ensureFilesPageShell();
 
   document.addEventListener('click', (event) => {
