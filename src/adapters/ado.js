@@ -9,7 +9,7 @@
  * inventory. Thread endpoints were verified against a live sandbox on
  * 2026-07-22; iteration endpoints follow Microsoft's stable 7.1 contract and
  * are covered by adapter + browser fixtures pending final live confirmation.
- * See `docs/ADO_ADAPTER_PLAN.md` §15/§16 and `docs/ADO_DEV_NOTES.md`.
+ * See `docs/ado/ADO_ADAPTER_PLAN.md` §15/§16 and `docs/ado/ADO_DEV_NOTES.md`.
  *
  * Auth model: cookie-based. All fetches use `credentials: 'same-origin'`;
  * ADO's session cookies authenticate the request. No PAT, no bearer, no

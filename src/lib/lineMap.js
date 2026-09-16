@@ -11,8 +11,8 @@
  *
  * The caller (content.js) orchestrates the per-file containers, the
  * `fetchRawSource()` network calls, and merges the per-file Maps into the
- * page-wide `fileLineMap`. See `docs/APPROACH.md` for the matching strategy
- * and `docs/DEV_NOTES.md` for the GitHub DOM quirks this function handles.
+ * page-wide `fileLineMap`. See `docs/github/APPROACH.md` for the matching strategy
+ * and `docs/github/DEV_NOTES.md` for the GitHub DOM quirks this function handles.
  *
  * Loaded in two contexts:
  *   • Extension content script  → exports attached to `window.GRDC.*`
@@ -120,7 +120,7 @@
     const sourceIndex = sourceLines && buildSourceIndex ? buildSourceIndex(sourceLines) : null;
     const maxLine = sourceLines ? sourceLines.length : Number.MAX_SAFE_INTEGER;
 
-    // Detect the rendered YAML frontmatter table (if any). See APPROACH.md
+    // Detect the rendered YAML frontmatter table (if any). See docs/github/APPROACH.md
     // → Edge cases that bit us → YAML frontmatter for the full diagnosis.
     const frontmatter = sourceLines && findFrontmatterRange
       ? findFrontmatterRange(sourceLines)

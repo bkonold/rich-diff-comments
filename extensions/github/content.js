@@ -10,7 +10,7 @@
   "use strict";
 
   // Pure helpers are defined in src/lib/*.js (loaded before this script via manifest.json).
-  // They're shared with the Node test suite. See docs/APPROACH.md for the strategy.
+  // They're shared with the Node test suite. See docs/github/APPROACH.md for the strategy.
   const {
     stripMarkdown,
     cleanRenderedText,
@@ -1351,7 +1351,7 @@
 
   // stripMarkdown / cleanRenderedText / buildSourceIndex / findLineAtOffset /
   // findTextInSource all live in src/lib/textMatch.js and are destructured at
-  // the top of this file. See docs/APPROACH.md for the matching strategy.
+  // the top of this file. See docs/github/APPROACH.md for the matching strategy.
 
   async function buildLineMap() {
     fileLineMap.clear();
@@ -1967,8 +1967,8 @@
   // Why we build our own instead of cloning GitHub's native form: GitHub's
   // comment box is rendered with Primer React (`prc-*` classes), and the
   // toolbar / mention / upload / preview behaviors all depend on React
-  // contexts that don't survive a `cloneNode(true)`. See docs/FEATURES.md
-  // → "Why we don't clone GitHub's native form".
+  // contexts that don't survive a `cloneNode(true)`. See
+  // docs/github/FEATURES.md → "Native comment form cloning".
   function buildEditor(opts) {
     opts = opts || {};
     const minRows = opts.minRows || 3;

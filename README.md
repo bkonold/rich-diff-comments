@@ -16,23 +16,26 @@ GitHub rich diff and Azure DevOps Preview render Markdown beautifully, but neith
 - Overlays a `+` button on every paragraph, heading, list item, table row, and code block in rich diff.
 - Click `+` → write a comment → posts as a real PR review comment on the correct source line.
 - Renders existing review threads inline at the rendered block that corresponds to each commented line.
-- **Reply** to threads, **resolve / unresolve** them, and see **resolved / outdated** state — all from the rendered view.
-- **Threads sidebar** docked to the right edge lists every review thread (author, snippet, file:line, resolved / outdated tags) — click to jump, with prev/next chevrons and a comment counter.
+- **Reply** to threads, **resolve / unresolve** them, and see resolved state — all from the rendered view. GitHub also exposes outdated-thread state.
+- **Threads sidebar** docked to the right edge lists every review thread (author, snippet, file:line, and target-supported status tags) — click to jump, with prev/next chevrons and a comment counter.
 - **Outline tab** in the sidebar shows the heading tree of every changed `.md` file with comment-count pills, per-section folding, and bulk `Fold H1 / H2 / H3` / `Expand all` controls.
 - **Changes tab** in the sidebar lists every changed block (paragraph / list item / table row / code block / heading / blockquote) with a `+` / `−` / `±` kind glyph, file:line, and a snippet. The header also gets a `◀ N/M ▶` counter so you can step through changes without opening the tab. Best way to scan a Markdown PR for the first time without re-reading the unchanged prose.
-- **One-click "Render all Markdown files as rich-diff"** flips every `.md` file in the PR from source-diff to rich-diff in a single sweep, so comments on those files load automatically.
+- **Start rendered review in one click:** GitHub can render every changed Markdown file as rich diff in one sweep; Azure DevOps can open the selected or first changed Markdown file in its sticky Preview mode.
 - **Keyboard shortcuts:** `j` / `k` next / previous thread, `h` / `l` first / last thread, `[` / `]` previous / next change, `{` / `}` (Shift+[, Shift+]) first / last change, `1` / `2` / `3` switch sidebar tab (Changes / Threads / Outline), `t` toggle the sidebar, `Shift+T` reset its position.
 - No PAT required — each target uses the existing signed-in session for its service.
 
 (For submitting a full review / approve / request changes, use GitHub's native **"Review changes"** button at the top of the Files-changed tab.)
 
-See [docs/FEATURES.md](docs/FEATURES.md) for the full feature list and roadmap.
+See the shared [feature parity roadmap](docs/FEATURES.md) for both targets and the small [GitHub](docs/github/FEATURES.md) / [Azure DevOps](docs/ado/FEATURES.md) platform notes for host-specific behavior.
 
 ## Install
 
 ### For end users
 
-**Azure DevOps:** Store links will be added here after the first Chrome Web Store and Edge Add-ons approvals. Until then, use the local-development instructions below and load [extensions/ado](extensions/ado).
+**Azure DevOps:**
+
+- **Chrome / Brave / Vivaldi / Arc / any Chromium browser:** <https://chromewebstore.google.com/detail/markdown-pr-comments-for/habbfnkhgmnkhlbakjlnapadamjijbdh>
+- **Microsoft Edge:** <https://microsoftedge.microsoft.com/addons/detail/ajgoipjphffaapagamibikngconoanac>
 
 **GitHub:**
 
@@ -41,7 +44,7 @@ See [docs/FEATURES.md](docs/FEATURES.md) for the full feature list and roadmap.
 
 No separate login, setup, or Personal Access Token is required. See [INSTALL.md](INSTALL.md) for both walkthroughs.
 
-> 📌 **Just installed?** Hard-refresh (Ctrl+Shift+R / Cmd+Shift+R) any GitHub PR tab that was already open when you installed — see [INSTALL.md → Just installed?](INSTALL.md#just-installed).
+> 📌 **Just installed?** Hard-refresh (Ctrl+Shift+R / Cmd+Shift+R) any GitHub or Azure DevOps PR tab that was already open when you installed — see [INSTALL.md → Just installed?](INSTALL.md#just-installed).
 
 ### For local development
 
@@ -90,9 +93,13 @@ scripts/
   dev-sync.ps1            Mirror src/lib + PRIVACY.md into extensions/<target>/
 tests/                 Node test runner specs (`npm test`)
 test_md_files/         Synthetic Markdown fixture for manual rich-diff testing
-docs/APPROACH.md       Strategy and design choices (start here)
-docs/DEV_NOTES.md      Implementation notes & GitHub internal data shapes
-docs/ADO_ADAPTER_PLAN.md   Design and validation record for the Azure DevOps target
+docs/github/APPROACH.md   GitHub strategy and design choices
+docs/FEATURES.md       Shared feature parity roadmap and target status
+docs/github/FEATURES.md   GitHub-specific feature mechanics and constraints
+docs/ado/FEATURES.md      ADO-specific feature mechanics and constraints
+docs/github/DEV_NOTES.md  Implementation notes & GitHub internal data shapes
+docs/ado/ADO_DEV_NOTES.md ADO REST, DOM, lifecycle, and debugging findings
+docs/ado/ADO_ADAPTER_PLAN.md   Design and validation record for the Azure DevOps target
 docs/PUBLISHING.md     Store submission and release workflow
 ```
 
@@ -117,7 +124,7 @@ npm run test:all          # Node tests plus both browser targets
 
 The extension itself ships zero runtime npm dependencies — `jsdom` and `@playwright/test` are devDependencies only. The published zip contains no `node_modules`, no `package.json`, no test files.
 
-GitHub network mutations remain covered by the [manual test checklist](docs/DEV_NOTES.md#manual-test-checklist). The ADO fixture suite covers create, reply, status, edit, and delete requests without contacting a live organization.
+GitHub network mutations remain covered by the [manual test checklist](docs/github/DEV_NOTES.md#manual-test-checklist). The ADO fixture suite covers create, reply, status, edit, and delete requests without contacting a live organization.
 
 ## Packaging a release
 
@@ -142,9 +149,11 @@ For a guided pre-submission audit + per-version release-doc generation, the [`rd
 
 ## See also
 
-- [docs/FEATURES.md](docs/FEATURES.md) — full feature list, roadmap, gap analysis.
-- [docs/APPROACH.md](docs/APPROACH.md) — strategy and design choices (start here if you're new).
-- [docs/DEV_NOTES.md](docs/DEV_NOTES.md) — internal GitHub data shapes, gotchas, and debugging recipes.
+- [docs/FEATURES.md](docs/FEATURES.md) — authoritative shared roadmap and GitHub/ADO parity status.
+- [docs/github/FEATURES.md](docs/github/FEATURES.md) and [docs/ado/FEATURES.md](docs/ado/FEATURES.md) — host-specific mechanics, constraints, and intentional differences.
+- [docs/github/APPROACH.md](docs/github/APPROACH.md) — GitHub strategy and design choices (start here if you're new).
+- [docs/github/DEV_NOTES.md](docs/github/DEV_NOTES.md) — internal GitHub data shapes, gotchas, and debugging recipes.
+- [docs/ado/ADO_DEV_NOTES.md](docs/ado/ADO_DEV_NOTES.md) — Azure DevOps REST, DOM, lifecycle, and debugging findings.
 
 ## Legal
 

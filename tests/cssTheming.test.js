@@ -12,7 +12,7 @@
 // Legacy Primer is still defined on older Enterprise Server installs. The
 // literal hex is the last-resort fallback if neither variable is defined.
 //
-// See `docs/DEV_NOTES.md → CSS theming` for the full mapping table.
+// See `docs/github/DEV_NOTES.md → CSS theming` for the full mapping table.
 //
 // These tests are pure lexical analysis of the CSS file — they don't run
 // the extension or load a browser. The cost of a missed regression here is
@@ -70,7 +70,7 @@ test('styles.css: every standalone hex color sits inside a var() fallback', () =
     const message =
       `Found ${offenders.length} standalone hex color(s) in styles.css. ` +
       `Every color must be wrapped in a var() fallback so it adapts to GitHub's theme. ` +
-      `See docs/DEV_NOTES.md → "CSS theming". Offending lines:\n` +
+      `See docs/github/DEV_NOTES.md → "CSS theming". Offending lines:\n` +
       offenders.map((s) => `  ${s}`).join('\n');
     assert.fail(message);
   }
@@ -188,7 +188,7 @@ test('styles.css: every legacy --color-* variable is wrapped in a new Primer nam
       `Found ${offenders.length} legacy Primer variable(s) used without a new-name wrapper. ` +
       `GitHub.com no longer defines the legacy --color-* variables; without the new ` +
       `--bgColor-* / --fgColor-* wrapper, these rules fall through to the literal hex ` +
-      `and break dark mode. See docs/DEV_NOTES.md → "CSS theming" for the mapping table.\n` +
+      `and break dark mode. See docs/github/DEV_NOTES.md → "CSS theming" for the mapping table.\n` +
       offenders.map((s) => `  ${s}`).join('\n');
     assert.fail(message);
   }
@@ -217,7 +217,7 @@ test('styles.css: every --color-* variable used has a known new-name mapping', (
     const message =
       `Found ${missing.length} legacy --color-* variable(s) without a known new-name mapping. ` +
       `Add each to the LEGACY_TO_NEW table at the top of this test, then re-run. ` +
-      `Run the variable-discovery snippet in docs/DEV_NOTES.md → "CSS theming" on a ` +
+      `Run the variable-discovery snippet in docs/github/DEV_NOTES.md → "CSS theming" on a ` +
       `live GitHub PR page to find the new Primer name.\n  ` +
       missing.join('\n  ');
     assert.fail(message);

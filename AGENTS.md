@@ -1,12 +1,12 @@
-# Agent context: Markdown PR Comments for GitHub
+# Agent context: Markdown PR Comments for GitHub and Azure DevOps
 
-A Chromium browser extension that adds inline review-comment UI to GitHub PR rich-diff (rendered markdown) pages. **Source of truth is here** (`c:\Local\local_repos\rich-diff-comments\`). A snapshot mirror lives at `content-understanding/tools/github-rich-diff-comments/` — **don't edit that copy**.
+Two Chromium browser-extension targets add inline review-comment UI to GitHub PR rich diff and Azure DevOps PR Preview. **Source of truth is here** (`c:\Local\local_repos\rich-diff-comments\`). A snapshot mirror lives at `content-understanding/tools/github-rich-diff-comments/` — **don't edit that copy**.
 
 ## Instructions
 
 ### CHANGELOG is user-facing — not engineering notes
 
-Every entry in `CHANGELOG.md` (and the equivalent blocks in the store submission templates) must read like a feature announcement to someone who has never opened the source code.
+Every entry in `CHANGELOG.md` or `CHANGELOG_ADO.md` (and the equivalent blocks in the matching store submission templates) must read like a feature announcement to someone who has never opened the source code.
 
 - **Forbidden:** internal class / file / function names, CSS selectors, DOM-shape detail (`<th>` vs `<td>` cells), specific line numbers from a bug repro file, "we did X via Y" implementation talk, **dev infrastructure changes** (test suites, refactors, library extractions, build-system tweaks, devDependency bumps).
 - **Required:** describe what the user sees, when they'd notice it, and why it's better. Use product names ("the threads sidebar", "the Outline tab"), not selectors.
@@ -20,9 +20,10 @@ Every entry in `CHANGELOG.md` (and the equivalent blocks in the store submission
 |---|---|
 | User-visible feature or bug fix | GitHub: `CHANGELOG.md`; ADO: `CHANGELOG_ADO.md`; plus the matching target's store submission docs |
 | Dev infrastructure (tests, refactors, lib extractions, devDeps) | Git commit message only — **NOT** CHANGELOG |
-| Captured GitHub endpoint payloads, DOM quirks, "I thought X but actually Y" | [docs/DEV_NOTES.md](docs/DEV_NOTES.md) |
-| Stable architecture decisions (why we forward-scan match, LEFT vs RIGHT side, edge-case strategy) | [docs/APPROACH.md](docs/APPROACH.md) |
-| Feature roadmap, status, priority (P0–P3) | [docs/FEATURES.md](docs/FEATURES.md) |
+| Captured endpoint payloads, DOM quirks, "I thought X but actually Y" | GitHub: [docs/github/DEV_NOTES.md](docs/github/DEV_NOTES.md); ADO: [docs/ado/ADO_DEV_NOTES.md](docs/ado/ADO_DEV_NOTES.md) |
+| Stable architecture decisions (why we forward-scan match, LEFT vs RIGHT side, edge-case strategy) | GitHub: [docs/github/APPROACH.md](docs/github/APPROACH.md); ADO history: [docs/ado/ADO_ADAPTER_PLAN.md](docs/ado/ADO_ADAPTER_PLAN.md) |
+| Shared feature parity roadmap, both target statuses, priority (P0–P3) | [docs/FEATURES.md](docs/FEATURES.md) |
+| Host-specific feature mechanics and constraints | GitHub: [docs/github/FEATURES.md](docs/github/FEATURES.md); ADO: [docs/ado/FEATURES.md](docs/ado/FEATURES.md) |
 
 ### Repo layout
 
@@ -30,7 +31,7 @@ The repository is a monorepo with per-target extension folders sharing a single 
 
 - **`src/lib/`** — DOM-agnostic pure helpers (source of truth). Shared across every extension target. Tests import from here.
 - **`extensions/github/`** — the GitHub extension: `manifest.json`, `content.js`, `styles.css`, `icons/`, plus `src/lib/*.js` and `PRIVACY.md` mirrored in by `scripts/dev-sync.ps1`. **Chrome / Edge load unpacked from this folder.**
-- **`extensions/<target>/`** — future targets (planned: `ado/`). See [docs/ADO_ADAPTER_PLAN.md](docs/ADO_ADAPTER_PLAN.md).
+- **`extensions/ado/`** — the Azure DevOps extension and adapter mirror. See [docs/ado/FEATURES.md](docs/ado/FEATURES.md) and [docs/ado/ADO_ADAPTER_PLAN.md](docs/ado/ADO_ADAPTER_PLAN.md).
 - **`scripts/dev-sync.ps1 -Target github`** — copies shared files from repo root into a target folder. Runs automatically before `package.ps1` and `preflight.ps1`. Re-run manually after editing anything under `src/lib/` if Chrome has the extension dev-loaded, then reload the extension.
 - **`scripts/package.ps1 -Target github|ado`** — builds a publish-ready zip from `extensions/<target>/`. Default target is `github`.
 - **`extensions/*/src/`** and **`extensions/*/PRIVACY.md`** are git-ignored — they're build output.
@@ -56,7 +57,7 @@ The published zip is built by [scripts/package.ps1](scripts/package.ps1) (`-Targ
 ### Skills
 
 Under `.github/skills/`:
-- **`rdc-feature-dev`** — the build-a-feature loop: identify → design in FEATURES.md → build → test → docs. Use when starting any new feature or bug fix.
+- **`rdc-feature-dev`** — the build-a-feature loop: identify → define the shared outcome and target statuses in FEATURES.md → record only necessary target differences → build → test → docs. Use when starting any new feature or bug fix.
 - **`rdc-publish-check`** — release prep: bump version, update CHANGELOG, run preflight, build zip, publish to stores. Use for every release.
 
 Each skill's `SKILL.md` has the detailed workflow. Consult them before improvising.

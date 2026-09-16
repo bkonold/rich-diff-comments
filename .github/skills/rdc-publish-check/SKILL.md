@@ -46,11 +46,13 @@ The preflight script (`scripts/preflight.ps1`) implements the **policy-lens chec
 > - ❌ *"GitHub renders frontmatter as a 2-column table; long values used to substring-match body content downstream, pushing the H1 to line ~85."*
 > - ✅ *"Comments on Markdown files that start with YAML frontmatter no longer land at the bottom of the file."*
 >
-> Implementation detail belongs in [docs/DEV_NOTES.md](../../../docs/DEV_NOTES.md) (engineer-facing) and the per-change comment block in `content.js` — keep CHANGELOG, README, and submission "What's new" blocks clean.
+> Implementation detail belongs in the target's engineer-facing notes—[docs/github/DEV_NOTES.md](../../../docs/github/DEV_NOTES.md) for GitHub or [docs/ado/ADO_DEV_NOTES.md](../../../docs/ado/ADO_DEV_NOTES.md) for ADO—and the relevant content-script comments. Keep CHANGELOG, README, and submission "What's new" blocks clean.
 >
 > **When in doubt**: write the entry, then ask "would a non-developer Chrome extension user understand what changed for them?" If no, rewrite.
 
 ## Workflow
+
+Before preflight, confirm that [docs/FEATURES.md](../../../docs/FEATURES.md) records the releasing target as `✅ GitHub vX.Y.Z` or `✅ ADO vX.Y.Z` for every capability shipping in the release. Update a target feature-notes page only when host-specific mechanics or constraints changed; priority and status never live there.
 
 ### 1. Run the preflight script
 

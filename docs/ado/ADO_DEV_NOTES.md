@@ -3,9 +3,11 @@
 Implementation details, Azure DevOps API quirks, and DOM findings learned while porting the extension. Read this before non-trivial changes to the ADO extension — it documents non-obvious behavior of the ADO REST API and Preview surface.
 
 **Companion docs:**
-- [ADO_ADAPTER_PLAN.md](ADO_ADAPTER_PLAN.md) — master port plan + decision log
-- [APPROACH.md](APPROACH.md) — shared architecture strategy (line mapping, DOM injection)
-- [DEV_NOTES.md](DEV_NOTES.md) — GitHub-side equivalent
+- [Shared feature roadmap](../FEATURES.md) — authoritative shared capability and parity status
+- [ADO feature notes](./FEATURES.md) — ADO-specific feature mechanics and constraints
+- [ADO_ADAPTER_PLAN.md](ADO_ADAPTER_PLAN.md) — historical port design, validation record, and decision log
+- [GitHub approach](../github/APPROACH.md) — GitHub architecture strategy and shared matching background
+- [GitHub developer notes](../github/DEV_NOTES.md) — GitHub-side equivalent
 
 ## High-level architecture
 
@@ -57,7 +59,7 @@ Without this, `window.ADORC_probe` is invisible to the default DevTools console 
    For example: 7.1-preview"
   ```
 
-  Fix in [src/adapters/ado.js](../src/adapters/ado.js) `connectionDataUrl()` — pins this one endpoint to `7.1-preview.1` while leaving everything else on stable `7.1`.
+  Fix in [src/adapters/ado.js](../../src/adapters/ado.js) `connectionDataUrl()` — pins this one endpoint to `7.1-preview.1` while leaving everything else on stable `7.1`.
 
 If we later hit similar 400s on other endpoints, bump only that URL builder — don't lift the whole extension to preview.
 
@@ -127,7 +129,7 @@ Threads are returned by `GET /threads`:
 
 **But** the `.adrc-hoverable:hover > .adrc-comment-btn { opacity: 1 }` CSS rule requires the button to be a **direct child** of the hovered `.adrc-hoverable`. If we put `.adrc-hoverable` on the `<tr>` (the mapped block), the button — one level down in a `<td>` — is *not* a direct child. Result: button stays at `opacity: 0` on hover.
 
-**Fix:** put `.adrc-hoverable` on the *host* returned by `buttonAnchor` (the first cell for `<tr>`, the block itself for everything else). Same DOM shape the GitHub extension uses. See `attachCommentButton()` in [extensions/ado/content.js](../extensions/ado/content.js).
+**Fix:** put `.adrc-hoverable` on the *host* returned by `buttonAnchor` (the first cell for `<tr>`, the block itself for everything else). Same DOM shape the GitHub extension uses. See `attachCommentButton()` in [extensions/ado/content.js](../../extensions/ado/content.js).
 
 ## DOM quirks — code blocks
 
@@ -141,7 +143,7 @@ Fenced code blocks render as `<pre><code><span>...</span>...</code></pre>` — n
 
 ### 1. `pre.innerText.split('\n').length` over-counts
 
-The DOM `innerText` includes highlighter decorations and trailing newlines that inflate the count vs. the real source. `findFenceRangeAroundLine(source, targetLine)` from [src/lib/codeBlocks.js](../src/lib/codeBlocks.js) parses fence markers directly from the raw source string and is authoritative — always prefer it.
+The DOM `innerText` includes highlighter decorations and trailing newlines that inflate the count vs. the real source. `findFenceRangeAroundLine(source, targetLine)` from [src/lib/codeBlocks.js](../../src/lib/codeBlocks.js) parses fence markers directly from the raw source string and is authoritative — always prefer it.
 
 ### 2. DOM row count ≠ source line count
 

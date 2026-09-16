@@ -86,6 +86,14 @@ The `+` button and the comment box have to live somewhere in the page. Two non-o
 
 2. **Our own injected nodes trigger the `MutationObserver`** that watches for new files loading via SPA navigation. Without a filter we loop infinitely. → Explicit ignore-list of CSS classes; every new injected class must be added.
 
+## Review-side model: head/right versus base/left
+
+Rendered review normally maps to the post-change file: GitHub calls this the RIGHT side, while ADO thread payloads expose it through `rightFileStart` / `rightFileEnd`. The shared mapper therefore treats the final rendered document and head source as the default review side.
+
+Commenting on removed content is a different capability. It requires the base source and a LEFT-side anchor on GitHub; ADO Preview omits removed prose entirely, so ADO also needs a safe rendered representation before an equivalent interaction exists. Side selection must remain explicit in mapping and payload construction—silently moving a removed-line comment to a nearby head line changes its meaning.
+
+Current target status and scope are tracked under deleted-line comments in [FEATURES.md → Correctness](../FEATURES.md#correctness); captured GitHub payload evidence remains in [DEV_NOTES.md](./DEV_NOTES.md).
+
 ## Authentication: piggybacking on the browser session
 
 The extension reuses the user's existing logged-in github.com session — same identity, same permissions as any click they make in the GitHub UI.
@@ -181,17 +189,17 @@ So a new comment, reply, or resolve toggle all appear immediately — no page re
 
 ## Limits
 
-- Lines outside any diff hunk are rejected by GitHub with `422 "Line could not be resolved"`. We don't currently snap to the nearest in-hunk line — TODO.
+- GitHub accepts some unchanged lines outside visible diff hunks, but stale or invalid comparison lines can still return `422 "Line could not be resolved"`. The mapper bounds fallback lines to the source and leaves the final target editable.
 - HTML blocks (`<details>`, raw `<table>`) inherit previous line on miss.
 - Mermaid diagrams have no `+` button (they're SVG with no source-line correspondence).
 
 ## When to read what
 
 - **You're new to the codebase** — start here.
-- **You're an end user installing it** — [INSTALL.md](../INSTALL.md) — store install + usage walkthrough.
+- **You're an end user installing it** — [INSTALL.md](../../INSTALL.md) — store install + usage walkthrough.
 - **You're hunting a specific bug** — [DEV_NOTES.md → Resolved issues (changelog)](./DEV_NOTES.md#resolved-issues-changelog).
-- **You're planning the next feature** — [FEATURES.md](./FEATURES.md) — Shipped / Planned (with P0–P3 priorities) / Won't-do.
-- **You're adding a new GitHub action** (e.g. edit-comment, react, mark-as-viewed) — [DEV_NOTES.md → How to add a new GitHub action](./DEV_NOTES.md#how-to-add-a-new-github-action-endpoint-discovery-recipe) for the step-by-step recipe. **First check if GitHub's UI already exposes the action on the same rich-diff page** — if so, don't reinvent it; see [FEATURES.md → Won't do](./FEATURES.md#-wont-do-deliberate-trade-offs).
+- **You're planning the next feature** — [FEATURES.md](../FEATURES.md) owns the shared outcome, P0–P3 priority, and both target statuses; use the linked target notes only for host-specific constraints.
+- **You're adding a new GitHub action** (e.g. edit-comment, react, mark-as-viewed) — [DEV_NOTES.md → How to add a new GitHub action](./DEV_NOTES.md#how-to-add-a-new-github-action-endpoint-discovery-recipe) for the step-by-step recipe. **First check if GitHub's UI already exposes the action on the same rich-diff page** — if so, don't reinvent it; see [FEATURES.md → Won't do](../FEATURES.md#-wont-do-deliberate-trade-offs).
 - **GitHub changed something and matching broke** — [DEV_NOTES.md → Debugging recipes](./DEV_NOTES.md#debugging-recipes). Check `[GRDC] NO MATCH` logs first.
-- **You're shipping a new version to the store** — [PUBLISHING.md](./PUBLISHING.md) — submission flow, store-listing copy, permissions justifications, gotchas, packaging script.
+- **You're shipping a new version to the store** — [PUBLISHING.md](../PUBLISHING.md) — submission flow, store-listing copy, permissions justifications, gotchas, packaging script.
 - **You're changing a pure helper** — add a test in `tests/`. Run with `npm test`. Pure logic lives in `src/lib/*.js`; the extension and Node tests both consume those modules.

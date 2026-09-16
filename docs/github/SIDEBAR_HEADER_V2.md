@@ -1,4 +1,4 @@
-# Sidebar Header v2 — Design Doc
+# GitHub sidebar header v2 — design record
 
 **Status:** Approved (2026-06-17). Implemented; book-button behaviour clarified 2026-06-17 to match the spec's "Toggle outline".
 **Source:** User-provided mockup ("Navigation UI — Design Summary (Final)") in the 2026-06-17 conversation.
@@ -148,18 +148,18 @@ Using inline SVG paths matching the mockup's visual style. Closest Octicon equiv
 
 | File | Change |
 |---|---|
-| [content.js](../content.js) | Rewrite header `innerHTML` template with new order, new icons, new SVG chevron orientation, and `aria-label` updates. Add click handlers on the diff/thread icons so they call `changesJump(+1)` / `sidebarJump(+1)`. |
-| [styles.css](../styles.css) | New header rules: 48 px height, 16 px padding, exact 8/8/6 gaps, 32 × 32 click targets via padding, three-tier white opacity, 1 × 24 px separators, hover/active states. |
-| [tests/collapsedSidebar.test.js](../tests/collapsedSidebar.test.js) | Class names preserved → tests should mostly still pass. Bumped min-height assertion if needed. |
-| [tests/sidebarSelectors.test.js](../tests/sidebarSelectors.test.js) | Class names preserved → no change. |
-| [tests/e2e/keyboardShortcuts.spec.js](../tests/e2e/keyboardShortcuts.spec.js) | Add a test: clicking `📄` icon navigates to next/first diff; clicking `💬` icon navigates to next/first thread. |
-| [CHANGELOG.md](../CHANGELOG.md) | New `[Unreleased] → Changed` entry: "Sidebar header refreshed per the v2 design spec — see docs/SIDEBAR_HEADER_V2.md." |
+| [content.js](../../extensions/github/content.js) | Rewrite header `innerHTML` template with new order, new icons, new SVG chevron orientation, and `aria-label` updates. Add click handlers on the diff/thread icons so they call `changesJump(+1)` / `sidebarJump(+1)`. |
+| [styles.css](../../extensions/github/styles.css) | New header rules: 48 px height, 16 px padding, exact 8/8/6 gaps, 32 × 32 click targets via padding, three-tier white opacity, 1 × 24 px separators, hover/active states. |
+| [tests/collapsedSidebar.test.js](../../tests/collapsedSidebar.test.js) | Class names preserved → tests should mostly still pass. Bumped min-height assertion if needed. |
+| [tests/sidebarSelectors.test.js](../../tests/sidebarSelectors.test.js) | Class names preserved → no change. |
+| [tests/e2e/keyboardShortcuts.spec.js](../../tests/e2e/keyboardShortcuts.spec.js) | Add a test: clicking `📄` icon navigates to next/first diff; clicking `💬` icon navigates to next/first thread. |
+| [CHANGELOG.md](../../CHANGELOG.md) | New `[Unreleased] → Changed` entry: "Sidebar header refreshed per the v2 design spec — see docs/github/SIDEBAR_HEADER_V2.md." |
 
 Existing files NOT affected:
 
 - Pure helpers in `src/lib/` — no navigation logic changes
 - `manifest.json` — no permission changes
-- [README.md](../README.md), [INSTALL.md](../INSTALL.md) — no user-facing behaviour change (keyboard shortcuts unchanged)
+- [README.md](../../README.md), [INSTALL.md](../../INSTALL.md) — no user-facing behaviour change (keyboard shortcuts unchanged)
 
 ## "Go to next or first if none in view" — implementation note
 

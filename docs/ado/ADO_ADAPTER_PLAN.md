@@ -1,11 +1,14 @@
-# ADO adapter — design & dev plan
+# ADO adapter — design & validation record
 
-Plan for extending this extension to Azure DevOps pull requests. Living doc — decisions here are proposals until validated by the probes in §11.
+Historical design, probe, iteration, and acceptance record for extending the product to Azure DevOps pull requests. It intentionally preserves original proposal language alongside validated results; it is no longer the source of truth for feature priority or target status.
+
+Current product status lives in the shared [feature parity roadmap](../FEATURES.md). Azure DevOps-specific feature mechanics and remaining constraints live in [ADO feature notes](./FEATURES.md).
 
 Related docs:
-- [APPROACH.md](./APPROACH.md) — the GitHub strategy this ports from
-- [FEATURES.md](./FEATURES.md) — the GitHub feature set this aims to match
-- [DEV_NOTES.md](./DEV_NOTES.md) — where ADO-specific "gotcha" findings will land as we hit them
+- [GitHub approach](../github/APPROACH.md) — the shared/GitHub strategy this port started from
+- [Shared feature roadmap](../FEATURES.md) — authoritative shared capability and parity status
+- [ADO feature notes](./FEATURES.md) — ADO-specific feature mechanics and constraints
+- [ADO_DEV_NOTES.md](./ADO_DEV_NOTES.md) — ADO REST, DOM, lifecycle, and debugging findings
 
 ---
 
@@ -48,11 +51,11 @@ Two paths were considered:
 
 **Decision: browser extension first.** Native Marketplace is a possible follow-up if adoption warrants and if we hit a wall with browser-side auth or DOM stability.
 
-## 4. Feature parity strategy
+## 4. Original feature parity strategy
 
 Match the GitHub extension **from the reader's perspective**, not from the internal architecture perspective. The user's mental model is *"click a block, leave a comment, done"* — everything else is plumbing.
 
-Priority tiers (matching the convention in FEATURES.md):
+Priority tiers used by the original port plan (current priorities live in FEATURES.md):
 
 - **P0** — ship blockers. Without these, the extension has no reason to exist.
 - **P1** — fast-follow within a couple of releases. Users notice they're missing.
@@ -154,9 +157,9 @@ Run auth probe on a real ADO PR (§11.B).
 └── If ADO's CSRF requires a specific header we can read from the page (like `X-VSS-ForceMsaPassThrough` or session tokens) → Option 1 with extra header.
 ```
 
-## 7. Feature parity matrix
+## 7. Original feature parity matrix
 
-Compared to the GitHub extension's shipped feature set (see FEATURES.md § Shipped).
+This is the planning snapshot used to scope the initial port. For current GitHub/ADO status, use FEATURES.md § Shipped and § Planned.
 
 | # | GitHub feature | ADO priority | ADO notes |
 |---|---|---|---|
@@ -801,7 +804,7 @@ The forward-scan matcher in `src/lib/textMatch.js` and `src/lib/lineMap.js` does
 
 ## 10. Testing strategy
 
-Match FEATURES.md's convention:
+Use the repository's shared test commands while keeping browser fixtures target-specific:
 
 - **Unit tests** (Node:test, in `tests/`) — any adapter logic that's pure (URL parsing, response-shape normalization) gets tests. Naming: `tests/adoAdapter.test.js`, `tests/adoResponses.test.js`, etc.
 - **GitHub Playwright e2e** (in `tests/e2e/`) — `npm run test:e2e` or
@@ -813,7 +816,7 @@ Match FEATURES.md's convention:
 - Browser fixtures never call a live GitHub or ADO service and need no account,
   cookie, PAT, or other credential.
 
-## 11. Open questions — probes to run before writing code
+## 11. Original probe questions and validated answers
 
 **Do these first, in this order. Each blocks downstream work.**
 
@@ -901,10 +904,10 @@ JSON.stringify(Object.keys(window)).match(/[a-z]*[Cc]onfig[a-z]*/g)
 
 and inspect the promising ones.
 
-## 12. Rollout plan
+## 12. Historical rollout checklist
 
 1. **Sandbox ready** — done (`chienyuanchang` org, README PR staged).
-2. **Run probes A–E** in the sandbox PR. Capture findings into DEV_NOTES.md under a new `## Azure DevOps` section.
+2. **Run probes A–E** in the sandbox PR. Capture findings in ADO_DEV_NOTES.md.
 3. **Repo refactor** (§5) as a standalone PR that touches zero behavior. All 288 tests still pass. GitHub extension zip byte-identical (verified via preflight).
 4. **Selector config extraction** (§8.1) as a second standalone PR.
 5. **`src/adapters/ado.js` skeleton + auth** — no UI yet, just callable from DevTools.

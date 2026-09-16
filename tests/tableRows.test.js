@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 
 const { computeTableRowLine } = require('../src/lib/tableRows.js');
 
-test('computeTableRowLine — canonical example from APPROACH.md', () => {
+test('computeTableRowLine — canonical example from docs/github/APPROACH.md', () => {
   // Source:
   //   line 40 : | header | header |
   //   line 41 : |--------|--------|

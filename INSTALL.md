@@ -20,7 +20,7 @@ That's it. The extension is now installed. No login, no setup, no token required
 
 ## Just installed?
 
-If you installed the extension while a GitHub PR was **already open in another tab**, the inline `+` buttons and threads sidebar won't appear on that tab until you reload it. **Hard-refresh** the tab with **Ctrl+Shift+R** (Windows / Linux) or **Cmd+Shift+R** (macOS) to activate the extension.
+If you installed either extension while a matching GitHub or Azure DevOps PR was **already open in another tab**, the inline `+` buttons and sidebar won't appear on that tab until you reload it. **Hard-refresh** the tab with **Ctrl+Shift+R** (Windows / Linux) or **Cmd+Shift+R** (macOS) to activate the extension.
 
 Tabs you open *after* installing work automatically — the tip above only matters for tabs that were already loaded.
 
@@ -45,13 +45,15 @@ Tabs you open *after* installing work automatically — the tip above only matte
 
 ## Install for Azure DevOps
 
-The first Chrome Web Store and Edge Add-ons listing links will be added after store approval. For pre-release testing:
+**Chrome / Brave / Vivaldi / Arc / any Chromium browser:**
 
-1. Clone or download <https://github.com/chienyuanchang/rich-diff-comments>.
-2. Open `chrome://extensions/` or `edge://extensions/`.
-3. Enable **Developer mode**.
-4. Click **Load unpacked** and select the `extensions/ado/` folder.
-5. If an Azure DevOps pull request was already open, hard-refresh it with **Ctrl+Shift+R** or **Cmd+Shift+R**.
+1. Go to: **<https://chromewebstore.google.com/detail/markdown-pr-comments-for/habbfnkhgmnkhlbakjlnapadamjijbdh>**
+2. Click **Add to Chrome** → **Add extension**.
+
+**Microsoft Edge:**
+
+1. Go to: **<https://microsoftedge.microsoft.com/addons/detail/ajgoipjphffaapagamibikngconoanac>**
+2. Click **Get** → **Add extension**.
 
 No separate login, token, or Personal Access Token is required. The extension uses the Azure DevOps session already open in your browser.
 

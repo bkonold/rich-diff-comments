@@ -22,12 +22,12 @@ How to ship the separate GitHub and Azure DevOps browser-extension targets. This
 
 | Target | Store | Listing | Status | Version |
 |---|---|---|---|---|
-| GitHub | Chrome Web Store | <https://chromewebstore.google.com/detail/markdown-pr-comments-for/bdkcmcdfnhonfcpdgcmemkpcmnhnhemj> | Live (Unlisted) | 1.4.0 |
-| GitHub | Microsoft Edge Add-ons | <https://microsoftedge.microsoft.com/addons/detail/agomibenjlnikaldoddminkjbokfocgb> | Live (Unlisted) | 1.4.0 |
-| Azure DevOps | Chrome Web Store | New listing | Preparing submission | 1.1.0 |
-| Azure DevOps | Microsoft Edge Add-ons | New listing | Preparing submission | 1.1.0 |
+| GitHub | Chrome Web Store | <https://chromewebstore.google.com/detail/markdown-pr-comments-for/bdkcmcdfnhonfcpdgcmemkpcmnhnhemj> | Live (Unlisted) | 1.9.0 |
+| GitHub | Microsoft Edge Add-ons | <https://microsoftedge.microsoft.com/addons/detail/agomibenjlnikaldoddminkjbokfocgb> | Live (Hidden) | 1.9.0 |
+| Azure DevOps | Chrome Web Store | <https://chromewebstore.google.com/detail/markdown-pr-comments-for/habbfnkhgmnkhlbakjlnapadamjijbdh> | Live (Unlisted) | 1.1.0 |
+| Azure DevOps | Microsoft Edge Add-ons | <https://microsoftedge.microsoft.com/addons/detail/ajgoipjphffaapagamibikngconoanac> | Live (Hidden) | 1.1.0 |
 
-> The existing GitHub listings are unlisted. The ADO rows are separate new items and receive their own store IDs after approval. Never upload an ADO package as an update to either GitHub listing.
+> GitHub and ADO use separate listing IDs in each store. Never upload one target's package as an update to the other target's listing.
 
 **End-user install guide:** [INSTALL.md](../INSTALL.md).
 
@@ -53,8 +53,8 @@ When you submit, pick one:
 ## Recommended path for this team
 
 - **GitHub:** maintain the existing Chrome and Edge listing IDs.
-- **Azure DevOps:** submit v1.1.0 as two new hidden/unlisted listings using the ADO package, icon, privacy policy, screenshots, and canonical form copy.
-- Switch either ADO listing to public only after approval and a dogfood period.
+- **Azure DevOps:** maintain the approved Chrome and Edge listing IDs separately from the GitHub listings.
+- Keep listings unlisted/hidden during dogfood; switch either listing to public when ready for broader discovery.
 - Skip self-hosted CRX distribution unless enterprise policy requires it.
 
 ## Pre-publish checklist
@@ -68,7 +68,7 @@ Order of operations the first time you publish:
 - [ ] At least 2 screenshots ready (1280×800 or 640×400) — see [Screenshots](#screenshots)
 - [ ] Marketing description finalized — see [Marketing copy](#marketing-copy)
 - [ ] All tests pass: `npm test` from the extension root
-- [ ] Manual checklist for the target has been walked through; ADO iteration confirmations live in [ADO_ADAPTER_PLAN.md](./ADO_ADAPTER_PLAN.md)
+- [ ] Manual checklist for the target has been walked through; ADO evidence lives in [ADO developer notes](./ado/ADO_DEV_NOTES.md) and the historical [ADO design/validation record](./ado/ADO_ADAPTER_PLAN.md)
 - [ ] Built the publish zip — see [Packaging](#packaging)
 
 ### Icons
@@ -294,7 +294,7 @@ Suggested release flow:
 
 1. Select one target; never release both implicitly.
 2. Bump `extensions/<target>/manifest.json`.
-3. Update [FEATURES.md](./FEATURES.md) when needed and the target changelog.
+3. Update the target status in the shared [feature parity roadmap](./FEATURES.md), update target feature notes only if platform behavior changed, and update the target changelog.
 4. Run target preflight, all browser tests relevant to changed DOM behavior, and manual validation.
 5. Run target release prep and zip verification.
 6. Commit and push the tested state.
