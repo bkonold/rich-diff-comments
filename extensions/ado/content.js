@@ -14,7 +14,7 @@
   'use strict';
 
   const LOG = '[ADRC]';
-  const RUNTIME_REVISION = '2026-09-16-preview-popup-scope-r18';
+  const RUNTIME_REVISION = '2026-09-16-pr-identity-reset-r19';
   const adapter = (typeof window !== 'undefined' && window.ADORC) || null;
   const startupTiming = {
     scriptLoadedAt: performance.now(),
@@ -38,6 +38,21 @@
     console.log(`${LOG} not a PR page (path=${window.location.pathname}), skipping init`);
     return;
   }
+  function prPageIdentity(context) {
+    if (!context) return null;
+    const normalize = (value) => {
+      const text = String(value == null ? '' : value);
+      try { return decodeURIComponent(text).toLowerCase(); } catch (_) { return text.toLowerCase(); }
+    };
+    return JSON.stringify([
+      normalize(window.location.origin),
+      normalize(context.org),
+      normalize(context.projectName),
+      normalize(context.repoName),
+      context.prId == null ? '' : String(context.prId)
+    ]);
+  }
+  const loadedPrIdentity = prPageIdentity(ctx);
   console.log(`${LOG} parsed PR context:`, ctx);
 
   // Resolve namespaced CSS theme aliases at the same inherited scope where
@@ -2712,6 +2727,7 @@
       sessionStorage.setItem(SIDEBAR_PENDING_THREAD_KEY, JSON.stringify({
         id: item.id,
         path: item.path,
+        identity: loadedPrIdentity,
         requirePreview: true,
         expiresAt: Date.now() + PENDING_NAVIGATION_TTL_MS
       }));
@@ -2725,7 +2741,8 @@
       const markdownPath = pending && (typeof GRDC.isMarkdownPath === 'function'
         ? GRDC.isMarkdownPath(pending.path)
         : /\.(md|markdown)$/i.test(String(pending.path || '').split(/[?#]/)[0]));
-      if (!pending || !markdownPath || pending.expiresAt < Date.now()) {
+        if (!pending || pending.identity !== loadedPrIdentity ||
+          !markdownPath || pending.expiresAt < Date.now()) {
         sessionStorage.removeItem(SIDEBAR_PENDING_THREAD_KEY);
         return null;
       }
@@ -2748,6 +2765,7 @@
       sessionStorage.setItem(SIDEBAR_PENDING_CHANGE_KEY, JSON.stringify({
         key: stop.key,
         path: stop.path,
+        identity: loadedPrIdentity,
         requirePreview: true,
         expiresAt: Date.now() + PENDING_NAVIGATION_TTL_MS
       }));
@@ -2757,7 +2775,7 @@
   function readPendingChangeJump() {
     try {
       const pending = JSON.parse(sessionStorage.getItem(SIDEBAR_PENDING_CHANGE_KEY) || 'null');
-      if (!pending || pending.expiresAt < Date.now()) {
+      if (!pending || pending.identity !== loadedPrIdentity || pending.expiresAt < Date.now()) {
         sessionStorage.removeItem(SIDEBAR_PENDING_CHANGE_KEY);
         return null;
       }
@@ -2780,6 +2798,7 @@
       sessionStorage.setItem(SIDEBAR_PENDING_OUTLINE_KEY, JSON.stringify({
         key: target.key || null,
         path: target.path,
+        identity: loadedPrIdentity,
         requirePreview: true,
         expiresAt: Date.now() + PENDING_NAVIGATION_TTL_MS
       }));
@@ -2789,7 +2808,7 @@
   function readPendingOutlineJump() {
     try {
       const pending = JSON.parse(sessionStorage.getItem(SIDEBAR_PENDING_OUTLINE_KEY) || 'null');
-      if (!pending || pending.expiresAt < Date.now()) {
+      if (!pending || pending.identity !== loadedPrIdentity || pending.expiresAt < Date.now()) {
         sessionStorage.removeItem(SIDEBAR_PENDING_OUTLINE_KEY);
         return null;
       }
@@ -2808,6 +2827,7 @@
     try {
       sessionStorage.setItem(EXACT_ROUTE_FALLBACK_KEY, JSON.stringify({
         path: adapter.normalizeFilePath(path),
+        identity: loadedPrIdentity,
         startedAt: Date.now()
       }));
     } catch (_) { /* sessionStorage may be blocked */ }
@@ -2816,7 +2836,8 @@
   function readExactRouteFallback() {
     try {
       const pending = JSON.parse(sessionStorage.getItem(EXACT_ROUTE_FALLBACK_KEY) || 'null');
-      if (!pending?.path || !Number.isFinite(pending.startedAt) ||
+      if (!pending?.path || pending.identity !== loadedPrIdentity ||
+          !Number.isFinite(pending.startedAt) ||
           Date.now() - pending.startedAt > PENDING_NAVIGATION_TTL_MS) {
         sessionStorage.removeItem(EXACT_ROUTE_FALLBACK_KEY);
         return null;
@@ -5266,6 +5287,7 @@
   // preview DOM mutation, and sometimes reuses the same preview element.
   let debounceTimer = null;
   function schedulePreviewInit(delay) {
+    if (reloadForChangedPr()) return;
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
       debounceTimer = null;
@@ -5278,6 +5300,7 @@
   // the background. This gives first-install users a visible next action even
   // on the bare `?_a=files` landing route.
   function ensureFilesPageShell() {
+    if (reloadForChangedPr()) return;
     if (!isAdoFilesRoute()) {
       applySidebarRouteVisibility();
       return;
@@ -5289,10 +5312,57 @@
     ensurePrOutlineCatalog();
   }
 
+  let prIdentityReloadStarted = false;
+
+  function clearPrScopedSessionState() {
+    [
+      SIDEBAR_PENDING_THREAD_KEY,
+      SIDEBAR_PENDING_CHANGE_KEY,
+      SIDEBAR_PENDING_OUTLINE_KEY,
+      EXACT_ROUTE_FALLBACK_KEY,
+      PR_SESSION_CATALOG_CACHE_KEY
+    ].forEach((key) => {
+      try { sessionStorage.removeItem(key); } catch (_) { /* sessionStorage may be blocked */ }
+    });
+  }
+
+  /**
+   * ADO can move between pull requests with history.pushState while retaining
+   * the current document. Every API promise and PR-wide catalog in this
+   * closure belongs to the PR parsed at script load, so an in-place reset is
+   * unsafe: a late PR-A request could repopulate PR-B state. Reload the current
+   * route once instead, letting Chromium cancel the old work and inject a new
+   * content-script closure for the new PR. Local sidebar preferences survive.
+   */
+  function reloadForChangedPr() {
+    const nextContext = adapter.parsePRUrl(window.location.pathname);
+    const nextIdentity = prPageIdentity(nextContext);
+    if (!nextIdentity || nextIdentity === loadedPrIdentity) return false;
+    if (prIdentityReloadStarted) return true;
+    prIdentityReloadStarted = true;
+    initGeneration++;
+    sidebarThreadsLoadGeneration++;
+    changesGeneration++;
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
+    clearPrScopedSessionState();
+    document.querySelectorAll('.adrc-sidebar, .adrc-sidebar-launcher, .adrc-toast')
+      .forEach((element) => element.remove());
+    console.log(`${LOG} pull request changed; reloading with a fresh context`, {
+      from: loadedPrIdentity,
+      to: nextIdentity
+    });
+    window.location.reload();
+    return true;
+  }
+
   restorePrSessionCatalogSnapshot();
   ensureFilesPageShell();
 
   const mo = new MutationObserver((records) => {
+    if (reloadForChangedPr()) return;
     const relevant = records.some((record) => {
       const target = record.target && record.target.nodeType === 1 ? record.target : null;
       if (target && target.closest('.adrc-sidebar, .adrc-sidebar-launcher')) return false;
@@ -5309,6 +5379,7 @@
 
   let observedRouteKey = currentPreviewRouteKey();
   setInterval(() => {
+    if (reloadForChangedPr()) return;
     reconcileExactRouteFallback();
     continuePendingThreadNavigation();
     continuePendingChangeNavigation();
@@ -5330,6 +5401,7 @@
 
   window.ADORC_probe = {
     revision: RUNTIME_REVISION,
+    prIdentity: loadedPrIdentity,
     ctx,
     adapter,
 

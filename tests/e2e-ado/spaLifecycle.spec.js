@@ -7,11 +7,100 @@ const {
   userThreadCount,
   SOURCE_COMMIT,
   FAKE_PR_FILES_URL,
+  SECOND_PR_ID,
+  SECOND_FAKE_PR_PATH,
   injectAdoExtension,
 } = require('./_helpers');
 const fixtures = require('./fixtures/sources');
 
 test.describe('ADO SPA lifecycle and cross-file navigation', () => {
+  test('reloads with clean PR-scoped state after an SPA switch to another pull request', async ({ page }) => {
+    const { server } = await setupAdoExtensionPage(page);
+    await page.keyboard.press('2');
+    await expect(page.locator('.adrc-sidebar-thread-card')).toContainText([
+      'Should this queue have a dead-letter policy?',
+      'Retry and metrics behavior is now documented.',
+      'Cross-file thread for navigation coverage.',
+    ]);
+
+    server.threads = [{
+      id: 201,
+      status: 'active',
+      threadContext: {
+        filePath: fixtures.DESIGN_PATH,
+        rightFileStart: { line: 7, offset: 1 },
+        rightFileEnd: { line: 7, offset: 1 },
+      },
+      comments: [{
+        id: 1,
+        parentCommentId: 0,
+        commentType: 1,
+        content: 'This thread belongs only to PR 43.',
+        author: fixtures.OTHER_USER,
+        publishedDate: '2026-09-15T12:00:00.000Z',
+        lastContentUpdatedDate: '2026-09-15T12:00:00.000Z',
+        isDeleted: false,
+      }],
+    }];
+    server.prChanges = [
+      { changeId: 43, changeTrackingId: 430, changeType: 'edit', item: { path: fixtures.DESIGN_PATH } },
+    ];
+    const requestBoundary = server.requests.length;
+
+    await page.evaluate((nextPath) => {
+      const expiresAt = Date.now() + 90000;
+      const identity = window.ADORC_probe.prIdentity;
+      sessionStorage.setItem('adrc-pending-thread-jump-v1', JSON.stringify({
+        id: '101', path: '/docs/design.md', identity, expiresAt,
+      }));
+      sessionStorage.setItem('adrc-pending-change-jump-v1', JSON.stringify({
+        key: 'pr-42-change', path: '/docs/design.md', identity, expiresAt,
+      }));
+      sessionStorage.setItem('adrc-pending-outline-jump-v1', JSON.stringify({
+        key: 'pr-42-outline', path: '/docs/design.md', identity, expiresAt,
+      }));
+      sessionStorage.setItem('adrc-exact-route-fallback-v1', JSON.stringify({
+        path: '/docs/design.md', identity, startedAt: Date.now(),
+      }));
+      sessionStorage.setItem('adrc-pr-session-catalog-v1', JSON.stringify({
+        version: 1, identity, expiresAt,
+      }));
+      const url = new URL(location.href);
+      url.pathname = nextPath;
+      history.pushState({}, '', url.href);
+    }, SECOND_FAKE_PR_PATH);
+
+    await expect.poll(() => server.pageLoads, { timeout: 4000 }).toBe(2);
+    expect(new URL(page.url()).pathname).toBe(SECOND_FAKE_PR_PATH);
+    const cleared = await page.evaluate(() => [
+      'adrc-pending-thread-jump-v1',
+      'adrc-pending-change-jump-v1',
+      'adrc-pending-outline-jump-v1',
+      'adrc-exact-route-fallback-v1',
+      'adrc-pr-session-catalog-v1',
+    ].every((key) => sessionStorage.getItem(key) == null));
+    expect(cleared).toBe(true);
+
+    // Chromium reinjects manifest content scripts after the production reload;
+    // the fixture mirrors that browser step explicitly.
+    await injectAdoExtension(page);
+    await waitForAdoReady(page, fixtures.DESIGN_PATH, userThreadCount(server.threads));
+    expect(await page.evaluate(() => window.ADORC_probe.ctx.prId)).toBe(SECOND_PR_ID);
+    await expect(page.locator('.adrc-sidebar-tab[data-tab="threads"]'))
+      .toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('.adrc-sidebar-thread-card')).toHaveCount(1);
+    await expect(page.locator('.adrc-sidebar-thread-card')).toContainText('This thread belongs only to PR 43.');
+    await expect(page.locator('.adrc-sidebar')).not.toContainText('Should this queue have a dead-letter policy?');
+
+    const newPrRequests = server.requests.slice(requestBoundary);
+    expect(newPrRequests.some((request) =>
+      request.pathname.endsWith(`/pullRequests/${SECOND_PR_ID}/threads`)
+    )).toBe(true);
+    expect(newPrRequests.some((request) =>
+      request.pathname.includes('/pullRequests/42/')
+    )).toBe(false);
+  });
+
   test('shows the sidebar immediately on Files and opens the first Markdown Preview', async ({ page }) => {
     const { server } = await setupAdoExtensionPage(page, {
       initialUrl: FAKE_PR_FILES_URL,
@@ -150,6 +239,7 @@ test.describe('ADO SPA lifecycle and cross-file navigation', () => {
       sessionStorage.setItem('adrc-pending-outline-jump-v1', JSON.stringify({
         key: null,
         path: stalePath,
+        identity: window.ADORC_probe.prIdentity,
         requirePreview: true,
         expiresAt: Date.now() + 90000,
       }));

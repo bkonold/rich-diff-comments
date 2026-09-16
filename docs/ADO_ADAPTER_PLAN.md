@@ -639,6 +639,35 @@ been opened; it must not require a manual Markdown selection first. A visible
 changed-file row whose name ends in `preview` must remain untouched while the
 actual view-mode popup opens and selects Preview.
 
+### 7.12 Iteration T — isolate state across pull-request SPA navigation (v1.1.0)
+
+Azure DevOps can navigate directly from one pull request to another with the
+History API while preserving the current document. The content script's parsed
+PR context, API promises, source caches, pending jumps, and PR-wide sidebar
+catalogs otherwise continue to belong to the first pull request.
+
+**Design:**
+
+- Treat the complete origin/organization/project/repository/PR tuple as the
+  runtime identity. A file or view change inside that tuple remains a normal
+  warm SPA transition.
+- Check that identity before route initialization and pending-navigation work.
+  When it changes, invalidate current async generations, remove stale extension
+  UI, clear only PR-scoped session entries, and reload the current route once.
+- Store the same identity with each pending destination and fallback marker so
+  a direct browser navigation also rejects state written by another PR.
+- Let the new document receive a fresh manifest content-script injection and
+  parse the new PR context. Preserve local sidebar layout, selected tab, and
+  unresolved-filter preferences.
+- Do not attempt a partial in-place reset: late requests from the old PR could
+  repopulate new sidebar state unless every promise, cache, and callback carried
+  an additional identity guard.
+
+**Acceptance:** switching directly from PR A to PR B clears PR-A Changes,
+Threads, Outline, pending destinations, and fallback snapshots; the reloaded
+runtime requests PR B's APIs and renders only PR-B data. Switching files or
+view modes within one PR still preserves warm catalogs without reloading.
+
 ### 7.10 Iteration R — immediate Files-page sidebar and one-click Preview (v1.1.0)
 
 Live first-install testing exposed a startup dependency that the sandbox did

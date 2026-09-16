@@ -14,6 +14,7 @@ All notable user-visible changes to the Azure DevOps browser extension are recor
 
 - **Cross-file navigation stays responsive when a file switch reloads the page.** Changes, Threads, and Outline remain ready instead of downloading and comparing every Markdown file again.
 - **Opening Markdown Preview no longer jumps to an unrelated changed file whose name resembles the Preview option.** The requested Markdown file remains selected while Preview opens.
+- **Switching directly between pull requests now shows the new pull request's review data.** Changes, Threads, and Outline refresh automatically instead of retaining items from the previously viewed pull request.
 
 ## [1.0.0] — 2026-08-28
 

@@ -200,6 +200,33 @@ slow response for file A from attaching buttons or outline rows to file B.
 **Debug helper:** `ADORC_probe.outline()` reports the current headings and the
 detected scroll container. After a file switch, both must reflect the new file.
 
+### SPA pull-request navigation must replace the runtime context
+
+ADO can also change `/pullrequest/<id>` with History API navigation while
+retaining the entire document. This is a different lifecycle boundary from a
+file or view change inside one PR. The content script parses its adapter context
+once at load, and its repository IDs, PR metadata promises, source caches,
+thread inventory, Changes catalog, and Outline catalog all belong to that
+original PR. Reusing the closure after moving from PR A to PR B therefore sends
+requests with PR A's ID and leaves PR A's sidebar cards visible on PR B.
+
+The route watcher compares a normalized identity containing the origin,
+organization, project, repository, and PR ID before doing any pending-jump or
+file initialization work. A changed identity clears only PR-scoped session
+entries (pending destinations, exact-route fallback, and catalog snapshot),
+removes the stale sidebar, and reloads the current URL once. Chromium then
+reinjects the scripts with PR B's context. Persistent sidebar placement, size,
+active tab, and filter preferences remain in local storage. Pending navigation
+and fallback records also carry the loaded PR identity, so a direct document
+navigation that bypasses the old route watcher still rejects stale PR-A state.
+
+Do not turn this into a partial in-place reset. Every old asynchronous request
+would also need cancellation or an identity guard, and every mutable promise,
+source cache, generation, DOM reference, and adapter-resolved ID would need to
+be replaced atomically. A document reload is the safer PR boundary; same-PR
+file/view navigation continues to use the warm in-memory catalogs without a
+reload.
+
 ### Cross-file sidebar navigation must reapply Preview
 
 The four-option file view mode (**Side-by-side / Inline / Raw content /

@@ -36,8 +36,20 @@ test('ADO manifest loads shared sidebar and Changes helpers before content.js', 
 });
 
 test('ADO exposes a runtime revision for live loaded-script verification', () => {
-  assert.match(content, /const RUNTIME_REVISION = '2026-09-16-preview-popup-scope-r18'/);
+  assert.match(content, /const RUNTIME_REVISION = '2026-09-16-pr-identity-reset-r19'/);
   assert.match(content, /revision: RUNTIME_REVISION/);
+});
+
+test('ADO reloads with fresh state when SPA navigation changes pull requests', () => {
+  assert.match(content, /const loadedPrIdentity = prPageIdentity\(ctx\)/);
+  assert.match(content, /function reloadForChangedPr\(\)/);
+  assert.match(content, /nextIdentity === loadedPrIdentity/);
+  assert.match(content, /clearPrScopedSessionState\(\)/);
+  assert.match(content, /identity: loadedPrIdentity/);
+  assert.match(content, /pending\.identity !== loadedPrIdentity/);
+  assert.match(content, /SIDEBAR_PENDING_THREAD_KEY,[\s\S]*SIDEBAR_PENDING_CHANGE_KEY,[\s\S]*SIDEBAR_PENDING_OUTLINE_KEY,[\s\S]*EXACT_ROUTE_FALLBACK_KEY,[\s\S]*PR_SESSION_CATALOG_CACHE_KEY/);
+  assert.match(content, /window\.location\.reload\(\)/);
+  assert.match(content, /setInterval\(\(\) => \{\s*if \(reloadForChangedPr\(\)\) return;/);
 });
 
 test('ADO exact TreeEx activation reaches the list selection model', () => {
@@ -257,7 +269,7 @@ test('ADO Threads pane supports persisted unresolved filtering', () => {
 
 test('ADO Threads pane includes only Markdown review destinations', () => {
   assert.match(content, /function normalizeSidebarThread\(thread\)[\s\S]*?GRDC\.isMarkdownPath\(path\)[\s\S]*?if \(!markdownPath\) return null/);
-  assert.match(content, /function readPendingThreadJump\(\)[\s\S]*?GRDC\.isMarkdownPath\(pending\.path\)[\s\S]*?if \(!pending \|\| !markdownPath/);
+  assert.match(content, /function readPendingThreadJump\(\)[\s\S]*?GRDC\.isMarkdownPath\(pending\.path\)[\s\S]*?if \(!pending \|\| pending\.identity !== loadedPrIdentity \|\|[\s\S]*?!markdownPath/);
 });
 
 test('ADO cross-file thread navigation stores and resumes a pending jump', () => {

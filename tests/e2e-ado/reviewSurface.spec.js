@@ -85,6 +85,7 @@ test.describe('ADO rendered review surface', () => {
       sessionStorage.setItem('adrc-pending-thread-jump-v1', JSON.stringify({
         id: 104,
         path: '/src/worker.js',
+        identity: window.ADORC_probe.prIdentity,
         requirePreview: true,
         expiresAt: Date.now() + 90000,
       }));

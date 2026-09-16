@@ -6,7 +6,7 @@
 
 ## Submission notes
 
-Version 1.1.0 adds an immediate Files-page sidebar and **Open Markdown Preview** action, keeps cross-file navigation responsive across fallback reloads, and prevents similarly named changed files from being mistaken for the Preview option. It remains packaged separately from the GitHub extension, requests no new permissions, loads no remote code, has no backend, and contains no analytics or telemetry.
+Version 1.1.0 adds an immediate Files-page sidebar and **Open Markdown Preview** action, keeps navigation responsive and accurate across file or pull-request switches, and prevents similarly named changed files from being mistaken for the Preview option. It remains packaged separately from the GitHub extension, requests no new permissions, loads no remote code, has no backend, and contains no analytics or telemetry.
 
 ## Package
 
@@ -34,7 +34,7 @@ Comment on rendered Markdown in Azure DevOps PRs with inline threads, Changes, O
 🆕 What's new — v1.1.0 (2026-09-15)
 
 • Start rendered Markdown review from any pull request Files page with the new Open Markdown Preview action.
-• Changes, Threads, and Outline stay responsive when cross-file navigation needs to reload the page.
+• Changes, Threads, and Outline stay responsive when switching files and refresh correctly when moving directly to another pull request.
 • Opening Preview no longer jumps to an unrelated changed file whose name resembles the Preview option.
 
 v1.0.0 (2026-08-28)
@@ -180,6 +180,7 @@ https://github.com/chienyuanchang/rich-diff-comments/blob/main/PRIVACY_ADO.md
 
 - Changes, Threads, and Outline stay responsive when cross-file navigation reloads the page.
 - Opening Markdown Preview no longer jumps to an unrelated changed file whose name resembles the Preview option.
+- Switching directly between pull requests refreshes Changes, Threads, and Outline for the newly opened pull request.
 
 ### v1.0.0 — 2026-08-28
 
