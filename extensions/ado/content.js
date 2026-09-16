@@ -14,7 +14,7 @@
   'use strict';
 
   const LOG = '[ADRC]';
-  const RUNTIME_REVISION = '2026-09-16-native-selection-r15';
+  const RUNTIME_REVISION = '2026-09-16-preview-popup-scope-r17';
   const adapter = (typeof window !== 'undefined' && window.ADORC) || null;
   const startupTiming = {
     scriptLoadedAt: performance.now(),
@@ -2980,23 +2980,32 @@
   }
 
   function getVisibleAdoModeMenuOptions() {
-    // Menu options are safe to click only when they have a menu/option role,
-    // are Bolt list rows, or live inside a visible popup/callout. We do NOT
-    // include arbitrary page buttons — doing so caused Side-by-side/Inline
-    // oscillation when an open menu option was mistaken for the split button.
-    const candidates = document.querySelectorAll([
-      '[role="menuitem"]',
-      '[role="menuitemradio"]',
-      '[role="option"]',
-      '.bolt-list-row',
-      '[role="menu"] button',
-      '.bolt-callout button',
-      '.ms-Callout button'
-    ].join(', '));
-    return Array.from(candidates).filter((el) => {
-      if (!isVisibleControl(el) || el.closest('.adrc-sidebar, .adrc-editor')) return false;
-      return !!getAdoViewModeLabel(el);
+    // Bolt uses list rows for both popup menus and the changed-file TreeEx.
+    // A repository file such as `2026-06-01-preview` therefore looks like a
+    // Preview option if rows are scanned page-wide. Search only inside a live
+    // popup owned by ADO's view-mode control; never treat the file tree (or
+    // another page List) as a mode menu.
+    const popupSelector = '[role="menu"], .bolt-callout, .ms-Callout, [role="listbox"]';
+    const popups = Array.from(document.querySelectorAll(popupSelector)).filter((popup) =>
+      isVisibleControl(popup) && !popup.closest('.adrc-sidebar, .adrc-editor')
+    );
+    const candidates = [];
+    const seen = new Set();
+    popups.forEach((popup) => {
+      popup.querySelectorAll([
+        '[role="menuitem"]',
+        '[role="menuitemradio"]',
+        '[role="option"]',
+        '.bolt-menuitem-row',
+        '.bolt-list-row',
+        'button'
+      ].join(', ')).forEach((el) => {
+        if (seen.has(el) || !isVisibleControl(el)) return;
+        seen.add(el);
+        if (getAdoViewModeLabel(el)) candidates.push(el);
+      });
     });
+    return candidates;
   }
 
   function findVisiblePreviewMenuOption() {
@@ -3655,7 +3664,7 @@
     return true;
   }
 
-  async function activateAdoFileTreeTarget(fileTarget, path, sequence) {
+  async function activateAdoFileTreeTarget(fileTarget, path, sequence, options) {
     let currentTarget = sequence === adoFileNavigationSequence
       ? currentAdoFileTreeTarget(fileTarget, path)
       : null;
@@ -3667,10 +3676,19 @@
       rowIndex: currentTarget.rowIndex,
       reconstructedPath: currentTarget.reconstructedPath
     });
-    if (invokeAdoTreeExSelection(currentTarget) &&
-        await waitForAdoFilePath(path, sequence, 800)) {
+    const selectionInvoked = invokeAdoTreeExSelection(currentTarget);
+    if (selectionInvoked && await waitForAdoFilePath(path, sequence, 800)) {
       recordNavigationTrace('tree.selection-model-accepted', { requestedPath: path, sequence });
       return true;
+    }
+    if (!selectionInvoked && options?.deferDomWhenSelectionUnavailable) {
+      recordNavigationTrace('tree.selection-model-unavailable', {
+        requestedPath: path,
+        sequence,
+        rowId: currentTarget.row.id || null,
+        rowIndex: currentTarget.rowIndex
+      });
+      return false;
     }
     currentTarget = sequence === adoFileNavigationSequence
       ? currentAdoFileTreeTarget(fileTarget, path)
@@ -3878,6 +3896,29 @@
     const sequence = ++adoFileNavigationSequence;
     adoFileNavigationTargetPath = normalizedPath;
     let preserveTargetForReload = false;
+    // Before any Markdown Preview has been established, ADO can expose the
+    // Files shell and selected-file state before TreeEx has mounted either the
+    // requested leaf or its current List dispatcher. A manual Markdown click
+    // naturally waits for that later paint. Give extension-initiated startup
+    // navigation the same bounded readiness window; established Preview
+    // navigation keeps the existing immediate native/fallback behavior.
+    const awaitColdStartTree = !hasVisibleMarkdownPreview();
+    const coldStartTreeDeadline = Date.now() + 3000;
+    let coldStartWaitRecorded = false;
+    const waitForColdStartTree = async (reason, attempt) => {
+      if (!awaitColdStartTree || Date.now() >= coldStartTreeDeadline) return false;
+      if (!coldStartWaitRecorded) {
+        coldStartWaitRecorded = true;
+        recordNavigationTrace('tree.cold-start-waiting', {
+          requestedPath: normalizedPath,
+          sequence,
+          reason,
+          attempt
+        });
+      }
+      await delay(Math.min(100, Math.max(0, coldStartTreeDeadline - Date.now())));
+      return sequence === adoFileNavigationSequence;
+    };
     recordNavigationTrace('navigation.requested', {
       requestedPath: normalizedPath,
       source: options?.source || 'unspecified',
@@ -3889,7 +3930,8 @@
         return true;
       }
 
-      for (let attempt = 0; attempt < 20 && sequence === adoFileNavigationSequence; attempt++) {
+      const maximumAttempts = awaitColdStartTree ? 40 : 20;
+      for (let attempt = 0; attempt < maximumAttempts && sequence === adoFileNavigationSequence; attempt++) {
         const fileTarget = findBestAdoFileTreeTarget(normalizedPath);
         if (fileTarget) {
           recordNavigationTrace('tree.target-found', {
@@ -3907,8 +3949,12 @@
             reconstructedPath: fileTarget.reconstructedPath,
             score: fileTarget.score
           });
-          if (await activateAdoFileTreeTarget(fileTarget, normalizedPath, sequence)) return true;
+          const deferDom = awaitColdStartTree && Date.now() < coldStartTreeDeadline;
+          if (await activateAdoFileTreeTarget(fileTarget, normalizedPath, sequence, {
+            deferDomWhenSelectionUnavailable: deferDom
+          })) return true;
           if (sequence !== adoFileNavigationSequence) return false;
+          if (deferDom && await waitForColdStartTree('list-dispatcher-unavailable', attempt)) continue;
           break;
         }
 
@@ -3935,9 +3981,14 @@
             reconstructedPath: materialized.reconstructedPath,
             score: materialized.score
           });
-          if (await activateAdoFileTreeTarget(materialized, normalizedPath, sequence)) return true;
+          const deferDom = awaitColdStartTree && Date.now() < coldStartTreeDeadline;
+          if (await activateAdoFileTreeTarget(materialized, normalizedPath, sequence, {
+            deferDomWhenSelectionUnavailable: deferDom
+          })) return true;
           if (sequence !== adoFileNavigationSequence) return false;
+          if (deferDom && await waitForColdStartTree('list-dispatcher-unavailable', attempt)) continue;
         }
+        if (await waitForColdStartTree('target-not-materialized', attempt)) continue;
         break;
       }
 

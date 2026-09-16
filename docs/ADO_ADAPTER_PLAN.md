@@ -581,6 +581,17 @@ outside Azure DevOps' virtualized materialized range.
   Invoke that one current list-level dispatcher with the exact revalidated leaf
   as the event target before considering the navigation accepted. Do not call
   arbitrary row/cell callbacks without their required row argument.
+- Treat first Preview activation as a separate host-readiness state. The Files
+  shell and PR inventory may be ready while the requested leaf or current List
+  dispatcher is still mounting. While no Markdown Preview exists, wait for
+  those native prerequisites for a bounded three seconds, re-resolving the
+  exact live row each time; do not jump immediately to a URL-only fallback that
+  ADO can overwrite from its selected-file model.
+- Scope view-mode option discovery to the visible ADO popup/callout/listbox.
+  Bolt List rows are also used by the changed-file TreeEx, and a repository
+  path ending in `preview` must never qualify as the Preview menu option. Open
+  the documented split-button trigger first, then select Preview only from its
+  popup surface.
 - If the current list dispatcher is unavailable or produces no transition,
   activate the revalidated leaf with the complete pointer/mouse
   press-release-click sequence. Some TreeEx consumers handle selection during
@@ -589,12 +600,10 @@ outside Azure DevOps' virtualized materialized range.
   expose the requested file. Track the requested path briefly across navigation
   and release the pending sidebar jump if ADO restores a different folder.
 - Render cross-file Changes, Threads, and Outline destinations as clean exact
-  links. Preserve the browser default for a trusted click when the native leaf
-  is not currently materialized; save pending state synchronously first. Keep
-  the no-reload SPA path when an exact native row is already visible.
-- Use top-level navigation semantics for cross-file links so ADO's delegated
-  same-tab anchor interceptor cannot restore the previously selected folder.
-  Prevent default only for same-file scrolling.
+  links for accessibility and manual fallback, but route ordinary sidebar
+  clicks through the shared native-tree-first path. Save pending state before
+  navigation and keep the no-reload SPA path whenever the exact native row can
+  be exposed.
 - Retain the exact-route reload only as a final safety fallback when the native
   tree cannot expose the requested file at all.
 - Before that final document reload, preserve a bounded, short-lived snapshot
@@ -631,6 +640,11 @@ a failed or superseded transition always releases navigation control. Starting
 on a selected non-Markdown file and choosing **Open Markdown Preview** must
 replace ADO's selected-file state with the first changed Markdown file; selecting
 another non-Markdown file and using sidebar navigation must do the same again.
+The same setup action must work from a bare Files URL before Preview has ever
+been opened, including when the target leaf or List dispatcher appears in a
+later TreeEx paint; it must not require a manual Markdown selection first. A
+visible changed-file row whose name ends in `preview` must remain untouched
+while the actual view-mode popup opens and selects Preview.
 
 ### 7.10 Iteration R — immediate Files-page sidebar and one-click Preview (v1.0.1)
 
@@ -669,6 +683,13 @@ make a large PR appear stuck indefinitely.
   view-mode menu to select Preview. Because ADO remembers Preview PR-wide, one
   successful action prepares subsequent Markdown files without a render-all
   loop.
+- During the first action, wait briefly for TreeEx's exact Markdown leaf and
+  List selection dispatcher if the Files shell wins the startup race. Update
+  native selection before opening the view-mode menu; a requested URL alone is
+  not evidence that ADO accepted the file.
+- Discover Preview only inside the visible view-mode popup. Never scan all Bolt
+  List rows, because the file tree uses the same row primitive and can contain
+  ordinary paths whose final segment ends in `preview`.
 - Prioritize the active/selected file ahead of background source analysis and
   publish Changes/Outline progress incrementally instead of waiting for every
   Markdown file. A failed file becomes an isolated unavailable entry rather
@@ -681,7 +702,8 @@ make a large PR appear stuck indefinitely.
 
 **Acceptance:** the shell appears promptly with no `?path=` and before any
 delayed source response; the setup action opens the current/first changed
-Markdown file and selects Preview; current-file buttons become usable without
+Markdown file and selects Preview without requiring a manual Markdown click,
+even when TreeEx mounts after the shell; current-file buttons become usable without
 waiting for all PR files; Changes and Outline visibly make progress on a large
 or partially failing PR; reload/SPA navigation creates no duplicate shell; no
 analytics or remote service is introduced.

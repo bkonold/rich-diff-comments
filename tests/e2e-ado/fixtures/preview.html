@@ -51,6 +51,9 @@
       <div id="tree-non-markdown" class="bolt-tree-row" role="treeitem" aria-label="src/ignored.js" data-path="/src/ignored.js">
         <div class="bolt-tree-cell"><div class="bolt-table-cell-content">ignored.js</div></div>
       </div>
+      <div id="tree-preview-suffix" class="bolt-tree-row bolt-table-row bolt-list-row single-click-activation" role="treeitem" aria-label="resources/openapi/2026-06-01-preview" data-path="/resources/openapi/2026-06-01-preview">
+        <div class="bolt-tree-cell"><div class="bolt-table-cell-content">2026-06-01-preview</div></div>
+      </div>
     </nav>
 
     <main class="repos-changes-viewer">
@@ -98,7 +101,8 @@
           '<h1 id="user-content-renamed-notes">Renamed Notes<a class="shareHeaderAnchor" href="#renamed-notes"></a></h1>',
           '<p>Updated wording after the rename.</p>'
         ].join(''),
-        '/src/ignored.js': null
+        '/src/ignored.js': null,
+        '/resources/openapi/2026-06-01-preview': null
       };
 
       const preview = document.getElementById('ado-preview');
@@ -110,20 +114,30 @@
         return sessionStorage.getItem(selectionLockKey) === '1';
       }
 
-      function openPath(path) {
+      function renderPath(path, requestedMode) {
         if (!Object.prototype.hasOwnProperty.call(fragments, path)) throw new Error('Unknown fixture path: ' + path);
         history.pushState({}, '', location.pathname + '?_a=files&path=' + encodeURIComponent(path));
         const renderable = fragments[path] != null;
-        preview.style.display = renderable ? '' : 'none';
-        preview.innerHTML = renderable ? fragments[path] : '';
+        const mode = renderable ? requestedMode : 'Inline';
+        const showPreview = renderable && mode === 'Preview';
+        preview.style.display = showPreview ? '' : 'none';
+        preview.innerHTML = showPreview ? fragments[path] : '';
         rows.forEach((row) => row.classList.toggle('fixture-active', row.dataset.path === path));
-        document.querySelector('.fixture-view-mode').textContent = renderable ? 'Preview' : 'Inline';
+        document.querySelector('.fixture-view-mode').textContent = mode;
         document.getElementById('preview-scroll').scrollTop = 0;
+      }
+
+      function openPath(path) {
+        renderPath(path, fragments[path] != null ? 'Preview' : 'Inline');
       }
 
       function selectPath(path) {
         if (selectionLockEnabled()) sessionStorage.setItem(selectedPathKey, path);
-        openPath(path);
+        // ADO keeps file selection and the four-option view mode as separate
+        // state. Native tree selection preserves the current mode; selecting
+        // a Markdown file from Inline does not create Preview by itself.
+        const currentMode = document.querySelector('.fixture-view-mode').textContent;
+        renderPath(path, currentMode);
       }
 
       function enableSelectionLock(path) {
@@ -162,7 +176,7 @@
           option.addEventListener('click', () => {
             if (label === 'Preview') {
               const path = new URLSearchParams(location.search).get('path');
-              if (path && fragments[path] != null) openPath(path);
+              if (path && fragments[path] != null) renderPath(path, 'Preview');
             } else {
               preview.style.display = 'none';
               preview.innerHTML = '';

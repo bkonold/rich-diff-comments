@@ -222,12 +222,12 @@ Sidebar thread navigation therefore:
 6. waits for route-aware Preview initialization before scrolling to and
    expanding the target inline thread.
 
-There is intentionally **no full-page URL or generic anchor fallback**. That
-fallback reloaded ADO (visible as a second MSAL/content-script initialization)
-and remounted the target file in Inline mode. If the target tree row is not
-materialized—usually because its folder is collapsed—the sidebar shows an
-actionable toast instead of destroying the user's Preview state. Use
-`ADORC_probe.fileTargets('/path/to/file.md')` to inspect row discovery.
+The native tree remains the primary path. A clean same-PR GET is retained only
+as a last resort after exact-row lookup, collapsed-ancestor expansion, and
+virtual-tree materialization fail. That document fallback cannot replace ADO's
+selected-file model reliably, so it is not treated as an alternative to native
+selection. Use `ADORC_probe.fileTargets('/path/to/file.md')` to inspect row
+discovery.
 
 Do not add a made-up view-mode URL parameter: ADO currently keeps this in its
 React/session state. The DOM fallback deliberately relies on user-visible mode
@@ -246,6 +246,39 @@ The restore flow is one-shot per pending navigation: open only the documented
 `.bolt-split-button-option`, click only the Preview menu row once, then wait for
 the rendered container. Unknown menu DOM fails safely and is exposed through
 `ADORC_probe.viewMode()`.
+
+**2026-09-16 correction: the file-X jump was false Preview-menu discovery, not
+a failed TreeEx selection.** A live trace from a bare Files route showed the
+requested Markdown leaf found and accepted by the List selection model. The
+route changed to that exact Markdown path. Two milliseconds later, Preview
+restoration reported `preview-restore.option-clicked` for
+`2026-06-01-preview`; the following `control.clicked` identified it as a
+changed-file TreeEx row, not a menu item. ADO correctly activated that row and
+returned to the extensionless file X.
+
+The bug was a page-wide `.bolt-list-row` scan in mode-option discovery combined
+with label matching that intentionally accepts accessible text ending in
+`Preview`. Bolt uses List rows for both popup menus and the repository tree, so
+any visible file/folder ending in `preview` could masquerade as the Preview
+mode option before the view-mode popup had even opened. The apparent
+before/after-file-X boundary came from which virtualized tree rows remained
+materialized: moving far enough past X removed the decoy from the current
+paint, allowing the real menu to open.
+
+Mode options must therefore be discovered only inside a visible ADO
+menu/callout/listbox root. Page-level List rows and TreeEx rows never qualify,
+regardless of their label. The browser fixture includes an extensionless
+`2026-06-01-preview` changed-file row and verifies that one-click setup remains
+on the requested Markdown file while selecting the real Preview menu option.
+
+This trace also separates earlier work by evidence. Native List-root selection
+is still required and is what successfully selected the requested Markdown
+leaf. Catalog preservation still protects the genuine final reload fallback.
+The bounded late-leaf/List-dispatcher wait covers a separate fixture-reproduced
+host-readiness race, but it was not the cause of this live file-X reproduction.
+The removed content-script/service-worker navigation experiment remains
+unnecessary because changing the browser URL cannot solve either native
+selection or popup misclassification.
 
 **TreeEx recycles connected row elements during virtualization.** Live testing
 on a large PR showed the same generated row element being reused for different
@@ -289,6 +322,26 @@ target before trying DOM activation fallbacks. The list itself constructs the
 real row payload and runs selection before activation. If no current list
 dispatcher is discoverable, this private path is skipped rather than guessing
 at component callbacks.
+
+**Cold start can also expose a separate TreeEx lifecycle state.** On a new PR Files page—
+especially a bare `_a=files` URL or one restored to a non-Markdown file—the
+sidebar and changed-file inventory can be ready before TreeEx has mounted the
+requested Markdown leaf or the current List click dispatcher. The previous
+router performed one lookup/materialization pass and immediately submitted the
+GET fallback. ADO then hydrated its still-authoritative non-Markdown selection
+and replaced the requested route, which made the setup action appear stuck.
+Manually opening a Markdown file worked because that interaction happened only
+after TreeEx had mounted and it updated selection before Preview.
+
+When no Markdown Preview has yet been established, native navigation now has a
+bounded three-second readiness window. It repeatedly rebuilds the exact live
+tree path and waits for the List dispatcher; it does not accept URL movement as
+a substitute for selection. Once the current leaf and dispatcher exist, the
+normal selection-before-activation path runs, and only then does Preview-mode
+restoration begin. Established Preview navigation keeps its existing fast path
+and does not inherit this startup delay. The fixture models URL, native
+selection, and view mode independently, with regressions for both a late leaf
+and a late List dispatcher.
 
 **Commit the exact fallback URL before reloading.** Live testing also showed the
 legacy PR viewer restoring its previously selected folder during a direct

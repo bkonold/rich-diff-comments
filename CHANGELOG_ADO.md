@@ -7,6 +7,7 @@ All notable user-visible changes to the Azure DevOps browser extension are recor
 ### Fixed
 
 - **Cross-file sidebar navigation no longer rebuilds the entire pull-request review catalog after a fallback page transition.** The destination file still opens correctly, while Changes, Threads, and Outline remain available without downloading and comparing every Markdown file again.
+- **Open Markdown Preview now works directly from a new Files page or a non-Markdown selection.** Reviewers no longer need to open a Markdown file manually first, and setup no longer jumps to an unrelated changed file whose name resembles the Preview option.
 
 ## [1.0.0] — 2026-08-28
 
