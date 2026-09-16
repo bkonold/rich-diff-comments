@@ -172,7 +172,12 @@ li.adrc-hoverable {
 }
 li.adrc-hoverable .adrc-comment-btn {
   left: -26px;
-  top: 4px;
+  /* Center on the first line box rather than using a fixed offset. A fixed
+     4px placed a 22px button 3px below the center of ADO's 24px list line;
+     `lh` also keeps nested items anchored to their own first line instead
+     of centering against the full nested subtree. */
+  line-height: inherit;
+  top: calc((1lh - 22px) / 2);
   transform: none;
 }
 

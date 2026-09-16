@@ -284,7 +284,7 @@
     const sourceLines = source.split('\n');
 
     const GRDC = window.GRDC || {};
-    const { mapBlocksToSourceLines, buildSourceIndex, findTextInSource, findFrontmatterRange, computeTableRowLine } = GRDC;
+    const { mapBlocksToSourceLines, buildSourceIndex, findTextInSource, cleanRenderedText, findFrontmatterRange, computeTableRowLine } = GRDC;
     if (typeof mapBlocksToSourceLines !== 'function') {
       throw new Error('window.GRDC.mapBlocksToSourceLines missing — check manifest content_scripts.js order');
     }
@@ -293,7 +293,7 @@
       container,
       sourceLines,
       filePath,
-      { buildSourceIndex, findTextInSource, findFrontmatterRange, computeTableRowLine },
+      { buildSourceIndex, findTextInSource, cleanRenderedText, findFrontmatterRange, computeTableRowLine },
       console.log.bind(console)
     );
     return { map, source };

@@ -54,6 +54,31 @@ test.describe('ADO rendered review surface', () => {
     expect(pageErrors).toEqual([]);
   });
 
+  test('centers comment buttons on single-line paragraphs and list-item line boxes', async ({ page }) => {
+    await setupAdoExtensionPage(page);
+    const preview = page.locator('.markdown-preview-container');
+    const paragraph = preview.locator('p', { hasText: 'durable queue' });
+    const listItem = preview.locator('li', { hasText: 'Architecture' });
+
+    for (const host of [paragraph, listItem]) {
+      const button = host.locator(':scope > .adrc-comment-btn');
+      const [hostBox, buttonBox, lineHeight] = await Promise.all([
+        host.boundingBox(),
+        button.boundingBox(),
+        host.evaluate((element) => parseFloat(getComputedStyle(element).lineHeight)),
+      ]);
+      expect(hostBox).not.toBeNull();
+      expect(buttonBox).not.toBeNull();
+      expect(Number.isFinite(lineHeight)).toBe(true);
+      // These fixture blocks contain exactly one text line. Paragraphs center
+      // against the host; list items center against their first line box so
+      // this remains correct even when an item later gains a nested list.
+      const expectedCenter = hostBox.y + Math.min(hostBox.height, lineHeight) / 2;
+      const buttonCenter = buttonBox.y + buttonBox.height / 2;
+      expect(Math.abs(buttonCenter - expectedCenter)).toBeLessThanOrEqual(1);
+    }
+  });
+
   test('excludes non-Markdown threads and discards their stale pending jumps', async ({ page }) => {
     const threads = fixtures.defaultThreads();
     threads.push({
@@ -128,6 +153,25 @@ test.describe('ADO rendered review surface', () => {
     await expect(page.locator('.adrc-thread-badge')).toHaveCount(3);
     await expect(page.locator('[data-count="threads"]')).toHaveText('4');
     expect(matchingRequests(server, 'GET', '/threads')).toHaveLength(2);
+  });
+
+  test('posts from the third list item on its bullet line rather than the matching section heading', async ({ page }) => {
+    const { server } = await setupAdoExtensionPage(page);
+    const thirdBullet = page.locator('.markdown-preview-container li').nth(2);
+    await expect(thirdBullet).toHaveText(/Architecture/);
+    await clickCommentButton(thirdBullet);
+
+    const editor = page.locator('.adrc-compose-editor');
+    await expect(editor.locator('.adrc-editor-header')).toContainText(`${fixtures.DESIGN_PATH}:11`);
+    await editor.locator('textarea').fill('Comment on the third bullet.');
+    await editor.locator('.adrc-editor-submit').click();
+
+    await expect.poll(() => matchingRequests(server, 'POST', '/threads').length).toBe(1);
+    expect(matchingRequests(server, 'POST', '/threads')[0].body.threadContext).toEqual({
+      filePath: fixtures.DESIGN_PATH,
+      rightFileStart: { line: 11, offset: 1 },
+      rightFileEnd: { line: 11, offset: 1 },
+    });
   });
 
   test('tracks individual source lines inside an ADO-rendered code fence', async ({ page }) => {

@@ -131,6 +131,29 @@ Threads are returned by `GET /threads`:
 
 **Fix:** put `.adrc-hoverable` on the *host* returned by `buttonAnchor` (the first cell for `<tr>`, the block itself for everything else). Same DOM shape the GitHub extension uses. See `attachCommentButton()` in [extensions/ado/content.js](../../extensions/ado/content.js).
 
+## List-item button alignment — first-line centering
+
+Manual testing on 2026-09-16 captured a single-line list item where the circular `+` button sat slightly below the center of the bullet text and its highlighted row. This was separate from the same item's incorrect source anchor.
+
+List items cannot use the default `top: 50%` rule because an item may contain a nested list; centering against the complete subtree would move the parent button into its children. The old fixed `top: 4px` placed a 22px button three pixels below the center of ADO's 24px list line. The corrected rule inherits the list item's line height and calculates the top offset from one `lh`, centering on the first line regardless of the nested subtree's total height.
+
+ADO browser coverage compares button geometry with the first line box for both a normal single-line paragraph and a list item. Table-cell and code-block rules remain unchanged.
+
+## List-item mapping — prevent section-heading anchors
+
+Manual testing on 2026-09-16 captured an ordered-list item whose visible `+` control opened a comment that ADO ultimately displayed on the preceding section heading rather than on the selected bullet (reported on the third bullet in the list). This is a source-anchor correctness defect, separate from the nearby visual button-alignment issue.
+
+The shared mapper walks `p, h1–h6, li, tr, pre` in DOM order, removes nested-list text from a parent `<li>`, then forward-matches each block against the head source. Generic prose matching is unsafe for `<li>` because the same visible text can appear in a heading; failed earlier matches can also leave the search cursor before that heading.
+
+The fix constrains `<li>` candidates to source lines beginning with a Markdown unordered, ordered, or task-list marker. If no valid candidate exists, the item follows the bounded unmatched-block fallback instead of being passed to the generic prose matcher. This preserves monotonic source order and prevents a textual heading match from stealing the list item's anchor.
+
+Regression coverage includes both layers:
+
+1. a shared mapper fixture with an unmatched rendered heading followed by an ordered list whose third item repeats the heading text; and
+2. an ADO browser fixture that clicks the third unordered-list item and asserts `rightFileStart` and `rightFileEnd` both target that bullet's source line.
+
+The original live PR still needs manual confirmation before this is considered release-validated. If it differs from the covered failure shape, capture the list DOM, raw Markdown, `ADORC_probe.detectLines(filePath)` output, and create-thread payload before broadening the matcher further.
+
 ## DOM quirks — code blocks
 
 Fenced code blocks render as `<pre><code><span>...</span>...</code></pre>` — no per-line wrapper elements. The extension:

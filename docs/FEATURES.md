@@ -47,7 +47,7 @@ Priority applies to the shared user outcome:
 
 | Capability | GitHub | Azure DevOps |
 |---|---|---|
-| Add a review comment from rendered paragraphs, headings, list items, table rows, and code blocks | ✅ GitHub v1.0.0 | ✅ ADO v1.0.0 |
+| Add a review comment from rendered paragraphs, headings, list items, table rows, and code blocks | ✅ GitHub v1.0.0 | 🧪 ADO fix implemented; awaiting live validation |
 | Create single-line and multi-line comments with editable source-line targets | ✅ GitHub v1.0.0 | ✅ ADO v1.0.0 |
 | Track a specific line inside a fenced code block from the pointer position | ✅ | ✅ |
 | Show new comments inline immediately without a manual refresh | ✅ | ✅ |
@@ -74,7 +74,7 @@ Priority applies to the shared user outcome:
 | Show one summary card for a newly added, deleted, or renamed Markdown file where applicable | ✅ | ✅ |
 | Navigate threads globally and filter to unresolved conversations | ✅ | ✅ |
 | Browse headings across changed Markdown files with per-section thread counts | ✅ | ✅ |
-| Fold individual sections or fold by H1/H2/H3 level and expand all | ✅ | ✅ |
+| Fold individual sections or bulk-fold by H1/H2/H3 level and expand all | ✅ Bulk actions affect all rendered files | ✅ Bulk actions affect the current file |
 | Show file-scoped position with a PR-wide total and jump header icons to the current file first | ✅ | ✅ |
 | Follow native file navigation and keep sidebar selection synchronized | ✅ | ✅ |
 | Hide or stand down outside the host's changed-files review surface | ✅ | ✅ |
@@ -106,6 +106,16 @@ Priority applies to the shared user outcome:
 ## 🚧 Planned / nice-to-have
 
 ### Correctness
+
+- [x] **P0 — Keep ADO list-item comments anchored to the selected bullet**
+  - **Outcome:** clicking `+` on an ordered or unordered list item creates the comment on that item's source line, never on the preceding section heading or another bullet.
+  - **GitHub:** ✅ List items, including nested items, have dedicated mapping coverage.
+  - **ADO:** 🧪 List matching is now restricted to Markdown list-marker lines; unit coverage and an ADO browser test verify the third bullet's create-thread payload. Awaiting confirmation on the original live PR before release.
+
+- [x] **P2 — Center the comment button on single-line highlighted blocks**
+  - **Outcome:** the `+` affordance is vertically centered on the text line and its hover/change highlight instead of appearing below it.
+  - **GitHub:** ✅ No equivalent alignment issue observed.
+  - **ADO:** 🧪 List-item buttons now center from the host's first-line height instead of a fixed offset; browser geometry coverage verifies single-line paragraphs and list items. Awaiting live confirmation.
 
 - [ ] **P0 — Inline markers for table rows and code lines that already have comments**
   - **Outcome:** a reviewer can see which exact row or code line has a conversation even though the thread body must remain below the containing table or code block.
@@ -174,6 +184,17 @@ Priority applies to the shared user outcome:
   - Evaluate the reduced click cost against the permanent vertical space added to every expanded thread.
 
 ### Navigation and focus
+
+- [ ] **P2 — Make bulk section-folding scope explicit and predictable**
+  - **Outcome:** reviewers can tell whether Fold H1/H2/H3 and Expand all affect the current file or every Markdown file before applying the action.
+  - **GitHub:** △ Shipped with PR-wide scope across all rendered Markdown files.
+  - **ADO:** △ Shipped with current-file scope because Preview renders one file at a time.
+  - Do not force identical mechanics without user evidence. First clarify the labels or expose an explicit scope choice; current-file scope is safer for focused review, while all-files scope is useful for PR-wide triage.
+
+- [ ] **P2 — Dismiss and restore the sidebar without losing its layout**
+  - **Outcome:** reviewers can remove the sidebar completely when they need the full page width, then restore it from a small launcher without losing its saved position and size.
+  - **GitHub:** 📋 Planned; collapse and keyboard toggle are available, but there is no full-dismiss control or launcher.
+  - **ADO:** ✅ The header × hides the sidebar and a launcher restores it.
 
 - [ ] **P1 — Current-file focus for Changes and Threads**
   - **Outcome:** reduce sidebar clutter while reviewing one file without corrupting global navigation state.

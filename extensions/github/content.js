@@ -1411,6 +1411,7 @@
     const deps = {
       buildSourceIndex,
       findTextInSource,
+      cleanRenderedText,
       computeTableRowLine,
       findFrontmatterRange,
     };

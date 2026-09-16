@@ -27,11 +27,15 @@ For the original port sequence and detailed acceptance records, see the [ADO ada
 ## Current platform constraints
 
 - Preview omits deleted content and does not visually distinguish changed blocks. Changes navigation is calculated by the extension, but persistent rendered-diff highlighting remains an ADO-specific opportunity.
+- List-item mapping now accepts only Markdown list-marker lines, preventing matching bullet text from being assigned to a section heading. Automated coverage verifies the third bullet's posted ADO line; the original live PR still needs manual confirmation before release.
+- List-item `+` buttons use the first rendered line's height, keeping single-line and nested-list controls centered on the bullet text. Automated geometry coverage also protects ordinary single-line paragraphs; live confirmation remains pending.
+- Outline bulk controls apply Fold H1/H2/H3 and Expand all only to the current file. This matches ADO's one-file-at-a-time Preview surface but differs from GitHub's all-rendered-files scope.
 - Shared frontmatter masking is loaded by the ADO target, but ADO-specific frontmatter rendering and line mapping do not yet have dedicated fixture coverage; the shared roadmap therefore records partial confidence rather than full parity.
 - ADO has no direct equivalent of GitHub's author-association roles. Identity GUIDs can establish comment ownership but not Owner, Member, or Contributor badges.
 - ADO thread tracking differs from GitHub's outdated-thread model; status should be presented using ADO semantics rather than forced into GitHub labels.
 - `@mention` autocomplete is not implemented. Identity search must be validated for relevance, permissions, result size, and insertion syntax before parity can be claimed.
 - The sidebar intentionally lists Markdown-file threads only. Threads on other file types have no rendered Preview destination in this extension.
+- The sidebar header's × fully hides the panel. A small launcher restores its saved position and size and opens the Threads tab.
 
 ## Open ADO design notes
 

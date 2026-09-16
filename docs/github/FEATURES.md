@@ -27,6 +27,8 @@ For durable GitHub architecture decisions, see [Approach](./APPROACH.md). For en
 ## Current platform constraints
 
 - Rich diff is enabled separately for each Markdown file, which is why GitHub needs the render-all action. Azure DevOps Preview is PR-wide and sticky instead.
+- Outline bulk controls currently apply Fold H1/H2/H3 and Expand all across every rendered Markdown file in the pull request. This is useful for PR-wide triage but broader than ADO's current-file behavior; labels do not yet make that scope explicit.
+- The sidebar can collapse to its header and can be toggled with the keyboard, but unlike ADO it has no × control that fully hides it and no compact launcher for restoring it.
 - Deleted prose appears in rich diff, but posting on it requires LEFT-side source mapping and payloads. That remains tracked in the shared roadmap.
 - Valid HTML and syntax-highlighting constraints place table-row and code-line thread bodies below the containing table or code block. The shared inline-marker feature will provide the missing in-place signal.
 - Changes navigation currently covers rendered Markdown only. Extending it to source-diff hunks for other file types remains shared roadmap work.

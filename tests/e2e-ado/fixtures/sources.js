@@ -19,7 +19,7 @@ const DESIGN_SOURCE = [
   '',                                           // 8
   '- Retry failed work',                        // 9
   '- Emit delivery metrics',                    // 10
-  '',                                           // 11
+  '- Architecture',                             // 11
   '## Implementation',                          // 12
   '',                                           // 13
   'The worker starts with three attempts.',      // 14
@@ -48,7 +48,7 @@ const DESIGN_BASE_SOURCE = [
   '',
   '- Retry failed work',
   '- Emit basic metrics',
-  '',
+  '- Architecture',
   '## Implementation',
   '',
   'The worker starts with three attempts.',
