@@ -58,7 +58,7 @@ No separate login, token, or Personal Access Token is required. The extension us
 ## How to use it on Azure DevOps
 
 1. Open an Azure DevOps pull request and select **Files**.
-2. Open a changed Markdown file and choose **Preview** from the file-view selector. Preview remains selected as you move between Markdown files.
+2. Click **Open Markdown Preview** in the sidebar. The extension opens an available changed Markdown file and selects Preview; if a Markdown file is already selected, it uses that file. Preview remains selected as you move between Markdown files.
 3. Hover a paragraph, heading, list item, table row, or code block. Click the blue **`+`** to create a real pull-request review comment.
 4. Existing comments appear inline. Expand a thread to reply, resolve/reopen it, or edit/delete your own comments.
 5. Use the sidebar:

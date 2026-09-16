@@ -51,14 +51,14 @@ No separate login, setup, or Personal Access Token is required. See [INSTALL.md]
 4. Click **Load unpacked** and select one target folder:
   - **GitHub:** `extensions/github/`
   - **Azure DevOps:** `extensions/ado/`
-5. Open a pull request's changed-files view and render a modified `.md` file (GitHub rich diff or Azure DevOps Preview).
+5. Open a pull request's changed-files view. Select rich diff for a GitHub Markdown file, or use the Azure DevOps sidebar's **Open Markdown Preview** action.
 
 After editing a target's content script, click the reload icon on the extension card and hard-refresh the PR (Ctrl+Shift+R). If you edit anything under `src/lib/`, run `.\scripts\dev-sync.ps1 -Target github` or `-Target ado` first, then reload that extension.
 
 ## Usage
 
 1. Open a PR's changed-files view
-2. Select **rich diff** on GitHub or **Preview** on Azure DevOps for a Markdown file
+2. Select **rich diff** for a GitHub Markdown file, or click **Open Markdown Preview** in the Azure DevOps sidebar
 3. Hover a block → click the `+` button → type → **Comment**
 4. Existing comments appear inline as a `💬 N comments` badge — click to expand
 
@@ -104,9 +104,9 @@ All suites are local — no live GitHub or Azure DevOps calls.
 npm install         # one-time: fetches jsdom + @playwright/test (devDeps only)
 npx playwright install chromium    # one-time: ~150 MB Chromium for e2e tests
 
-npm test                  # 395 unit/static tests (Node:test + jsdom)
+npm test                  # 409 unit/static tests (Node:test + jsdom)
 npm run test:e2e          # 21 GitHub Playwright fixtures
-npm run test:e2e:ado      # 40 ADO Preview + mocked REST Playwright fixtures
+npm run test:e2e:ado      # 62 ADO Preview + mocked REST Playwright fixtures
 npm run test:e2e:all      # both browser targets
 npm run test:all          # Node tests plus both browser targets
 ```

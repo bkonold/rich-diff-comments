@@ -36,7 +36,7 @@ test('ADO manifest loads shared sidebar and Changes helpers before content.js', 
 });
 
 test('ADO exposes a runtime revision for live loaded-script verification', () => {
-  assert.match(content, /const RUNTIME_REVISION = '2026-09-16-preview-popup-scope-r17'/);
+  assert.match(content, /const RUNTIME_REVISION = '2026-09-16-preview-popup-scope-r18'/);
   assert.match(content, /revision: RUNTIME_REVISION/);
 });
 
@@ -47,23 +47,11 @@ test('ADO exact TreeEx activation reaches the list selection model', () => {
   assert.match(content, /navigateToExactAdoFileRoute\(normalizedPath\)/);
 });
 
-test('ADO exposes a bounded navigation trace that survives exact-route reloads', () => {
-  assert.match(content, /const NAVIGATION_TRACE_KEY = 'adrc-navigation-trace-v1'/);
-  assert.match(content, /const NAVIGATION_TRACE_LIMIT = 180/);
-  assert.match(content, /sessionStorage\.setItem\(NAVIGATION_TRACE_KEY/);
-  assert.match(content, /navigationTrace\(\) \{/);
-  assert.match(content, /navigationTraceText\(\) \{/);
-  assert.match(content, /clearNavigationTrace\(\) \{/);
-  assert.match(content, /recordNavigationTrace\('fallback\.submitted'/);
-  assert.match(content, /recordNavigationTrace\('fallback\.rejected'/);
-  assert.match(content, /recordNavigationTrace\('route\.changed'/);
-});
-
 test('ADO preserves compact PR catalogs across an exact-route document fallback', () => {
   assert.match(content, /const PR_SESSION_CATALOG_CACHE_KEY = 'adrc-pr-session-catalog-v1'/);
-  assert.match(content, /function persistPrSessionCatalogSnapshot\(reason\)/);
+  assert.match(content, /function persistPrSessionCatalogSnapshot\(\)/);
   assert.match(content, /function restorePrSessionCatalogSnapshot\(\)/);
-  assert.match(content, /persistPrSessionCatalogSnapshot\('exact-route-fallback'\)/);
+  assert.match(content, /persistPrSessionCatalogSnapshot\(\)/);
   assert.match(content, /restorePrSessionCatalogSnapshot\(\);\s*ensureFilesPageShell\(\);/);
   assert.match(content, /prChangesInventoryPromise = Promise\.resolve\(prMarkdownChanges\)/);
   assert.match(content, /prChangesPromise = Promise\.resolve\(sidebarChangeStops\)/);
@@ -370,7 +358,7 @@ test('ADO scans virtualized native tree rows before the exact-route fallback', (
   assert.match(content, /entry\.row\?\.isConnected && findScrollContainer\(entry\.row\) === scroller/);
   assert.match(content, /Array\.from\(remembered\.values\(\)\)\.sort\(\(a, b\) => a\.rowIndex - b\.rowIndex\)/);
   assert.match(content, /through materialized native ADO tree row/);
-  assert.match(content, /function activateAdoFileTreeTarget\(fileTarget, path, sequence, options\)/);
+  assert.match(content, /function activateAdoFileTreeTarget\(fileTarget, path, sequence\)/);
   assert.match(content, /function currentAdoFileTreeTarget\(fileTarget, path\)/);
   assert.match(content, /expectedIndex !== currentIndex/);
   assert.match(content, /currentExact = exact && liveEntries\.find/);
@@ -379,15 +367,6 @@ test('ADO scans virtualized native tree rows before the exact-route fallback', (
   assert.match(content, /new KeyboardEvent\('keydown'/);
   assert.match(content, /new MouseEvent\('dblclick'/);
   assert.doesNotMatch(content, /const target = exactLink \|\|/);
-});
-
-test('ADO waits for cold-start TreeEx selection before falling back', () => {
-  assert.match(content, /const awaitColdStartTree = !hasVisibleMarkdownPreview\(\)/);
-  assert.match(content, /const coldStartTreeDeadline = Date\.now\(\) \+ 3000/);
-  assert.match(content, /recordNavigationTrace\('tree\.cold-start-waiting'/);
-  assert.match(content, /deferDomWhenSelectionUnavailable: deferDom/);
-  assert.match(content, /recordNavigationTrace\('tree\.selection-model-unavailable'/);
-  assert.match(content, /waitForColdStartTree\('target-not-materialized', attempt\)/);
 });
 
 test('ADO mounts a Files-page sidebar before Preview and offers bounded progressive startup', () => {
@@ -459,7 +438,7 @@ test('ADO Outline cross-file rows preserve Preview and resume by stable heading 
   assert.match(content, /function continuePendingOutlineNavigation\(\)/);
   assert.match(content, /function resumePendingOutlineJump\(attempt\)/);
   assert.match(content, /outlineHeadings\.find\(\(heading\) => heading\.key === pending\.key\)/);
-  assert.match(content, /openAdoFilePath\(target\.path, \{ source: 'outline\.target' \}\)/);
+  assert.match(content, /openAdoFilePath\(target\.path\)/);
 });
 
 test('ADO Outline has per-row and bulk fold controls backed by stable source keys', () => {

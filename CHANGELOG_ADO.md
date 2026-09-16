@@ -4,6 +4,8 @@ All notable user-visible changes to the Azure DevOps browser extension are recor
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-09-15
+
 ### Added
 
 - **Start rendered Markdown review from any pull request Files page.** Choose **Open Markdown Preview** from a new pull request or while viewing a non-Markdown file, and the extension opens an available changed Markdown file in Preview automatically.

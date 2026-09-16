@@ -271,14 +271,14 @@ regardless of their label. The browser fixture includes an extensionless
 `2026-06-01-preview` changed-file row and verifies that one-click setup remains
 on the requested Markdown file while selecting the real Preview menu option.
 
-This trace also separates earlier work by evidence. Native List-root selection
-is still required and is what successfully selected the requested Markdown
-leaf. Catalog preservation still protects the genuine final reload fallback.
-The bounded late-leaf/List-dispatcher wait covers a separate fixture-reproduced
-host-readiness race, but it was not the cause of this live file-X reproduction.
-The removed content-script/service-worker navigation experiment remains
-unnecessary because changing the browser URL cannot solve either native
-selection or popup misclassification.
+These findings also separate earlier work by evidence. Native List-root
+selection is still required and is what successfully selected the requested
+Markdown leaf. Catalog preservation still protects the genuine final reload
+fallback. The late-leaf/List-dispatcher readiness wait was supported only by
+an artificial fixture and was removed before release. The removed
+content-script/service-worker navigation experiment remains unnecessary
+because changing the browser URL cannot solve either native selection or popup
+misclassification.
 
 **TreeEx recycles connected row elements during virtualization.** Live testing
 on a large PR showed the same generated row element being reused for different
@@ -323,26 +323,6 @@ real row payload and runs selection before activation. If no current list
 dispatcher is discoverable, this private path is skipped rather than guessing
 at component callbacks.
 
-**Cold start can also expose a separate TreeEx lifecycle state.** On a new PR Files page—
-especially a bare `_a=files` URL or one restored to a non-Markdown file—the
-sidebar and changed-file inventory can be ready before TreeEx has mounted the
-requested Markdown leaf or the current List click dispatcher. The previous
-router performed one lookup/materialization pass and immediately submitted the
-GET fallback. ADO then hydrated its still-authoritative non-Markdown selection
-and replaced the requested route, which made the setup action appear stuck.
-Manually opening a Markdown file worked because that interaction happened only
-after TreeEx had mounted and it updated selection before Preview.
-
-When no Markdown Preview has yet been established, native navigation now has a
-bounded three-second readiness window. It repeatedly rebuilds the exact live
-tree path and waits for the List dispatcher; it does not accept URL movement as
-a substitute for selection. Once the current leaf and dispatcher exist, the
-normal selection-before-activation path runs, and only then does Preview-mode
-restoration begin. Established Preview navigation keeps its existing fast path
-and does not inherit this startup delay. The fixture models URL, native
-selection, and view mode independently, with regressions for both a late leaf
-and a late List dispatcher.
-
 **Commit the exact fallback URL before reloading.** Live testing also showed the
 legacy PR viewer restoring its previously selected folder during a direct
 `location.assign()` to another file. The page visibly refreshed, but its
@@ -364,22 +344,11 @@ by that full-document navigation; they are symptoms, not evidence that MSAL or
 the REST endpoints initiated the redirect. The browser's permissions-policy
 `unload` warnings are emitted by ADO bundles and are unrelated.
 
-The experimental runtime now keeps a bounded trace in session storage so it
-survives this document replacement. `ADORC_probe.navigationTraceText()` reports
-the initiating sidebar surface, exact TreeEx candidate/activation method,
-fallback submission, each document ID, route rewrites, automatic Preview-mode
-clicks, pending-jump state, and inventory/catalog restart or reuse. Use
-`copy(ADORC_probe.navigationTraceText())` immediately after one reproduction;
-clear earlier attempts first with `ADORC_probe.clearNavigationTrace()`.
-
-**Cross-file sidebar cards remain real links, but the current experiment routes
-their ordinary clicks through one observable path.** Changes, Threads, and
-Outline destinations retain clean same-PR `href` values and `_top` as a manual
-fallback, while the click handler prevents the default and calls the shared
-native-tree-first router. This makes the initiating surface and every fallback
-decision traceable. Live testing of this unified-router experiment still ended
-at ADO's previously selected directory, disproving the hypothesis that the
-sidebar anchor's default navigation alone caused the issue.
+**Cross-file sidebar cards remain real links, while ordinary clicks use the
+shared native-tree-first router.** Changes, Threads, and Outline destinations
+retain clean same-PR `href` values and `_top` as a manual fallback. Their click
+handlers prevent the default so normal use updates ADO's native selected-file
+state before Preview restoration instead of relying on URL navigation alone.
 
 **A last-resort document navigation must carry the PR-wide catalogs across the
 reload.** In-memory promises correctly deduplicate normal SPA file switches,
@@ -397,8 +366,7 @@ presence marker for each diff hunk's base/head lines. It expires with the
 and progressively drops thread, Outline, then detailed Changes data while
 retaining lightweight file/version inventory whenever possible. Failure is
 non-fatal: navigation still completes and the new document falls back to the
-normal service requests. Trace events `catalog-cache.saved`,
-`catalog-cache.restored`, and `catalog-cache.skipped` expose which path ran.
+normal service requests.
 
 The isolated content-script/service-worker navigation experiment was removed.
 Live testing showed that changing the browser URL from outside the page still

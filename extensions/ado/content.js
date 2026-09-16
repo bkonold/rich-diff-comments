@@ -14,7 +14,7 @@
   'use strict';
 
   const LOG = '[ADRC]';
-  const RUNTIME_REVISION = '2026-09-16-preview-popup-scope-r17';
+  const RUNTIME_REVISION = '2026-09-16-preview-popup-scope-r18';
   const adapter = (typeof window !== 'undefined' && window.ADORC) || null;
   const startupTiming = {
     scriptLoadedAt: performance.now(),
@@ -25,41 +25,6 @@
     outlineReadyAt: null
   };
   const ADO_REQUEST_TIMEOUT_MS = 30000;
-  const NAVIGATION_TRACE_KEY = 'adrc-navigation-trace-v1';
-  const NAVIGATION_TRACE_LIMIT = 180;
-  const navigationDocumentId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-  let navigationTraceEntries = [];
-  try {
-    const stored = JSON.parse(sessionStorage.getItem(NAVIGATION_TRACE_KEY) || '[]');
-    if (Array.isArray(stored)) navigationTraceEntries = stored.slice(-NAVIGATION_TRACE_LIMIT);
-  } catch (_) { /* sessionStorage may be blocked or contain stale data */ }
-
-  function navigationTraceDetails(value) {
-    if (value == null) return null;
-    try { return JSON.parse(JSON.stringify(value)); } catch (_) { return String(value); }
-  }
-
-  function recordNavigationTrace(event, details) {
-    const url = new URL(window.location.href);
-    const lastSequence = navigationTraceEntries[navigationTraceEntries.length - 1]?.sequence || 0;
-    const entry = {
-      sequence: lastSequence + 1,
-      documentId: navigationDocumentId,
-      at: new Date().toISOString(),
-      elapsedMs: Math.round(performance.now()),
-      event,
-      path: url.searchParams.get('path'),
-      action: url.searchParams.get('_a'),
-      href: url.href,
-      details: navigationTraceDetails(details)
-    };
-    navigationTraceEntries.push(entry);
-    if (navigationTraceEntries.length > NAVIGATION_TRACE_LIMIT) {
-      navigationTraceEntries.splice(0, navigationTraceEntries.length - NAVIGATION_TRACE_LIMIT);
-    }
-    try { sessionStorage.setItem(NAVIGATION_TRACE_KEY, JSON.stringify(navigationTraceEntries)); } catch (_) {}
-    return entry;
-  }
 
   if (!adapter) {
     console.error(`${LOG} adapter (window.ADORC) not loaded. Check that src/adapters/ado.js is listed BEFORE content.js in manifest.json content_scripts.js.`);
@@ -74,14 +39,6 @@
     return;
   }
   console.log(`${LOG} parsed PR context:`, ctx);
-  recordNavigationTrace('document.loaded', {
-    revision: RUNTIME_REVISION,
-    navigationType: performance.getEntriesByType('navigation')[0]?.type || 'unknown',
-    referrer: document.referrer || null
-  });
-  window.addEventListener('pagehide', (event) => {
-    recordNavigationTrace('document.pagehide', { persisted: event.persisted });
-  });
 
   // Resolve namespaced CSS theme aliases at the same inherited scope where
   // ADO exposes its live semantic tokens. Attribute observation is disabled,
@@ -2067,7 +2024,7 @@
       continuePendingOutlineNavigation();
       return;
     }
-    openAdoFilePath(targetPath, { source: 'setup.open-preview' }).catch((err) => {
+    openAdoFilePath(targetPath).catch((err) => {
       if (readPendingOutlineJump()?.path !== targetPath) return;
       clearPendingOutlineJump();
       showErrorToast(`Could not open ${targetPath}: ${String(err.message || err).slice(0, 120)}`);
@@ -2084,7 +2041,7 @@
       continuePendingOutlineNavigation();
       return;
     }
-    openAdoFilePath(targetPath, { source: 'outline.shortcut' }).catch((err) => {
+    openAdoFilePath(targetPath).catch((err) => {
       if (!sameAdoFilePath(readPendingOutlineJump()?.path, targetPath)) return;
       clearPendingOutlineJump();
       updateSidebarSetupState();
@@ -2528,12 +2485,8 @@
       sidebarThreadsLoadPromise = null;
       sidebarThreadsReady = false;
     }
-    if (sidebarThreadsLoadPromise) {
-      recordNavigationTrace('threads.reused', { generation: sidebarThreadsLoadGeneration });
-      return sidebarThreadsLoadPromise;
-    }
+    if (sidebarThreadsLoadPromise) return sidebarThreadsLoadPromise;
     const generation = ++sidebarThreadsLoadGeneration;
-    recordNavigationTrace('threads.started', { generation, forced: options?.force === true });
     const request = resolveIdsOnce()
       .then(() => withTimeout(
         adapter.listThreads(ctx),
@@ -2546,7 +2499,6 @@
           sidebarThreadsReady = true;
           setSidebarThreads(threads);
         }
-        recordNavigationTrace('threads.ready', { generation, count: threads.length });
         return threads;
       })
       .catch((err) => {
@@ -2554,7 +2506,6 @@
           sidebarThreadsLoadPromise = null;
           sidebarThreadsReady = false;
         }
-        recordNavigationTrace('threads.failed', { generation, error: String(err?.message || err) });
         console.warn(`${LOG} sidebar thread inventory unavailable:`, err);
         throw err;
       });
@@ -2764,7 +2715,6 @@
         requirePreview: true,
         expiresAt: Date.now() + PENDING_NAVIGATION_TTL_MS
       }));
-      recordNavigationTrace('pending.saved', { kind: 'thread', path: item.path, id: item.id });
     } catch (_) { /* sessionStorage may be blocked */ }
   }
 
@@ -2801,7 +2751,6 @@
         requirePreview: true,
         expiresAt: Date.now() + PENDING_NAVIGATION_TTL_MS
       }));
-      recordNavigationTrace('pending.saved', { kind: 'change', path: stop.path, key: stop.key });
     } catch (_) { /* sessionStorage may be blocked */ }
   }
 
@@ -2834,7 +2783,6 @@
         requirePreview: true,
         expiresAt: Date.now() + PENDING_NAVIGATION_TTL_MS
       }));
-      recordNavigationTrace('pending.saved', { kind: 'outline', path: target.path, key: target.key || null });
     } catch (_) { /* sessionStorage may be blocked */ }
   }
 
@@ -2862,7 +2810,6 @@
         path: adapter.normalizeFilePath(path),
         startedAt: Date.now()
       }));
-      recordNavigationTrace('fallback.remembered', { requestedPath: adapter.normalizeFilePath(path) });
     } catch (_) { /* sessionStorage may be blocked */ }
   }
 
@@ -2900,10 +2847,7 @@
     if (sameAdoFilePath(currentFilePath(), fallback.path)) {
       // Keep watching briefly because ADO may rewrite the route after its own
       // PR file viewer finishes initializing.
-      if (age >= 5000) {
-        recordNavigationTrace('fallback.accepted', { requestedPath: fallback.path, ageMs: age });
-        clearExactRouteFallback();
-      }
+      if (age >= 5000) clearExactRouteFallback();
       return;
     }
     if (age < 1500) return;
@@ -2911,11 +2855,6 @@
     clearExactRouteFallback();
     clearPendingNavigationForPath(fallback.path);
     adoFileNavigationTargetPath = '';
-    recordNavigationTrace('fallback.rejected', {
-      requestedPath: fallback.path,
-      actualPath: currentFilePath(),
-      ageMs: age
-    });
     updateSidebarSetupState();
     showErrorToast(`Azure DevOps did not open ${fallback.path}. Choose the file in the native tree and try again.`);
     console.error(`${LOG} Azure DevOps rejected exact file route`, {
@@ -3088,10 +3027,6 @@
     if (now - previewRestoreState.startedAt >= PREVIEW_RESTORE_MAX_TOTAL_MS) {
       previewRestoreState.gaveUp = true;
       previewRestoreState.lastError = 'Markdown Preview restoration timed out';
-      recordNavigationTrace('preview-restore.timed-out', {
-        phase: previewRestoreState.phase,
-        retryCount: previewRestoreState.retryCount
-      });
       return false;
     }
     const restoreStartedAt = previewRestoreState.phase === 'opening'
@@ -3119,9 +3054,6 @@
       if (previewRestoreState.phase !== 'selecting') {
         previewRestoreState.phase = 'selecting';
         previewRestoreState.selectedAt = now;
-        recordNavigationTrace('preview-restore.option-clicked', {
-          label: getAdoControlLabels(visibleOption)
-        });
         visibleOption.click();
       }
       return false;
@@ -3164,10 +3096,6 @@
     previewRestoreState.phase = 'opening';
     previewRestoreState.openedAt = now;
     previewRestoreState.lastError = '';
-    recordNavigationTrace('preview-restore.menu-opened', {
-      currentMode: modeLabel,
-      triggerLabel: getAdoControlLabels(controls.trigger)
-    });
     controls.trigger.click();
     return false;
   }
@@ -3177,12 +3105,6 @@
     if (!pending) return;
     if (!sameAdoFilePath(pending.path, currentFilePath())) {
       if (!sameAdoFilePath(pending.path, adoFileNavigationTargetPath)) {
-        recordNavigationTrace('pending.cleared-path-mismatch', {
-          kind: 'thread',
-          pendingPath: pending.path,
-          actualPath: currentFilePath(),
-          navigationTargetPath: adoFileNavigationTargetPath || null
-        });
         clearPendingThreadJump();
         updateSidebarSetupState();
       }
@@ -3205,12 +3127,6 @@
     if (!pending) return;
     if (!sameAdoFilePath(pending.path, currentFilePath())) {
       if (!sameAdoFilePath(pending.path, adoFileNavigationTargetPath)) {
-        recordNavigationTrace('pending.cleared-path-mismatch', {
-          kind: 'change',
-          pendingPath: pending.path,
-          actualPath: currentFilePath(),
-          navigationTargetPath: adoFileNavigationTargetPath || null
-        });
         clearPendingChangeJump();
         updateSidebarSetupState();
       }
@@ -3233,12 +3149,6 @@
     if (!pending) return;
     if (!sameAdoFilePath(pending.path, currentFilePath())) {
       if (!sameAdoFilePath(pending.path, adoFileNavigationTargetPath)) {
-        recordNavigationTrace('pending.cleared-path-mismatch', {
-          kind: 'outline',
-          pendingPath: pending.path,
-          actualPath: currentFilePath(),
-          navigationTargetPath: adoFileNavigationTargetPath || null
-        });
         clearPendingOutlineJump();
         updateSidebarSetupState();
       }
@@ -3338,7 +3248,7 @@
     }
 
     savePendingThreadJump(item);
-    openAdoFilePath(item.path, { source: 'threads.card' }).catch((err) => {
+    openAdoFilePath(item.path).catch((err) => {
       if (readPendingThreadJump()?.path !== item.path) return;
       clearPendingThreadJump();
       console.warn(`${LOG} cross-file thread navigation failed for ${item.path}:`, err);
@@ -3488,12 +3398,6 @@
     const pending = readPendingThreadJump() ||
       readPendingChangeJump() ||
       readPendingOutlineJump();
-    recordNavigationTrace('native-tree.clicked', {
-      rowId: row.id || null,
-      rowIndex: row.getAttribute('data-row-index'),
-      label: normalizedText(row.getAttribute('aria-label') || row.textContent).slice(0, 160),
-      pendingPath: pending?.path || null
-    });
     adoFileNavigationSequence++;
     adoFileNavigationTargetPath = '';
     clearPendingThreadJump();
@@ -3664,49 +3568,20 @@
     return true;
   }
 
-  async function activateAdoFileTreeTarget(fileTarget, path, sequence, options) {
+  async function activateAdoFileTreeTarget(fileTarget, path, sequence) {
     let currentTarget = sequence === adoFileNavigationSequence
       ? currentAdoFileTreeTarget(fileTarget, path)
       : null;
     if (!currentTarget) return false;
-    recordNavigationTrace('tree.selection-model-activation', {
-      requestedPath: path,
-      sequence,
-      rowId: currentTarget.row.id || null,
-      rowIndex: currentTarget.rowIndex,
-      reconstructedPath: currentTarget.reconstructedPath
-    });
-    const selectionInvoked = invokeAdoTreeExSelection(currentTarget);
-    if (selectionInvoked && await waitForAdoFilePath(path, sequence, 800)) {
-      recordNavigationTrace('tree.selection-model-accepted', { requestedPath: path, sequence });
-      return true;
-    }
-    if (!selectionInvoked && options?.deferDomWhenSelectionUnavailable) {
-      recordNavigationTrace('tree.selection-model-unavailable', {
-        requestedPath: path,
-        sequence,
-        rowId: currentTarget.row.id || null,
-        rowIndex: currentTarget.rowIndex
-      });
-      return false;
-    }
+    if (invokeAdoTreeExSelection(currentTarget) &&
+        await waitForAdoFilePath(path, sequence, 800)) return true;
     currentTarget = sequence === adoFileNavigationSequence
       ? currentAdoFileTreeTarget(fileTarget, path)
       : null;
     if (!currentTarget) return false;
 
-    recordNavigationTrace('tree.dom-activation', {
-      requestedPath: path,
-      sequence,
-      rowId: currentTarget.row.id || null,
-      rowIndex: currentTarget.rowIndex,
-      reconstructedPath: currentTarget.reconstructedPath
-    });
     dispatchAdoTreeActivation(currentTarget.target);
-    if (await waitForAdoFilePath(path, sequence, 1800)) {
-      recordNavigationTrace('tree.dom-accepted', { requestedPath: path, sequence });
-      return true;
-    }
+    if (await waitForAdoFilePath(path, sequence, 1800)) return true;
     currentTarget = sequence === adoFileNavigationSequence
       ? currentAdoFileTreeTarget(fileTarget, path)
       : null;
@@ -3846,7 +3721,7 @@
     // promises cannot survive it. Preserve only compact, DOM-free catalogs;
     // raw Markdown source is deliberately excluded. The target document can
     // then remap its one active file without repeating PR-wide source work.
-    persistPrSessionCatalogSnapshot('exact-route-fallback');
+    persistPrSessionCatalogSnapshot();
     rememberExactRouteFallback(normalizedPath);
     console.log(`${LOG} using exact same-PR route fallback`, {
       requestedPath: normalizedPath,
@@ -3871,10 +3746,6 @@
       form.appendChild(input);
     });
     document.body.appendChild(form);
-    recordNavigationTrace('fallback.submitted', {
-      requestedPath: normalizedPath,
-      destination: url.href
-    });
     HTMLFormElement.prototype.submit.call(form);
   }
 
@@ -3891,82 +3762,31 @@
    * ancestors as needed. A full same-PR route is the final fallback, and the
    * caller's session-stored pending jump restores Preview after the reload.
    */
-  async function openAdoFilePath(path, options) {
+  async function openAdoFilePath(path) {
     const normalizedPath = adapter.normalizeFilePath(path);
     const sequence = ++adoFileNavigationSequence;
     adoFileNavigationTargetPath = normalizedPath;
     let preserveTargetForReload = false;
-    // Before any Markdown Preview has been established, ADO can expose the
-    // Files shell and selected-file state before TreeEx has mounted either the
-    // requested leaf or its current List dispatcher. A manual Markdown click
-    // naturally waits for that later paint. Give extension-initiated startup
-    // navigation the same bounded readiness window; established Preview
-    // navigation keeps the existing immediate native/fallback behavior.
-    const awaitColdStartTree = !hasVisibleMarkdownPreview();
-    const coldStartTreeDeadline = Date.now() + 3000;
-    let coldStartWaitRecorded = false;
-    const waitForColdStartTree = async (reason, attempt) => {
-      if (!awaitColdStartTree || Date.now() >= coldStartTreeDeadline) return false;
-      if (!coldStartWaitRecorded) {
-        coldStartWaitRecorded = true;
-        recordNavigationTrace('tree.cold-start-waiting', {
-          requestedPath: normalizedPath,
-          sequence,
-          reason,
-          attempt
-        });
-      }
-      await delay(Math.min(100, Math.max(0, coldStartTreeDeadline - Date.now())));
-      return sequence === adoFileNavigationSequence;
-    };
-    recordNavigationTrace('navigation.requested', {
-      requestedPath: normalizedPath,
-      source: options?.source || 'unspecified',
-      sequence
-    });
     try {
-      if (sameAdoFilePath(currentFilePath(), normalizedPath)) {
-        recordNavigationTrace('navigation.already-current', { requestedPath: normalizedPath, sequence });
-        return true;
-      }
+      if (sameAdoFilePath(currentFilePath(), normalizedPath)) return true;
 
-      const maximumAttempts = awaitColdStartTree ? 40 : 20;
-      for (let attempt = 0; attempt < maximumAttempts && sequence === adoFileNavigationSequence; attempt++) {
+      for (let attempt = 0; attempt < 20 && sequence === adoFileNavigationSequence; attempt++) {
         const fileTarget = findBestAdoFileTreeTarget(normalizedPath);
         if (fileTarget) {
-          recordNavigationTrace('tree.target-found', {
-            requestedPath: normalizedPath,
-            sequence,
-            rowId: fileTarget.row.id || null,
-            rowIndex: fileTarget.rowIndex,
-            reconstructedPath: fileTarget.reconstructedPath,
-            labels: fileTarget.labels,
-            score: fileTarget.score
-          });
           console.log(`${LOG} navigating to ${normalizedPath} through exact native ADO tree row`, {
             rowId: fileTarget.row.id,
             labels: fileTarget.labels,
             reconstructedPath: fileTarget.reconstructedPath,
             score: fileTarget.score
           });
-          const deferDom = awaitColdStartTree && Date.now() < coldStartTreeDeadline;
-          if (await activateAdoFileTreeTarget(fileTarget, normalizedPath, sequence, {
-            deferDomWhenSelectionUnavailable: deferDom
-          })) return true;
+          if (await activateAdoFileTreeTarget(fileTarget, normalizedPath, sequence)) return true;
           if (sequence !== adoFileNavigationSequence) return false;
-          if (deferDom && await waitForColdStartTree('list-dispatcher-unavailable', attempt)) continue;
           break;
         }
 
         const folder = findCollapsedAdoFileTreeAncestor(normalizedPath);
         const expand = folder?.row?.querySelector('.bolt-tree-expand-button');
         if (folder && expand) {
-          recordNavigationTrace('tree.ancestor-expanded', {
-            requestedPath: normalizedPath,
-            sequence,
-            ancestorPath: folder.reconstructedPath,
-            rowId: folder.row.id || null
-          });
           console.log(`${LOG} expanding ADO folder ${folder.reconstructedPath} for ${normalizedPath}`);
           expand.click();
           await waitForAdoTreePaint();
@@ -3981,34 +3801,19 @@
             reconstructedPath: materialized.reconstructedPath,
             score: materialized.score
           });
-          const deferDom = awaitColdStartTree && Date.now() < coldStartTreeDeadline;
-          if (await activateAdoFileTreeTarget(materialized, normalizedPath, sequence, {
-            deferDomWhenSelectionUnavailable: deferDom
-          })) return true;
+          if (await activateAdoFileTreeTarget(materialized, normalizedPath, sequence)) return true;
           if (sequence !== adoFileNavigationSequence) return false;
-          if (deferDom && await waitForColdStartTree('list-dispatcher-unavailable', attempt)) continue;
         }
-        if (await waitForColdStartTree('target-not-materialized', attempt)) continue;
         break;
       }
 
       if (sequence !== adoFileNavigationSequence) return false;
       preserveTargetForReload = true;
-      recordNavigationTrace('navigation.fallback-required', {
-        requestedPath: normalizedPath,
-        sequence,
-        visibleTreeEntries: getAdoFileTreeEntries().length
-      });
       navigateToExactAdoFileRoute(normalizedPath);
       return true;
     } finally {
       if (!preserveTargetForReload && sequence === adoFileNavigationSequence) {
         adoFileNavigationTargetPath = '';
-        recordNavigationTrace('navigation.finished', {
-          requestedPath: normalizedPath,
-          sequence,
-          actualPath: currentFilePath()
-        });
       }
     }
   }
@@ -4279,7 +4084,7 @@
    * browser storage limits, optional thread/outline data is dropped before the
    * Changes catalog; failure is always safe and merely falls back to refetching.
    */
-  function persistPrSessionCatalogSnapshot(reason) {
+  function persistPrSessionCatalogSnapshot() {
     const hasReadyCatalog = prChangesInventoryReady || sidebarThreadsReady ||
       sidebarChangesStatus === 'ready' || prOutlineStatus === 'ready';
     if (!hasReadyCatalog) return false;
@@ -4288,7 +4093,6 @@
       identity: prSessionCatalogIdentity(),
       savedAt: Date.now(),
       expiresAt: Date.now() + PENDING_NAVIGATION_TTL_MS,
-      reason: reason || 'navigation',
       context: {
         repoId: ctx.repoId || null,
         projectId: ctx.projectId || null
@@ -4329,26 +4133,11 @@
         serialized = JSON.stringify(snapshot);
       }
       if (serialized.length > PR_SESSION_CATALOG_CACHE_MAX_CHARS) {
-        recordNavigationTrace('catalog-cache.skipped', {
-          reason: 'size',
-          characters: serialized.length
-        });
         return false;
       }
       sessionStorage.setItem(PR_SESSION_CATALOG_CACHE_KEY, serialized);
-      recordNavigationTrace('catalog-cache.saved', {
-        reason: snapshot.reason,
-        characters: serialized.length,
-        inventory: !!snapshot.inventory,
-        changes: !!snapshot.changes,
-        outline: !!snapshot.outline,
-        threads: !!snapshot.threads
-      });
       return true;
-    } catch (err) {
-      recordNavigationTrace('catalog-cache.skipped', {
-        reason: String(err?.message || err).slice(0, 160)
-      });
+    } catch (_) {
       return false;
     }
   }
@@ -4425,15 +4214,6 @@
       sidebarActiveThreadId = readPendingThreadJump()?.id || null;
     }
 
-    recordNavigationTrace('catalog-cache.restored', {
-      ageMs: Date.now() - snapshot.savedAt,
-      inventory: prChangesInventoryReady,
-      changes: sidebarChangesStatus === 'ready',
-      outline: prOutlineStatus === 'ready',
-      threads: sidebarThreadsReady,
-      detailComplete: sidebarChangesStatus === 'ready' &&
-        prOutlineStatus === 'ready' && sidebarThreadsReady
-    });
     return true;
   }
 
@@ -4443,11 +4223,7 @@
    * as paths are known, even when a large Markdown file is slow to download.
    */
   function ensurePrChangesInventory() {
-    if (prChangesInventoryPromise) {
-      recordNavigationTrace('inventory.reused', { markdownFiles: prMarkdownChanges.length });
-      return prChangesInventoryPromise;
-    }
-    recordNavigationTrace('inventory.started');
+    if (prChangesInventoryPromise) return prChangesInventoryPromise;
     sidebarChangesStatus = 'loading';
     sidebarChangesError = '';
     changesAnalyzedFiles = 0;
@@ -4485,10 +4261,6 @@
       );
       prChangesInventoryReady = true;
       startupTiming.inventoryReadyAt = performance.now();
-      recordNavigationTrace('inventory.ready', {
-        iterationId: prChangesIterationId,
-        markdownFiles: prMarkdownChanges.length
-      });
       updateSidebarSetupState();
       return prMarkdownChanges;
     })().catch((err) => {
@@ -4496,7 +4268,6 @@
       sidebarChangesStatus = 'error';
       sidebarChangesError = String(err && (err.message || err)).slice(0, 200);
       prChangesInventoryPromise = null;
-      recordNavigationTrace('inventory.failed', { error: String(err?.message || err) });
       renderChangesSidebar();
       updateSidebarSetupState();
       throw err;
@@ -4510,17 +4281,10 @@
    * a time so a slow/failing file cannot make completed files appear absent.
    */
   function ensurePrChangesCatalog() {
-    if (prChangesPromise) {
-      recordNavigationTrace('changes.reused', {
-        generation: changesGeneration,
-        stops: sidebarChangeStops.length
-      });
-      return prChangesPromise;
-    }
+    if (prChangesPromise) return prChangesPromise;
     sidebarChangesStatus = 'loading';
     sidebarChangesError = '';
     const requestVersion = ++changesGeneration;
-    recordNavigationTrace('changes.started', { generation: requestVersion });
     const priorKey = readPendingChangeJump()?.key ||
       sidebarChangeStops[sidebarActiveChangeIndex]?.key ||
       null;
@@ -4556,11 +4320,6 @@
       sidebarChangesStatus = 'ready';
       sidebarChangesError = '';
       startupTiming.changesReadyAt = performance.now();
-      recordNavigationTrace('changes.ready', {
-        generation: requestVersion,
-        files: prMarkdownChanges.length,
-        stops: sidebarChangeStops.length
-      });
       const restored = priorKey
         ? sidebarChangeStops.findIndex((stop) => stop.key === priorKey)
         : -1;
@@ -4593,10 +4352,6 @@
         updateSidebarSetupState();
         console.warn(`${LOG} PR-wide Changes unavailable:`, err);
       }
-      recordNavigationTrace('changes.failed', {
-        generation: requestVersion,
-        error: String(err?.message || err)
-      });
       prChangesPromise = null;
       return sidebarChangeStops;
     });
@@ -4850,14 +4605,14 @@
     // is still useful, but requiring Preview would create an impossible retry.
     if (stop.lifecycle === 'delete') {
       clearPendingChangeJump();
-      openAdoFilePath(stop.path, { source: 'changes.deleted-card' }).catch((err) => {
+      openAdoFilePath(stop.path).catch((err) => {
         showErrorToast(`Could not open ${stop.path}: ${String(err.message || err).slice(0, 120)}`);
       });
       return true;
     }
 
     savePendingChangeJump(stop);
-    openAdoFilePath(stop.path, { source: 'changes.card' }).catch((err) => {
+    openAdoFilePath(stop.path).catch((err) => {
       if (readPendingChangeJump()?.path !== stop.path) return;
       clearPendingChangeJump();
       console.warn(`${LOG} cross-file change navigation failed for ${stop.path}:`, err);
@@ -5114,14 +4869,14 @@
 
     if (target.lifecycle === 'delete' || target.status === 'deleted') {
       clearPendingOutlineJump();
-      openAdoFilePath(target.path, { source: 'outline.deleted-target' }).catch((err) => {
+      openAdoFilePath(target.path).catch((err) => {
         showErrorToast(`Could not open ${target.path}: ${String(err.message || err).slice(0, 120)}`);
       });
       return true;
     }
 
     savePendingOutlineJump(target);
-    openAdoFilePath(target.path, { source: 'outline.target' }).catch((err) => {
+    openAdoFilePath(target.path).catch((err) => {
       if (readPendingOutlineJump()?.path !== target.path) return;
       clearPendingOutlineJump();
       console.warn(`${LOG} cross-file outline navigation failed for ${target.path}:`, err);
@@ -5421,7 +5176,6 @@
 
     const generation = ++initGeneration;
     initInFlight = { container, routeKey, generation };
-    recordNavigationTrace('preview-init.started', { generation, filePath, routeKey });
     container.dataset.adrcInitializing = routeKey;
     currentPreviewInitStatus = 'loading';
     currentPreviewInitError = '';
@@ -5439,12 +5193,6 @@
         container === getCurrentPreviewContainer();
       const mapStillConnected = mappedBlocks.every((block) => block.isConnected && container.contains(block));
       if (!stillCurrent || !mapStillConnected) {
-        recordNavigationTrace('preview-init.stale', {
-          generation,
-          filePath,
-          routeStillCurrent: stillCurrent,
-          mapStillConnected
-        });
         schedulePreviewInit(100);
         return;
       }
@@ -5484,7 +5232,6 @@
       container.dataset.adrcInitialized = routeKey;
       currentPreviewInitStatus = 'ready';
       startupTiming.activeFileReadyAt = startupTiming.activeFileReadyAt || performance.now();
-      recordNavigationTrace('preview-init.ready', { generation, filePath, attached });
       console.log(`${LOG} Initialized: ${attached} commentable blocks in ${filePath}`);
       // The sidebar survives route changes; only its per-file Outline and
       // current-file ordering are rebuilt here.
@@ -5498,11 +5245,6 @@
       refreshThreadBadges();
     } catch (err) {
       if (generation === initGeneration) {
-        recordNavigationTrace('preview-init.failed', {
-          generation,
-          filePath,
-          error: String(err?.message || err)
-        });
         console.error(`${LOG} init failed for ${filePath}:`, err);
         currentPreviewInitStatus = 'error';
         currentPreviewInitError = `Could not prepare ${filePath}: ${String(err.message || err).slice(0, 120)}`;
@@ -5550,26 +5292,6 @@
   restorePrSessionCatalogSnapshot();
   ensureFilesPageShell();
 
-  document.addEventListener('click', (event) => {
-    const target = event.target?.closest?.(
-      '.adrc-sidebar a, .adrc-sidebar button, [role="treeitem"], .bolt-tree-row, ' +
-      '.bolt-split-button button, [role="menuitem"], [role="menuitemradio"], [role="option"]'
-    );
-    if (!target) return;
-    let href = null;
-    try { href = target.closest('a[href]')?.href || null; } catch (_) {}
-    const row = target.closest('[role="treeitem"], .bolt-tree-row');
-    recordNavigationTrace('control.clicked', {
-      trusted: event.isTrusted,
-      tag: target.tagName,
-      className: String(target.className || '').slice(0, 160),
-      label: normalizedText(target.getAttribute('aria-label') || target.textContent).slice(0, 160),
-      href,
-      rowId: row?.id || null,
-      rowIndex: row?.getAttribute('data-row-index') || null
-    });
-  }, true);
-
   const mo = new MutationObserver((records) => {
     const relevant = records.some((record) => {
       const target = record.target && record.target.nodeType === 1 ? record.target : null;
@@ -5593,11 +5315,6 @@
     continuePendingOutlineNavigation();
     const nextRouteKey = currentPreviewRouteKey();
     if (nextRouteKey === observedRouteKey) return;
-    recordNavigationTrace('route.changed', {
-      previousRouteKey: observedRouteKey,
-      nextRouteKey,
-      navigationTargetPath: adoFileNavigationTargetPath || null
-    });
     observedRouteKey = nextRouteKey;
     ensureFilesPageShell();
     renderOutlineRows();
@@ -5615,48 +5332,6 @@
     revision: RUNTIME_REVISION,
     ctx,
     adapter,
-
-    navigationTrace() {
-      const parseStored = (key) => {
-        try { return JSON.parse(sessionStorage.getItem(key) || 'null'); } catch (_) { return null; }
-      };
-      return {
-        revision: RUNTIME_REVISION,
-        documentId: navigationDocumentId,
-        limit: NAVIGATION_TRACE_LIMIT,
-        current: {
-          href: window.location.href,
-          path: currentFilePath(),
-          routeKey: currentPreviewRouteKey(),
-          cachedPath: currentFilePathCached,
-          navigationSequence: adoFileNavigationSequence,
-          navigationTargetPath: adoFileNavigationTargetPath || null,
-          previewVisible: hasVisibleMarkdownPreview(),
-          previewStatus: currentPreviewInitStatus
-        },
-        pending: {
-          fallback: parseStored(EXACT_ROUTE_FALLBACK_KEY),
-          thread: parseStored(SIDEBAR_PENDING_THREAD_KEY),
-          change: parseStored(SIDEBAR_PENDING_CHANGE_KEY),
-          outline: parseStored(SIDEBAR_PENDING_OUTLINE_KEY)
-        },
-        entries: navigationTraceEntries.slice()
-      };
-    },
-
-    navigationTraceText() {
-      return JSON.stringify(this.navigationTrace(), null, 2);
-    },
-
-    clearNavigationTrace() {
-      navigationTraceEntries = [];
-      try { sessionStorage.removeItem(NAVIGATION_TRACE_KEY); } catch (_) {}
-      return true;
-    },
-
-    markNavigationTrace(label, details) {
-      return recordNavigationTrace(`probe.${String(label || 'mark')}`, details);
-    },
 
     startup() {
       const elapsed = (value) => value == null ? null : Math.round(value - startupTiming.scriptLoadedAt);
@@ -6020,7 +5695,7 @@
     },
 
     openFile(path) {
-      return openAdoFilePath(path, { source: 'probe.open-file' });
+      return openAdoFilePath(path);
     },
 
     // Diagnose a code block: source-range vs DOM-row geometry.
@@ -6086,5 +5761,5 @@
     }
   };
 
-  console.log(`${LOG} DevTools probe available: ADORC_probe (copy trace with 'copy(ADORC_probe.navigationTraceText())')`);
+  console.log(`${LOG} DevTools probe available: ADORC_probe (try 'await ADORC_probe.list()' or 'await ADORC_probe.reinit()')`);
 })();

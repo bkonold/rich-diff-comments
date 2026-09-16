@@ -12,30 +12,6 @@ const {
 const fixtures = require('./fixtures/sources');
 
 test.describe('ADO SPA lifecycle and cross-file navigation', () => {
-  test('navigation diagnostics are bounded and do not navigate or refetch', async ({ page }) => {
-    const { server } = await setupAdoExtensionPage(page);
-    const before = {
-      href: page.url(),
-      pageLoads: server.pageLoads,
-      requests: server.requests.length,
-    };
-
-    const trace = await page.evaluate(() => {
-      for (let index = 0; index < 220; index++) {
-        window.ADORC_probe.markNavigationTrace('bounded-test', { index });
-      }
-      return window.ADORC_probe.navigationTrace();
-    });
-
-    expect(trace.limit).toBe(180);
-    expect(trace.entries).toHaveLength(180);
-    expect(trace.entries.at(-1).event).toBe('probe.bounded-test');
-    expect(trace.entries.at(-1).details.index).toBe(219);
-    expect(page.url()).toBe(before.href);
-    expect(server.pageLoads).toBe(before.pageLoads);
-    expect(server.requests).toHaveLength(before.requests);
-  });
-
   test('shows the sidebar immediately on Files and opens the first Markdown Preview', async ({ page }) => {
     const { server } = await setupAdoExtensionPage(page, {
       initialUrl: FAKE_PR_FILES_URL,
@@ -91,75 +67,7 @@ test.describe('ADO SPA lifecycle and cross-file navigation', () => {
     expect(new URL(page.url()).searchParams.get('path')).toBe(fixtures.OTHER_PATH);
     expect(await page.evaluate(() => window.__ADO_FIXTURE__.selectedPath())).toBe(fixtures.OTHER_PATH);
     expect(server.pageLoads).toBe(1);
-    const trace = await page.evaluate(() => window.ADORC_probe.navigationTrace());
-    expect(trace.entries.filter((entry) => entry.event === 'tree.selection-model-accepted')).toHaveLength(2);
   });
-
-  for (const coldStart of [
-    {
-      name: 'a bare Files route with a late Markdown row',
-      initialUrl: FAKE_PR_FILES_URL,
-      clearPath: true,
-      delayTarget: true,
-    },
-    {
-      name: 'a non-Markdown Files route with a late List dispatcher',
-      initialUrl: `${FAKE_PR_FILES_URL}&path=${encodeURIComponent(fixtures.NON_MARKDOWN_PATH)}`,
-      clearPath: false,
-      delayTarget: false,
-    },
-  ]) {
-    test(`cold-starts Markdown Preview from ${coldStart.name} while TreeEx mounts`, async ({ page }) => {
-      const { server } = await setupAdoExtensionPage(page, {
-        initialUrl: coldStart.initialUrl,
-        hideInitialPreview: true,
-        keepInitialPathWithoutPreview: !coldStart.clearPath,
-        waitForReady: false,
-      });
-      await page.evaluate(({ selectedPath, targetPath, clearPath, delayTarget }) => {
-        window.__ADO_FIXTURE__.enableSelectionLock(selectedPath);
-        if (clearPath) {
-          history.replaceState({}, '', `${location.pathname}?_a=files`);
-        }
-
-        const tree = document.querySelector('.fixture-tree');
-        const target = document.querySelector('#tree-design');
-        const listProps = tree.__reactProps$fixture;
-        delete tree.__reactProps$fixture;
-        if (delayTarget) target.remove();
-
-        // Model the first Files paint: ADO's selected-file state already
-        // exists, but the target leaf and current List dispatcher arrive in a
-        // later TreeEx paint. A manual Markdown click naturally waits for this
-        // state; the extension setup action must do the same.
-        setTimeout(() => {
-          if (delayTarget) {
-            target.setAttribute('data-path', targetPath);
-            tree.prepend(target);
-          }
-          tree.__reactProps$fixture = listProps;
-        }, 400);
-      }, {
-        selectedPath: fixtures.NON_MARKDOWN_PATH,
-        targetPath: fixtures.DESIGN_PATH,
-        clearPath: coldStart.clearPath,
-        delayTarget: coldStart.delayTarget,
-      });
-
-      await expect(page.locator('.adrc-sidebar-open-preview'))
-        .toHaveText('Open Markdown Preview', { timeout: 4000 });
-      await page.locator('.adrc-sidebar-open-preview').click();
-      await waitForAdoReady(page, fixtures.DESIGN_PATH, userThreadCount(server.threads));
-
-      expect(new URL(page.url()).searchParams.get('path')).toBe(fixtures.DESIGN_PATH);
-      expect(await page.evaluate(() => window.__ADO_FIXTURE__.selectedPath())).toBe(fixtures.DESIGN_PATH);
-      expect((await page.evaluate(() => window.ADORC_probe.viewMode())).currentMode).toBe('preview');
-      expect(server.pageLoads).toBe(1);
-      const trace = await page.evaluate(() => window.ADORC_probe.navigationTrace());
-      expect(trace.entries.some((entry) => entry.event === 'navigation.fallback-required')).toBe(false);
-      expect(trace.entries.some((entry) => entry.event === 'tree.selection-model-accepted')).toBe(true);
-    });
-  }
 
   test('ignores a changed-file tree row whose name ends in preview while restoring Preview mode', async ({ page }) => {
     const decoyPath = '/resources/openapi/2026-06-01-preview';
@@ -189,11 +97,6 @@ test.describe('ADO SPA lifecycle and cross-file navigation', () => {
     expect(await page.evaluate(() => window.__ADO_FIXTURE__.selectedPath())).toBe(fixtures.DESIGN_PATH);
     expect((await page.evaluate(() => window.ADORC_probe.viewMode())).currentMode).toBe('preview');
     expect(server.pageLoads).toBe(1);
-    const trace = await page.evaluate(() => window.ADORC_probe.navigationTrace());
-    expect(trace.entries.some((entry) =>
-      entry.event === 'preview-restore.option-clicked' &&
-      entry.details?.label?.includes('2026-06-01-preview')
-    )).toBe(false);
   });
 
   test('immediate sidebar stays hidden outside the PR Files tab', async ({ page }) => {
@@ -355,11 +258,6 @@ test.describe('ADO SPA lifecycle and cross-file navigation', () => {
     expect(new URL(page.url()).searchParams.get('path')).toBe(fixtures.OTHER_PATH);
     await expect.poll(() => server.pageLoads).toBe(2);
     expect(server.pageLoads).toBe(2);
-    await injectAdoExtension(page);
-    const trace = await page.evaluate(() => window.ADORC_probe.navigationTrace());
-    expect(new Set(trace.entries.map((entry) => entry.documentId)).size).toBeGreaterThan(1);
-    expect(trace.entries.some((entry) => entry.event === 'fallback.submitted')).toBe(true);
-    expect(trace.entries.filter((entry) => entry.event === 'document.loaded').length).toBeGreaterThan(1);
   });
 
   test('a pending change resumes after the exact-route reload fallback', async ({ page }) => {
@@ -396,9 +294,6 @@ test.describe('ADO SPA lifecycle and cross-file navigation', () => {
     // The new document remaps only its active Preview source. It must not
     // download both source versions for every Markdown file again.
     expect(countRequests('/items')).toBe(before.items + 1);
-    const trace = await page.evaluate(() => window.ADORC_probe.navigationTrace());
-    expect(trace.entries.some((entry) => entry.event === 'catalog-cache.saved')).toBe(true);
-    expect(trace.entries.some((entry) => entry.event === 'catalog-cache.restored')).toBe(true);
   });
 
   test('a superseded tree lookup cannot reload or override the newer target', async ({ page }) => {
