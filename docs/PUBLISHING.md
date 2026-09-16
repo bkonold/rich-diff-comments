@@ -24,8 +24,8 @@ How to ship the separate GitHub and Azure DevOps browser-extension targets. This
 |---|---|---|---|---|
 | GitHub | Chrome Web Store | <https://chromewebstore.google.com/detail/markdown-pr-comments-for/bdkcmcdfnhonfcpdgcmemkpcmnhnhemj> | Live (Unlisted) | 1.4.0 |
 | GitHub | Microsoft Edge Add-ons | <https://microsoftedge.microsoft.com/addons/detail/agomibenjlnikaldoddminkjbokfocgb> | Live (Unlisted) | 1.4.0 |
-| Azure DevOps | Chrome Web Store | New listing | Preparing submission | 1.0.0 |
-| Azure DevOps | Microsoft Edge Add-ons | New listing | Preparing submission | 1.0.0 |
+| Azure DevOps | Chrome Web Store | New listing | Preparing submission | 1.1.0 |
+| Azure DevOps | Microsoft Edge Add-ons | New listing | Preparing submission | 1.1.0 |
 
 > The existing GitHub listings are unlisted. The ADO rows are separate new items and receive their own store IDs after approval. Never upload an ADO package as an update to either GitHub listing.
 
@@ -53,7 +53,7 @@ When you submit, pick one:
 ## Recommended path for this team
 
 - **GitHub:** maintain the existing Chrome and Edge listing IDs.
-- **Azure DevOps:** submit v1.0.0 as two new hidden/unlisted listings using the ADO package, icon, privacy policy, screenshots, and canonical form copy.
+- **Azure DevOps:** submit v1.1.0 as two new hidden/unlisted listings using the ADO package, icon, privacy policy, screenshots, and canonical form copy.
 - Switch either ADO listing to public only after approval and a dogfood period.
 - Skip self-hosted CRX distribution unless enterprise policy requires it.
 
@@ -99,7 +99,7 @@ GitHub uses the original dark speech-bubble icon. ADO uses the separate Fluent-b
 
 The Web Store accepts up to 5 screenshots at **1280×800 or 640×400** (use the higher resolution). Never reuse screenshots across targets when the service chrome differs.
 
-Suggested ADO v1.0.0 set, in order:
+Suggested ADO v1.1.0 set, in order:
 
 1. Changes tab with cards spanning multiple Markdown files.
 2. An expanded inline thread showing the reply and Resolve actions.
@@ -281,7 +281,7 @@ Do not hand-build or hand-edit the zip. The checked-in packager synchronizes sha
 After release prep, verify the selected target package:
 
 ```powershell
-.\.github\skills\rdc-publish-check\scripts\preflight.ps1 -Target ado -VerifyZip .\releases\ado\1.0.0\rdc-ado-1.0.0.zip
+.\.github\skills\rdc-publish-check\scripts\preflight.ps1 -Target ado -VerifyZip .\releases\ado\1.1.0\rdc-ado-1.1.0.zip
 ```
 
 Verification checks the packaged target identity and hosts, top-level manifest, declared scripts/styles/icons, privacy policy, and absence of development-only files.

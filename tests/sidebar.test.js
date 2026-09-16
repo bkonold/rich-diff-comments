@@ -13,6 +13,10 @@ const {
   filterSidebarThreadItems,
   sortSidebarThreadItems,
   buildScopedCounterState,
+  normalizeAdoTreePath,
+  buildAdoTreePathEntries,
+  adoTreeEntryMatchesPath,
+  findDeepestAdoTreeAncestor,
 } = require('../src/lib/sidebar.js');
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -360,6 +364,77 @@ test('buildScopedCounterState — selected item in another file reports zero cur
 test('buildScopedCounterState — unknown route and invalid input use defensive flat count', () => {
   assert.equal(buildScopedCounterState([{ path: '/a.md' }], 0, '', 'threads').text, '1/1');
   assert.equal(buildScopedCounterState(null, 99, null, 'changes').text, '0/0');
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Azure DevOps flattened tree reconstruction
+// ──────────────────────────────────────────────────────────────────────
+
+test('buildAdoTreePathEntries — reconstructs nested paths from aria levels', () => {
+  const entries = buildAdoTreePathEntries([
+    { label: 'public', level: 1, folder: true, expanded: true },
+    { label: '.github', level: 2, folder: true, expanded: true },
+    { label: 'skills', level: 3, folder: true, expanded: true },
+    { label: 'bug-bash', level: 4, folder: true, expanded: true },
+    { label: 'SKILL.md', level: 5, folder: false },
+    { label: 'SECURITY.md', level: 2, folder: false },
+    { label: 'SECURITY.md', level: 1, folder: false },
+  ]);
+  assert.equal(entries[4].reconstructedPath, '/public/.github/skills/bug-bash/SKILL.md');
+  assert.equal(entries[5].reconstructedPath, '/public/SECURITY.md');
+  assert.equal(entries[6].reconstructedPath, '/SECURITY.md');
+});
+
+test('buildAdoTreePathEntries — preserves compressed multi-segment folders', () => {
+  const entries = buildAdoTreePathEntries([
+    { label: 'public/.github/skills', level: 1, folder: true, expanded: true },
+    { label: 'bug-bash/references', level: 2, folder: true, expanded: true },
+    { label: 'report-template.md', level: 3, folder: false },
+  ]);
+  assert.equal(
+    entries[2].reconstructedPath,
+    '/public/.github/skills/bug-bash/references/report-template.md'
+  );
+});
+
+test('adoTreeEntryMatchesPath — rejects structural and duplicate-basename false positives', () => {
+  const entries = buildAdoTreePathEntries([
+    { label: 'public', level: 1, folder: true, expanded: true },
+    { label: 'cu-cli', level: 2, folder: true, expanded: true },
+    { label: 'SECURITY.md', level: 3, folder: false },
+    { label: 'SUPPORT.md', level: 3, folder: false },
+  ]);
+  assert.equal(adoTreeEntryMatchesPath(entries[2], '/public/SECURITY.md'), false);
+  assert.equal(adoTreeEntryMatchesPath(entries[2], '/public/cu-cli/SECURITY.md'), true);
+  assert.equal(adoTreeEntryMatchesPath(entries[3], '/issues/unrelated.md'), false);
+});
+
+test('adoTreeEntryMatchesPath — accepts exact href and full-label paths', () => {
+  const entries = buildAdoTreePathEntries([
+    { label: 'display name', level: 1, folder: false, hrefPath: '/docs/README.md' },
+    { label: 'docs/guide.md', level: 1, folder: false },
+  ]);
+  assert.equal(adoTreeEntryMatchesPath(entries[0], '/docs/README.md'), true);
+  assert.equal(adoTreeEntryMatchesPath(entries[0], '/docs/readme.md'), false);
+  assert.equal(adoTreeEntryMatchesPath(entries[1], '/docs/guide.md'), true);
+});
+
+test('findDeepestAdoTreeAncestor — chooses the deepest exact collapsed path prefix', () => {
+  const entries = buildAdoTreePathEntries([
+    { label: 'public', level: 1, folder: true, expanded: true },
+    { label: '.github', level: 2, folder: true, expanded: false },
+    { label: 'other', level: 1, folder: true, expanded: false },
+  ]);
+  assert.equal(
+    findDeepestAdoTreeAncestor(entries, '/public/.github/skills/x/SKILL.md').reconstructedPath,
+    '/public/.github'
+  );
+  assert.equal(findDeepestAdoTreeAncestor(entries, '/missing/file.md'), null);
+});
+
+test('normalizeAdoTreePath — normalizes separators, root, casing, and invalid input', () => {
+  assert.equal(normalizeAdoTreePath('Public\\Docs//README.md/'), '/Public/Docs/README.md');
+  assert.equal(normalizeAdoTreePath(null), '');
 });
 
 

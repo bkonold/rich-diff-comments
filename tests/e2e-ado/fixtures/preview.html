@@ -32,7 +32,7 @@
 </head>
 <body>
   <div class="fixture-shell">
-    <nav class="fixture-tree" aria-label="Changed files">
+    <nav class="fixture-tree bolt-list" role="tree" aria-label="Changed files">
       <div id="tree-design" class="bolt-tree-row fixture-active" role="treeitem" aria-label="docs/design.md" data-path="/docs/design.md">
         <div class="bolt-tree-cell"><div class="bolt-table-cell-content">design.md</div></div>
       </div>
@@ -47,6 +47,12 @@
       </div>
       <div id="tree-renamed" class="bolt-tree-row" role="treeitem" aria-label="docs/renamed.md" data-path="/docs/renamed.md">
         <div class="bolt-tree-cell"><div class="bolt-table-cell-content">renamed.md</div></div>
+      </div>
+      <div id="tree-non-markdown" class="bolt-tree-row" role="treeitem" aria-label="src/ignored.js" data-path="/src/ignored.js">
+        <div class="bolt-tree-cell"><div class="bolt-table-cell-content">ignored.js</div></div>
+      </div>
+      <div id="tree-preview-suffix" class="bolt-tree-row bolt-table-row bolt-list-row single-click-activation" role="treeitem" aria-label="resources/openapi/2026-06-01-preview" data-path="/resources/openapi/2026-06-01-preview">
+        <div class="bolt-tree-cell"><div class="bolt-table-cell-content">2026-06-01-preview</div></div>
       </div>
     </nav>
 
@@ -94,27 +100,114 @@
         '/docs/renamed.md': [
           '<h1 id="user-content-renamed-notes">Renamed Notes<a class="shareHeaderAnchor" href="#renamed-notes"></a></h1>',
           '<p>Updated wording after the rename.</p>'
-        ].join('')
+        ].join(''),
+        '/src/ignored.js': null,
+        '/resources/openapi/2026-06-01-preview': null
       };
 
       const preview = document.getElementById('ado-preview');
       const rows = Array.from(document.querySelectorAll('.bolt-tree-row[data-path]'));
+      const selectionLockKey = 'fixture-ado-selection-lock';
+      const selectedPathKey = 'fixture-ado-selected-path';
 
-      function openPath(path) {
+      function selectionLockEnabled() {
+        return sessionStorage.getItem(selectionLockKey) === '1';
+      }
+
+      function renderPath(path, requestedMode) {
         if (!Object.prototype.hasOwnProperty.call(fragments, path)) throw new Error('Unknown fixture path: ' + path);
         history.pushState({}, '', location.pathname + '?_a=files&path=' + encodeURIComponent(path));
         const renderable = fragments[path] != null;
-        preview.style.display = renderable ? '' : 'none';
-        preview.innerHTML = renderable ? fragments[path] : '';
+        const mode = renderable ? requestedMode : 'Inline';
+        const showPreview = renderable && mode === 'Preview';
+        preview.style.display = showPreview ? '' : 'none';
+        preview.innerHTML = showPreview ? fragments[path] : '';
         rows.forEach((row) => row.classList.toggle('fixture-active', row.dataset.path === path));
-        document.querySelector('.fixture-view-mode').textContent = renderable ? 'Preview' : 'Inline';
+        document.querySelector('.fixture-view-mode').textContent = mode;
         document.getElementById('preview-scroll').scrollTop = 0;
       }
 
-      rows.forEach((row) => row.addEventListener('click', () => openPath(row.dataset.path)));
-      window.__ADO_FIXTURE__ = { fragments, openPath, preview };
+      function openPath(path) {
+        renderPath(path, fragments[path] != null ? 'Preview' : 'Inline');
+      }
 
-      const initialPath = new URLSearchParams(location.search).get('path') || '/docs/design.md';
+      function selectPath(path) {
+        if (selectionLockEnabled()) sessionStorage.setItem(selectedPathKey, path);
+        // ADO keeps file selection and the four-option view mode as separate
+        // state. Native tree selection preserves the current mode; selecting
+        // a Markdown file from Inline does not create Preview by itself.
+        const currentMode = document.querySelector('.fixture-view-mode').textContent;
+        renderPath(path, currentMode);
+      }
+
+      function enableSelectionLock(path) {
+        sessionStorage.setItem(selectionLockKey, '1');
+        sessionStorage.setItem(selectedPathKey, path);
+        installSelectionHandler();
+        openPath(path);
+      }
+
+      function installSelectionHandler() {
+        document.querySelector('.fixture-tree').__reactProps$fixture = {
+          onClick: (event) => {
+            const row = event.target?.closest?.('.bolt-tree-row[data-path]');
+            if (row) selectPath(row.dataset.path);
+          }
+        };
+      }
+
+      function selectedPath() {
+        return sessionStorage.getItem(selectedPathKey);
+      }
+
+      function showViewOptions() {
+        document.querySelector('.fixture-view-options')?.remove();
+        const menu = document.createElement('div');
+        menu.className = 'fixture-view-options bolt-callout';
+        menu.setAttribute('role', 'menu');
+        menu.style.cssText = 'position:fixed;top:52px;right:12px;width:160px;padding:4px;background:#fff;border:1px solid #ccc;z-index:20';
+        ['Side-by-side', 'Inline', 'Raw content', 'Preview'].forEach((label) => {
+          const option = document.createElement('button');
+          option.type = 'button';
+          option.className = 'bolt-menuitem-row bolt-list-row';
+          option.setAttribute('role', 'menuitem');
+          option.style.cssText = 'display:block;width:100%;min-height:28px';
+          option.innerHTML = `<span class="bolt-menuitem-cell-text">${label}</span>`;
+          option.addEventListener('click', () => {
+            if (label === 'Preview') {
+              const path = new URLSearchParams(location.search).get('path');
+              if (path && fragments[path] != null) renderPath(path, 'Preview');
+            } else {
+              preview.style.display = 'none';
+              preview.innerHTML = '';
+              document.querySelector('.fixture-view-mode').textContent = label;
+            }
+            menu.remove();
+          });
+          menu.appendChild(option);
+        });
+        document.body.appendChild(menu);
+      }
+
+      rows.forEach((row) => row.addEventListener('click', (event) => {
+        if (selectionLockEnabled() && !event.isTrusted) return;
+        selectPath(row.dataset.path);
+      }));
+      document.querySelector('.bolt-split-button-option').addEventListener('click', showViewOptions);
+      window.__ADO_FIXTURE__ = {
+        fragments,
+        openPath,
+        selectPath,
+        selectedPath,
+        enableSelectionLock,
+        preview
+      };
+
+      const requestedPath = new URLSearchParams(location.search).get('path') || '/docs/design.md';
+      const initialPath = selectionLockEnabled() && selectedPath()
+        ? selectedPath()
+        : requestedPath;
+      if (selectionLockEnabled()) installSelectionHandler();
       openPath(initialPath);
     })();
   </script>

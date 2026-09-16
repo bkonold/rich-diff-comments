@@ -200,6 +200,33 @@ slow response for file A from attaching buttons or outline rows to file B.
 **Debug helper:** `ADORC_probe.outline()` reports the current headings and the
 detected scroll container. After a file switch, both must reflect the new file.
 
+### SPA pull-request navigation must replace the runtime context
+
+ADO can also change `/pullrequest/<id>` with History API navigation while
+retaining the entire document. This is a different lifecycle boundary from a
+file or view change inside one PR. The content script parses its adapter context
+once at load, and its repository IDs, PR metadata promises, source caches,
+thread inventory, Changes catalog, and Outline catalog all belong to that
+original PR. Reusing the closure after moving from PR A to PR B therefore sends
+requests with PR A's ID and leaves PR A's sidebar cards visible on PR B.
+
+The route watcher compares a normalized identity containing the origin,
+organization, project, repository, and PR ID before doing any pending-jump or
+file initialization work. A changed identity clears only PR-scoped session
+entries (pending destinations, exact-route fallback, and catalog snapshot),
+removes the stale sidebar, and reloads the current URL once. Chromium then
+reinjects the scripts with PR B's context. Persistent sidebar placement, size,
+active tab, and filter preferences remain in local storage. Pending navigation
+and fallback records also carry the loaded PR identity, so a direct document
+navigation that bypasses the old route watcher still rejects stale PR-A state.
+
+Do not turn this into a partial in-place reset. Every old asynchronous request
+would also need cancellation or an identity guard, and every mutable promise,
+source cache, generation, DOM reference, and adapter-resolved ID would need to
+be replaced atomically. A document reload is the safer PR boundary; same-PR
+file/view navigation continues to use the warm in-memory catalogs without a
+reload.
+
 ### Cross-file sidebar navigation must reapply Preview
 
 The four-option file view mode (**Side-by-side / Inline / Raw content /
@@ -222,12 +249,12 @@ Sidebar thread navigation therefore:
 6. waits for route-aware Preview initialization before scrolling to and
    expanding the target inline thread.
 
-There is intentionally **no full-page URL or generic anchor fallback**. That
-fallback reloaded ADO (visible as a second MSAL/content-script initialization)
-and remounted the target file in Inline mode. If the target tree row is not
-materialized—usually because its folder is collapsed—the sidebar shows an
-actionable toast instead of destroying the user's Preview state. Use
-`ADORC_probe.fileTargets('/path/to/file.md')` to inspect row discovery.
+The native tree remains the primary path. A clean same-PR GET is retained only
+as a last resort after exact-row lookup, collapsed-ancestor expansion, and
+virtual-tree materialization fail. That document fallback cannot replace ADO's
+selected-file model reliably, so it is not treated as an alternative to native
+selection. Use `ADORC_probe.fileTargets('/path/to/file.md')` to inspect row
+discovery.
 
 Do not add a made-up view-mode URL parameter: ADO currently keeps this in its
 React/session state. The DOM fallback deliberately relies on user-visible mode
@@ -246,6 +273,134 @@ The restore flow is one-shot per pending navigation: open only the documented
 `.bolt-split-button-option`, click only the Preview menu row once, then wait for
 the rendered container. Unknown menu DOM fails safely and is exposed through
 `ADORC_probe.viewMode()`.
+
+**2026-09-16 correction: the file-X jump was false Preview-menu discovery, not
+a failed TreeEx selection.** A live trace from a bare Files route showed the
+requested Markdown leaf found and accepted by the List selection model. The
+route changed to that exact Markdown path. Two milliseconds later, Preview
+restoration reported `preview-restore.option-clicked` for
+`2026-06-01-preview`; the following `control.clicked` identified it as a
+changed-file TreeEx row, not a menu item. ADO correctly activated that row and
+returned to the extensionless file X.
+
+The bug was a page-wide `.bolt-list-row` scan in mode-option discovery combined
+with label matching that intentionally accepts accessible text ending in
+`Preview`. Bolt uses List rows for both popup menus and the repository tree, so
+any visible file/folder ending in `preview` could masquerade as the Preview
+mode option before the view-mode popup had even opened. The apparent
+before/after-file-X boundary came from which virtualized tree rows remained
+materialized: moving far enough past X removed the decoy from the current
+paint, allowing the real menu to open.
+
+Mode options must therefore be discovered only inside a visible ADO
+menu/callout/listbox root. Page-level List rows and TreeEx rows never qualify,
+regardless of their label. The browser fixture includes an extensionless
+`2026-06-01-preview` changed-file row and verifies that one-click setup remains
+on the requested Markdown file while selecting the real Preview menu option.
+
+These findings also separate earlier work by evidence. Native List-root
+selection is still required and is what successfully selected the requested
+Markdown leaf. Catalog preservation still protects the genuine final reload
+fallback. The late-leaf/List-dispatcher readiness wait was supported only by
+an artificial fixture and was removed before release. The removed
+content-script/service-worker navigation experiment remains unnecessary
+because changing the browser URL cannot solve either native selection or popup
+misclassification.
+
+**TreeEx recycles connected row elements during virtualization.** Live testing
+on a large PR showed the same generated row element being reused for different
+`data-row-index` values while the file-tree scroller moved. A remembered
+descriptor can therefore still name the requested Markdown file while its
+connected `row` now represents an unrelated folder. This was observed as every
+navigation landing on an extensionless `openapi/2026-06-01-preview` directory.
+Remembered entries are path snapshots only: activation requires the matched row
+index to be present in the current paint, and the row is revalidated immediately
+before each click, Enter, or double-click gesture.
+
+**2026-09-16 root cause: ADO's selected-file model is separate from the URL.**
+The repeatable sequence is: select a non-Markdown file, use extension navigation
+to request Markdown, and observe ADO remain pinned to the non-Markdown file;
+manually selecting a Markdown file and choosing Preview releases the lock until
+another non-Markdown file is selected. URL changes, document reloads, and
+browser-level tab updates all failed to replace that native selection. The
+earlier startup explanation based on a recycled collapsed ancestor was therefore
+incorrect, and that speculative ancestor-specific code was removed.
+
+**An exact materialized row can require press events, not only `click()`.** A
+live probe reconstructed the correct deeply nested Markdown leaf at score 240,
+yet click-only activation left the route unchanged and forced the rejected URL
+fallback. When the list-level selection path is unavailable or produces no
+transition, the DOM fallback targets the freshly revalidated cell with a
+complete pointer/mouse press-release-click sequence before trying keyboard and
+double-click. This accommodates TreeEx consumers that select or activate from
+`pointerdown` / `mousedown`.
+
+**TreeEx selection and activation are distinct operations.** The published
+`azure-devops-ui` List/TreeEx implementation handles a row click at the list
+root, derives the row index from `event.target`, calls the selection model, and
+only then performs single-click activation. The prior private-React fallback
+walked arbitrary row/cell ancestors and called event handlers with only a
+fabricated event. It could appear to request the right URL without supplying
+the list row that ADO needs to replace its selected-file state.
+
+The native path now locates the current TreeEx list root and invokes its single
+click dispatcher once with the exact, freshly revalidated leaf as the event
+target before trying DOM activation fallbacks. The list itself constructs the
+real row payload and runs selection before activation. If no current list
+dispatcher is discoverable, this private path is skipped rather than guessing
+at component callbacks.
+
+**Commit the exact fallback URL before reloading.** Live testing also showed the
+legacy PR viewer restoring its previously selected folder during a direct
+`location.assign()` to another file. The page visibly refreshed, but its
+`?path=` returned to the old extensionless folder. The fallback now constructs
+a clean same-PR URL. Further testing confirmed that pasting this exact URL into
+the address bar works while script-driven assignment and replace/reload are
+rewritten. The fallback therefore submits a plain browser-level GET form to the
+PR path with only `path` and `_a=files`, matching a direct document navigation
+instead of notifying ADO's SPA router first. A short-lived session marker
+verifies that ADO retained the requested path; if ADO still rejects it, the
+pending sidebar jump is released instead of repeatedly pinning navigation.
+
+**2026-09-04 live result: the GET fallback is not stable during ADO startup.**
+The new document initially loaded with the requested Markdown `?path=`, then
+ADO's PR viewer rewrote it during hydration to its previously selected
+extensionless directory (`openapi/2026-06-01-preview`). The subsequent
+`Failed to fetch` inventory errors are consistent with requests being aborted
+by that full-document navigation; they are symptoms, not evidence that MSAL or
+the REST endpoints initiated the redirect. The browser's permissions-policy
+`unload` warnings are emitted by ADO bundles and are unrelated.
+
+**Cross-file sidebar cards remain real links, while ordinary clicks use the
+shared native-tree-first router.** Changes, Threads, and Outline destinations
+retain clean same-PR `href` values and `_top` as a manual fallback. Their click
+handlers prevent the default so normal use updates ADO's native selected-file
+state before Preview restoration instead of relying on URL navigation alone.
+
+**A last-resort document navigation must carry the PR-wide catalogs across the
+reload.** In-memory promises correctly deduplicate normal SPA file switches,
+but the exact-route GET fallback creates a new JavaScript document and therefore
+used to repeat changed-file discovery, every head/base source comparison, the
+PR-wide Outline build, and thread discovery. Immediately before submitting the
+fallback, the extension now writes a short-lived, PR-scoped session snapshot of
+the normalized Markdown inventory, compact Changes stops, DOM-free Outline, and
+thread data. The next document restores it only while the exact-route marker is
+pending, then fetches just the active file source needed for line mapping.
+
+The snapshot deliberately excludes raw Markdown source and stores only a
+presence marker for each diff hunk's base/head lines. It expires with the
+90-second navigation window, is capped at 1.5 million serialized characters,
+and progressively drops thread, Outline, then detailed Changes data while
+retaining lightweight file/version inventory whenever possible. Failure is
+non-fatal: navigation still completes and the new document falls back to the
+normal service requests.
+
+The isolated content-script/service-worker navigation experiment was removed.
+Live testing showed that changing the browser URL from outside the page still
+left ADO's selected-file model pinned, so the extra manifest surface did not
+address the failure. The exact-route GET remains only as a final fallback when
+the native tree cannot expose a target; it is not used as a substitute for a
+known materialized row's selection transition.
 
 ## Changes tab — source diff, not DOM markers
 

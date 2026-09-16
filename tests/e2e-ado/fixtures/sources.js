@@ -1,6 +1,7 @@
 'use strict';
 
 const DESIGN_PATH = '/docs/design.md';
+const NON_MARKDOWN_PATH = '/src/ignored.js';
 const OTHER_PATH = '/docs/other.md';
 const NEW_PATH = '/docs/new.md';
 const DELETED_PATH = '/docs/deleted.md';
@@ -215,7 +216,7 @@ function defaultChanges() {
       originalPath: OLD_RENAMED_PATH,
       item: { path: RENAMED_PATH },
     },
-    { changeId: 6, changeTrackingId: 106, changeType: 'edit', item: { path: '/src/ignored.js' } },
+    { changeId: 6, changeTrackingId: 106, changeType: 'edit', item: { path: NON_MARKDOWN_PATH } },
     {
       changeId: 7,
       changeTrackingId: 107,
@@ -228,6 +229,7 @@ function defaultChanges() {
 
 module.exports = {
   DESIGN_PATH,
+  NON_MARKDOWN_PATH,
   OTHER_PATH,
   NEW_PATH,
   DELETED_PATH,

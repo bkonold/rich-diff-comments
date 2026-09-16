@@ -25,11 +25,14 @@ const PROJECT_ID = 'project-guid';
 const REPO_NAME = 'test-repo';
 const REPO_ID = 'repo-guid';
 const PR_ID = 42;
+const SECOND_PR_ID = 43;
 const TARGET_COMMIT = 'b'.repeat(40);
 const SOURCE_COMMIT = 'c'.repeat(40);
 const COMMON_COMMIT = 'a'.repeat(40);
 const FAKE_PR_PATH = `/${ORG}/${PROJECT_NAME}/_git/${REPO_NAME}/pullrequest/${PR_ID}`;
+const SECOND_FAKE_PR_PATH = `/${ORG}/${PROJECT_NAME}/_git/${REPO_NAME}/pullrequest/${SECOND_PR_ID}`;
 const FAKE_PR_URL = `https://dev.azure.com${FAKE_PR_PATH}?_a=files&path=${encodeURIComponent(fixtureData.DESIGN_PATH)}`;
+const FAKE_PR_FILES_URL = `https://dev.azure.com${FAKE_PR_PATH}?_a=files`;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -101,6 +104,7 @@ async function installAdoRoutes(page, options) {
     }, opts.baseSources || {}),
     sourceDelays: Object.assign({}, opts.sourceDelays || {}),
     sourceFailures: Object.assign({}, opts.sourceFailures || {}),
+    inventoryDelay: Number(opts.inventoryDelay || 0),
     nextThreadId: 1000,
   };
 
@@ -111,7 +115,10 @@ async function installAdoRoutes(page, options) {
     const body = await readRequestBody(request);
     state.requests.push({ method, url: url.toString(), pathname: url.pathname, search: url.search, body });
 
-    if (method === 'GET' && url.pathname === FAKE_PR_PATH) {
+    const documentPrMatch = url.pathname.match(new RegExp(
+      `^/${ORG}/${PROJECT_NAME}/_git/${REPO_NAME}/pullrequest/(\\d+)$`
+    ));
+    if (method === 'GET' && documentPrMatch) {
       state.pageLoads++;
       return route.fulfill({
         status: 200,
@@ -135,18 +142,25 @@ async function installAdoRoutes(page, options) {
       return fulfillJson(route, { authenticatedUser: clone(fixtureData.CURRENT_USER) });
     }
 
-    const prPath = `/${ORG}/_apis/git/repositories/${REPO_ID}/pullRequests/${PR_ID}`;
-    if (method === 'GET' && url.pathname === prPath) {
+    const prMatch = url.pathname.match(new RegExp(
+      `^/${ORG}/_apis/git/repositories/${REPO_ID}/pullRequests/(\\d+)$`
+    ));
+    if (method === 'GET' && prMatch) {
       return fulfillJson(route, {
-        pullRequestId: PR_ID,
+        pullRequestId: Number(prMatch[1]),
         sourceRefName: 'refs/heads/feature/fixture',
         targetRefName: 'refs/heads/main',
         lastMergeTargetCommit: { commitId: TARGET_COMMIT },
       });
     }
 
-    const projectPrPath = `/${ORG}/${PROJECT_ID}/_apis/git/repositories/${REPO_ID}/pullRequests/${PR_ID}`;
-    if (method === 'GET' && url.pathname === `${projectPrPath}/iterations`) {
+    const iterationsMatch = url.pathname.match(new RegExp(
+      `^/${ORG}/${PROJECT_ID}/_apis/git/repositories/${REPO_ID}/pullRequests/(\\d+)/iterations$`
+    ));
+    if (method === 'GET' && iterationsMatch) {
+      if (state.inventoryDelay > 0) {
+        await new Promise((resolve) => setTimeout(resolve, state.inventoryDelay));
+      }
       return fulfillJson(route, {
         count: 2,
         value: [
@@ -161,7 +175,10 @@ async function installAdoRoutes(page, options) {
       });
     }
 
-    if (method === 'GET' && url.pathname === `${projectPrPath}/iterations/2/changes`) {
+    const iterationChangesMatch = url.pathname.match(new RegExp(
+      `^/${ORG}/${PROJECT_ID}/_apis/git/repositories/${REPO_ID}/pullRequests/(\\d+)/iterations/2/changes$`
+    ));
+    if (method === 'GET' && iterationChangesMatch) {
       return fulfillJson(route, {
         changeEntries: clone(state.prChanges),
         nextSkip: 0,
@@ -191,8 +208,10 @@ async function installAdoRoutes(page, options) {
       return fulfillJson(route, { content: sourceSet[filePath] });
     }
 
-    const threadsPath = `${prPath}/threads`;
-    if (url.pathname === threadsPath) {
+    const threadsMatch = url.pathname.match(new RegExp(
+      `^/${ORG}/_apis/git/repositories/${REPO_ID}/pullRequests/(\\d+)/threads$`
+    ));
+    if (threadsMatch) {
       if (method === 'GET') {
         return fulfillJson(route, { count: state.threads.length, value: clone(state.threads) });
       }
@@ -219,10 +238,12 @@ async function installAdoRoutes(page, options) {
       }
     }
 
-    const commentMatch = url.pathname.match(new RegExp(`^${threadsPath}/(\\d+)/comments/(\\d+)$`));
+    const commentMatch = url.pathname.match(new RegExp(
+      `^/${ORG}/_apis/git/repositories/${REPO_ID}/pullRequests/(\\d+)/threads/(\\d+)/comments/(\\d+)$`
+    ));
     if (commentMatch) {
-      const thread = state.threads.find((item) => String(item.id) === commentMatch[1]);
-      const comment = thread?.comments?.find((item) => String(item.id) === commentMatch[2]);
+      const thread = state.threads.find((item) => String(item.id) === commentMatch[2]);
+      const comment = thread?.comments?.find((item) => String(item.id) === commentMatch[3]);
       if (!thread || !comment) return route.fulfill({ status: 404, body: 'Comment not found' });
       if (method === 'PATCH') {
         comment.content = body.content;
@@ -237,9 +258,11 @@ async function installAdoRoutes(page, options) {
       }
     }
 
-    const commentsMatch = url.pathname.match(new RegExp(`^${threadsPath}/(\\d+)/comments$`));
+    const commentsMatch = url.pathname.match(new RegExp(
+      `^/${ORG}/_apis/git/repositories/${REPO_ID}/pullRequests/(\\d+)/threads/(\\d+)/comments$`
+    ));
     if (commentsMatch && method === 'POST') {
-      const thread = state.threads.find((item) => String(item.id) === commentsMatch[1]);
+      const thread = state.threads.find((item) => String(item.id) === commentsMatch[2]);
       if (!thread) return route.fulfill({ status: 404, body: 'Thread not found' });
       const nextId = Math.max(0, ...thread.comments.map((item) => Number(item.id) || 0)) + 1;
       const created = {
@@ -256,9 +279,11 @@ async function installAdoRoutes(page, options) {
       return fulfillJson(route, clone(created), 201);
     }
 
-    const threadMatch = url.pathname.match(new RegExp(`^${threadsPath}/(\\d+)$`));
+    const threadMatch = url.pathname.match(new RegExp(
+      `^/${ORG}/_apis/git/repositories/${REPO_ID}/pullRequests/(\\d+)/threads/(\\d+)$`
+    ));
     if (threadMatch && method === 'PATCH') {
-      const thread = state.threads.find((item) => String(item.id) === threadMatch[1]);
+      const thread = state.threads.find((item) => String(item.id) === threadMatch[2]);
       if (!thread) return route.fulfill({ status: 404, body: 'Thread not found' });
       thread.status = statusName(body.status);
       return fulfillJson(route, clone(thread));
@@ -317,7 +342,7 @@ async function setupAdoExtensionPage(page, options) {
   page.on('console', (message) => logs.push(message.text()));
   page.on('pageerror', (error) => pageErrors.push(String(error.message || error)));
 
-  await page.goto(FAKE_PR_URL, { waitUntil: 'domcontentloaded' });
+  await page.goto(opts.initialUrl || FAKE_PR_URL, { waitUntil: 'domcontentloaded' });
   await page.addStyleTag({ path: path.join(EXT_ROOT, 'styles.css') });
   await page.evaluate(() => {
     localStorage.setItem('adrc-sidebar-state-v1', JSON.stringify({
@@ -331,6 +356,16 @@ async function setupAdoExtensionPage(page, options) {
       height: 620,
     }));
   });
+  if (opts.hideInitialPreview) {
+    await page.evaluate((keepPath) => {
+      const url = new URL(location.href);
+      if (!keepPath) url.searchParams.delete('path');
+      history.replaceState({}, '', url.href);
+      window.__ADO_FIXTURE__.preview.style.display = 'none';
+      window.__ADO_FIXTURE__.preview.innerHTML = '';
+      document.querySelector('.fixture-view-mode').textContent = 'Inline';
+    }, opts.keepInitialPathWithoutPreview === true);
+  }
   await injectAdoExtension(page);
 
   if (opts.waitForReady !== false) {
@@ -355,10 +390,14 @@ module.exports = {
   EXT_ROOT,
   CONTENT_SCRIPTS,
   FAKE_PR_URL,
+  FAKE_PR_FILES_URL,
   FAKE_PR_PATH,
+  SECOND_PR_ID,
+  SECOND_FAKE_PR_PATH,
   TARGET_COMMIT,
   SOURCE_COMMIT,
   COMMON_COMMIT,
+  injectAdoExtension,
   setupAdoExtensionPage,
   waitForAdoReady,
   waitForOutlineReady,

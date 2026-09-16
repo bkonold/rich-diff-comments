@@ -199,6 +199,83 @@
     };
   }
 
+  // Normalize an ADO repository path for exact comparison.
+  // Azure DevOps API paths include a leading slash while DOM labels often do
+  // not; repeated/trailing slashes are not meaningful for tree matching.
+  function normalizeAdoTreePath(value) {
+    if (typeof value !== 'string') return '';
+    const cleaned = value.trim().replace(/\\/g, '/').replace(/\/{2,}/g, '/');
+    if (!cleaned) return '';
+    const withRoot = cleaned.startsWith('/') ? cleaned : '/' + cleaned;
+    return withRoot.length > 1 ? withRoot.replace(/\/$/, '') : withRoot;
+  }
+
+  /**
+   * Reconstruct full paths from the flattened rows rendered by ADO TreeEx.
+   * Each input is `{label, level, folder, hrefPath, ...}`. `aria-level`
+   * supplies `level`; folder rows expose `aria-expanded`. Extra properties are
+   * preserved so browser callers can keep the associated DOM node.
+   */
+  function buildAdoTreePathEntries(entries) {
+    if (!Array.isArray(entries)) return [];
+    const folderPaths = [];
+    return entries.map((entry) => {
+      const value = entry && typeof entry === 'object' ? entry : {};
+      const level = Number.isFinite(Number(value.level)) && Number(value.level) > 0
+        ? Math.floor(Number(value.level))
+        : 1;
+      const labelPath = normalizeAdoTreePath(value.label || '');
+      const labelParts = labelPath.split('/').filter(Boolean);
+      const label = labelParts[labelParts.length - 1] || '';
+      folderPaths.length = Math.max(0, level - 1);
+      const parentPath = level > 1 ? folderPaths[level - 2] || '' : '';
+      const reconstructedPath = !labelPath
+        ? parentPath
+        : parentPath && !labelPath.startsWith(parentPath + '/')
+          ? normalizeAdoTreePath(parentPath + labelPath)
+          : labelPath;
+      const hrefPath = normalizeAdoTreePath(value.hrefPath || '');
+      const fullLabelPath = labelParts.length > 1 ? labelPath : '';
+      const result = Object.assign({}, value, {
+        level,
+        normalizedLabel: label,
+        hrefPath,
+        fullLabelPath,
+        reconstructedPath
+      });
+      if (value.folder === true && label) {
+        folderPaths[level - 1] = reconstructedPath;
+      }
+      return result;
+    });
+  }
+
+  // A file row qualifies only through an exact path-bearing signal. Basename,
+  // row role, and leaf styling are deliberately insufficient: large PRs often
+  // contain duplicate README.md / SECURITY.md / SKILL.md names.
+  function adoTreeEntryMatchesPath(entry, targetPath) {
+    const target = normalizeAdoTreePath(targetPath);
+    if (!target || !entry || entry.folder === true) return false;
+    return entry.hrefPath === target ||
+      entry.fullLabelPath === target ||
+      entry.reconstructedPath === target;
+  }
+
+  // Return the deepest currently visible collapsed folder that is an exact
+  // ancestor of the requested file. Callers click its native expand control,
+  // rebuild the flattened rows, then retry until the leaf materializes.
+  function findDeepestAdoTreeAncestor(entries, targetPath) {
+    const target = normalizeAdoTreePath(targetPath);
+    if (!target || !Array.isArray(entries)) return null;
+    return entries
+      .filter((entry) => entry && entry.folder === true && entry.expanded === false)
+      .filter((entry) => {
+        const path = entry.hrefPath || entry.fullLabelPath || entry.reconstructedPath;
+        return path && target.startsWith(path + '/');
+      })
+      .sort((a, b) => b.level - a.level)[0] || null;
+  }
+
   return {
     buildSnippet,
     clampDragPos,
@@ -209,5 +286,9 @@
     filterSidebarThreadItems,
     sortSidebarThreadItems,
     buildScopedCounterState,
+    normalizeAdoTreePath,
+    buildAdoTreePathEntries,
+    adoTreeEntryMatchesPath,
+    findDeepestAdoTreeAncestor,
   };
 });

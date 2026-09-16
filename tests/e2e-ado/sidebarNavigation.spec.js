@@ -33,7 +33,7 @@ test.describe('ADO sidebar and keyboard navigation', () => {
     expect(state.visible).toBe(true);
     expect(state.collapsed).toBe(false);
     expect(state.tab).toBe('threads');
-    expect(state.width).toBe(480);
+    expect(state.width).toBe(520);
     expect(state.height).toBe(480);
   });
 

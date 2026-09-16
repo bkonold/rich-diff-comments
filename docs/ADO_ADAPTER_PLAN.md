@@ -514,6 +514,221 @@ were manually confirmed in the live ADO sandbox before release preparation.
 **Deferred by decision:** `@mention` autocomplete remains a later iteration;
 none of M/N/O adds identity-search traffic or editor suggestion UI.
 
+### 7.9 Iteration Q — reliable nested/virtualized file navigation (v1.1.0)
+
+Live v1.0.0 testing on a large pull request exposed two false-match classes in
+cross-file Changes navigation. Structural row bonuses allowed unrelated leaf
+rows to qualify with score `30`; basename-only matches could select a different
+file such as `/public/cu-cli/SECURITY.md` for `/public/SECURITY.md`. Deeply
+nested targets hidden behind collapsed or virtualized folders therefore clicked
+the wrong materialized row and left the route unchanged.
+
+**Design:**
+
+- Reconstruct visible file paths from Azure DevOps tree `aria-level` hierarchy
+  and the leaf/folder labels rendered by `azure-devops-ui`.
+- A row may be activated only by an exact href, full label, or reconstructed
+  path match. Structural and basename signals may rank an already-qualified
+  match, but can never qualify a row by themselves.
+- Expand the deepest visible collapsed ancestor of the requested path and retry
+  while Azure DevOps materializes its children.
+- Prefer native row activation to retain Preview without a reload. If the exact
+  row remains unavailable because the tree is virtualized—or native activation
+  does not change the route—navigate to the exact same-PR `?path=` route while
+  retaining the pending jump. Existing one-shot Preview restoration then
+  returns the file to Preview before locating the selected change/thread/
+  heading.
+- Keep rapid repeated navigation safe: an older asynchronous tree lookup must
+  not override a newer pending target.
+
+**Acceptance:** duplicate basenames never activate the wrong row; collapsed
+folder paths expand and use native navigation; absent/virtualized rows use the
+exact route fallback and restore Preview; the original native fast path still
+performs no page reload; Changes, Threads, and Outline share the behavior.
+
+### 7.11 Iteration S — preserve PR-wide state during sidebar navigation (v1.1.0)
+
+Live testing of Iterations Q/R confirmed the immediate Files-page sidebar and
+one-click Preview action, but exposed a route-transition regression: crossing
+files could look like a fresh extension startup, reload the review-thread
+inventory, briefly show Preview setup again, and move Changes back to the first
+item instead of the card or keyboard target the reviewer selected. Exact-route
+fallbacks also caused a full page load when the requested tree row was merely
+outside Azure DevOps' virtualized materialized range.
+
+**Design:**
+
+- Treat PR-wide Changes, Threads, and Outline as session catalogs. A normal
+  file switch remaps only the active Preview DOM and renders inline badges from
+  the cached thread catalog. Refresh threads from the service only after a
+  comment/thread mutation or an explicit retry.
+- While a pending change/thread/heading jump exists, keep that stable key as
+  the authoritative selection. Scroll-follow and route initialization must not
+  replace it with the first item in the newly opened file.
+- Keep the setup action hidden during an extension-driven cross-file switch;
+  Preview restoration is already automatic for the pending target.
+- Before using the full-page exact-route fallback, scan the native tree's own
+  scroll container so Azure DevOps can materialize offscreen rows. Preserve
+  `aria-level` hierarchy while scanning, expand exact collapsed ancestors, and
+  activate the exact leaf through native click/keyboard semantics.
+- Treat remembered virtual-tree entries as path snapshots only. TreeEx can
+  recycle a still-connected row element for another index, so the exact index
+  must also be present in the current paint and the row must be revalidated
+  immediately before every activation gesture.
+- Treat ADO's selected-file model as authoritative and distinct from the URL.
+  TreeEx selection occurs at the List/Table root: its click dispatcher derives
+  the row index, runs `onSelect` with the real row payload, then runs activation.
+  Invoke that one current list-level dispatcher with the exact revalidated leaf
+  as the event target before considering the navigation accepted. Do not call
+  arbitrary row/cell callbacks without their required row argument.
+- Scope view-mode option discovery to the visible ADO popup/callout/listbox.
+  Bolt List rows are also used by the changed-file TreeEx, and a repository
+  path ending in `preview` must never qualify as the Preview menu option. Open
+  the documented split-button trigger first, then select Preview only from its
+  popup surface.
+- If the current list dispatcher is unavailable or produces no transition,
+  activate the revalidated leaf with the complete pointer/mouse
+  press-release-click sequence. Some TreeEx consumers handle selection during
+  press events and ignore a standalone programmatic click.
+- Retain the clean GET form only as a final fallback when the native tree cannot
+  expose the requested file. Track the requested path briefly across navigation
+  and release the pending sidebar jump if ADO restores a different folder.
+- Render cross-file Changes, Threads, and Outline destinations as clean exact
+  links for accessibility and manual fallback, but route ordinary sidebar
+  clicks through the shared native-tree-first path. Save pending state before
+  navigation and keep the no-reload SPA path whenever the exact native row can
+  be exposed.
+- Retain the exact-route reload only as a final safety fallback when the native
+  tree cannot expose the requested file at all.
+- Before that final document reload, preserve a bounded, short-lived snapshot
+  of the PR-wide Changes, Threads, and Outline catalogs in session storage.
+  Restore it only for the pending exact-route navigation so the new document
+  remaps the active Preview without repeating every file's source comparison;
+  never persist raw Markdown source in the snapshot.
+- Keep the Threads catalog scoped to `.md` / `.markdown` files, matching the
+  GitHub extension's rendered-review sidebar. Azure DevOps returns threads for
+  every file type, but a non-Markdown thread has no Preview destination for
+  this extension; exposing it would create a pending jump that cannot finish.
+- Match the GitHub header with a persistent three-line collapse control and an
+  open-book Outline control. The book expands the sidebar, selects Outline,
+  and switches the selected/first changed Markdown file to Preview when needed.
+- Replace the disappearing setup action during Preview restoration with an
+  explicit disabled progress state naming the file being opened. If ADO's view
+  control cannot reach Preview after bounded retries, cancel the pending jump
+  and restore the actionable setup state instead of holding the UI indefinitely.
+- Give each asynchronous native-tree lookup an active target. A pending jump
+  whose route no longer matches is retained only while that exact target is
+  still owned by the active lookup; otherwise it is stale and is cleared. This
+  makes later native, thread, change, and outline clicks authoritative.
+
+**Acceptance:** visible, collapsed, and offscreen virtualized file targets use
+native SPA navigation without a page reload; one cross-file jump does not
+refetch iteration inventory, source catalogs, or thread inventory; the selected
+change/thread/heading remains active through remapping; no setup banner flashes
+during the transition; a reviewer clicking ADO's native file tree cancels any
+slower pending sidebar jump and restores the setup action when Preview is not
+active; non-Markdown threads never appear or start Preview navigation; mutations
+still refresh thread data from Azure DevOps. The header uses the same hamburger
+and book affordances as GitHub, Preview transitions explain their progress, and
+a failed or superseded transition always releases navigation control. Starting
+on a selected non-Markdown file and choosing **Open Markdown Preview** must
+replace ADO's selected-file state with the first changed Markdown file; selecting
+another non-Markdown file and using sidebar navigation must do the same again.
+The same setup action must work from a bare Files URL before Preview has ever
+been opened; it must not require a manual Markdown selection first. A visible
+changed-file row whose name ends in `preview` must remain untouched while the
+actual view-mode popup opens and selects Preview.
+
+### 7.12 Iteration T — isolate state across pull-request SPA navigation (v1.1.0)
+
+Azure DevOps can navigate directly from one pull request to another with the
+History API while preserving the current document. The content script's parsed
+PR context, API promises, source caches, pending jumps, and PR-wide sidebar
+catalogs otherwise continue to belong to the first pull request.
+
+**Design:**
+
+- Treat the complete origin/organization/project/repository/PR tuple as the
+  runtime identity. A file or view change inside that tuple remains a normal
+  warm SPA transition.
+- Check that identity before route initialization and pending-navigation work.
+  When it changes, invalidate current async generations, remove stale extension
+  UI, clear only PR-scoped session entries, and reload the current route once.
+- Store the same identity with each pending destination and fallback marker so
+  a direct browser navigation also rejects state written by another PR.
+- Let the new document receive a fresh manifest content-script injection and
+  parse the new PR context. Preserve local sidebar layout, selected tab, and
+  unresolved-filter preferences.
+- Do not attempt a partial in-place reset: late requests from the old PR could
+  repopulate new sidebar state unless every promise, cache, and callback carried
+  an additional identity guard.
+
+**Acceptance:** switching directly from PR A to PR B clears PR-A Changes,
+Threads, Outline, pending destinations, and fallback snapshots; the reloaded
+runtime requests PR B's APIs and renders only PR-B data. Switching files or
+view modes within one PR still preserves warm catalogs without reloading.
+
+### 7.10 Iteration R — immediate Files-page sidebar and one-click Preview (v1.1.0)
+
+Live first-install testing exposed a startup dependency that the sandbox did
+not model: the sidebar is currently constructed only after a visible Markdown
+Preview exists, a `?path=` is selected, the active file source request
+completes, and every rendered block is mapped. On the PR Files landing route
+there is therefore no extension UI explaining what to do. A slow or stalled
+current-file source request also leaves the user with no progress or retry
+surface.
+
+PR size does not block the existing shell directly because PR-wide Changes is
+started only after current-file mapping. It does, however, make Changes and
+Outline slow: the current catalog fetches head and base source for every
+changed Markdown file with four workers, waits for the full set before
+publishing results, and Outline waits behind that entire Changes pass. There is
+no network timeout or startup timing probe, so one stalled source request can
+make a large PR appear stuck indefinitely.
+
+**Design:**
+
+- Construct the persisted sidebar shell immediately on every matching
+  `pullrequest/<id>?_a=files` route, independently of file selection, Preview
+  DOM, source fetches, and line mapping.
+- Load the ADO content scripts at `document_end` so the shell can mount as soon
+  as the DOM exists instead of waiting for Chromium's later `document_idle`
+  scheduling or unrelated remote images.
+- Load thread inventory and changed-file inventory independently in the
+  background. Split lightweight Markdown-file discovery from expensive
+  per-file source comparison so onboarding can use the inventory as soon as it
+  arrives.
+- Show an explicit setup state when no rendered Markdown is active. Its primary
+  action is **Open Markdown Preview**: use the selected file when it is
+  Markdown, otherwise choose the first non-deleted changed Markdown file.
+- The action reuses Iteration Q's exact navigation path, then uses ADO's visible
+  view-mode menu to select Preview. Because ADO remembers Preview PR-wide, one
+  successful action prepares subsequent Markdown files without a render-all
+  loop.
+- During the first action, update native selection through TreeEx before
+  opening the view-mode menu; a requested URL alone is not evidence that ADO
+  accepted the file.
+- Discover Preview only inside the visible view-mode popup. Never scan all Bolt
+  List rows, because the file tree uses the same row primitive and can contain
+  ordinary paths whose final segment ends in `preview`.
+- Prioritize the active/selected file ahead of background source analysis and
+  publish Changes/Outline progress incrementally instead of waiting for every
+  Markdown file. A failed file becomes an isolated unavailable entry rather
+  than blocking the catalog.
+- Add bounded source-request timing and a retryable current-file error state;
+  never leave the shell absent while a request is pending.
+- Expose local-only startup diagnostics (script load, shell mount, inventory,
+  active-file map, Changes completion) through `ADORC_probe` so large-PR delays
+  can be measured without telemetry.
+
+**Acceptance:** the shell appears promptly with no `?path=` and before any
+delayed source response; the setup action opens the current/first changed
+Markdown file and selects Preview without requiring a manual Markdown click;
+current-file buttons become usable without waiting for all PR files; Changes
+and Outline visibly make progress on a large or partially failing PR;
+reload/SPA navigation creates no duplicate shell; no analytics or remote
+service is introduced.
+
 ## 8. DOM adapter surface — what actually needs writing
 
 Per the audit from the previous session, the new work is:

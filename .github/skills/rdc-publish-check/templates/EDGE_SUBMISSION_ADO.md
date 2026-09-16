@@ -1,4 +1,4 @@
-# Microsoft Edge Add-ons submission — Azure DevOps v1.0.0
+# Microsoft Edge Add-ons submission — Azure DevOps v1.1.0
 
 > Canonical living submission document for the separate Azure DevOps extension.
 > Paste each fenced section into Microsoft Partner Center.
@@ -6,13 +6,13 @@
 
 ## Submission notes
 
-This is the first release of the Azure DevOps target. It is separate from the existing GitHub extension, requests access only to Azure DevOps origins, declares no browser API permissions, and has no backend, analytics, telemetry, advertising, or remote code.
+Version 1.1.0 adds an immediate Files-page sidebar and **Open Markdown Preview** action, keeps navigation responsive and accurate across file switches, refreshes the page once when moving directly to another pull request, and prevents similarly named changed files from being mistaken for the Preview option. It remains separate from the GitHub extension, requests no new permissions, and has no backend, analytics, telemetry, advertising, or remote code.
 
 ## Package
 
-- **Zip:** `rdc-ado-1.0.0.zip`
-- **Manifest version:** `1.0.0`
-- **Release folder:** `releases/ado/1.0.0/`
+- **Zip:** `rdc-ado-1.1.0.zip`
+- **Manifest version:** `1.1.0`
+- **Release folder:** `releases/ado/1.1.0/`
 
 ## Store listing
 
@@ -31,7 +31,13 @@ Comment on rendered Markdown in Azure DevOps PRs with inline threads, Changes, O
 ### Description
 
 ```
-🆕 First release — v1.0.0 (2026-08-28)
+🆕 What's new — v1.1.0 (2026-09-15)
+
+• Start rendered Markdown review from any pull request Files page with the new Open Markdown Preview action.
+• Changes, Threads, and Outline stay responsive when switching files. When moving directly to another pull request, the extension refreshes the page once to load that pull request's review data.
+• Opening Preview no longer jumps to an unrelated changed file whose name resembles the Preview option.
+
+v1.0.0 (2026-08-28)
 
 • Review rendered Markdown directly: comment on paragraphs, headings, lists, tables, and individual code-block lines without leaving Preview.
 • Navigate every Markdown change, thread, and heading across the pull request from one keyboard-friendly sidebar.
@@ -45,6 +51,7 @@ Azure DevOps Preview makes Markdown design documents, plans, READMEs, and ADRs e
 
 What it does:
 
+• Start from any pull request Files page: the sidebar appears immediately and can open an available changed Markdown file in Preview for you.
 • Hover a paragraph, heading, list item, table row, or code block and click the blue “+” to create a real Azure DevOps pull request comment on the matching source line.
 • Drag between rendered blocks to comment on a multi-line range. Inside fenced code, move the “+” to target an individual source line.
 • See existing review conversations beside the rendered section they belong to. Expand a thread to reply, resolve or reopen it, and edit or delete your own comments.
@@ -148,7 +155,7 @@ https://dev.azure.com/chienyuanchang/test-ado-md-comments/_git/test-ado-md-comme
 
 HOW TO TEST
 1. Sign in to Azure DevOps and open the test pull request (or any accessible PR that changes a .md file).
-2. Select Files, open a changed Markdown file, and choose Preview from the file-view menu.
+2. Select Files while no Markdown Preview is open. The sidebar should appear immediately; choose Open Markdown Preview and confirm that it opens an available changed Markdown file in Preview.
 3. Hover a paragraph or heading. A blue “+” appears. Clicking it opens the Markdown comment editor. Posting requires normal comment permission; read-only navigation works without write permission.
 4. Existing conversations appear beside rendered content. The sidebar contains Changes, Threads, and Outline tabs. Cards and headings navigate between Markdown files while retaining Preview.
 5. Use 1/2/3 to switch tabs, j/k for threads, [ and ] for changes, and t to collapse/expand the sidebar.
@@ -171,7 +178,17 @@ https://github.com/chienyuanchang/rich-diff-comments/blob/main/PRIVACY_ADO.md
 
 ## What's new in this version
 
-First public release.
+### v1.1.0 — 2026-09-15
+
+#### Added
+
+- Start rendered Markdown review from any pull request Files page with **Open Markdown Preview**.
+
+#### Fixed
+
+- Changes, Threads, and Outline stay responsive when cross-file navigation reloads the page.
+- Opening Markdown Preview no longer jumps to an unrelated changed file whose name resembles the Preview option.
+- When switching directly between pull requests, the extension refreshes the page once so Changes, Threads, and Outline show the newly opened pull request.
 
 ### v1.0.0 — 2026-08-28
 

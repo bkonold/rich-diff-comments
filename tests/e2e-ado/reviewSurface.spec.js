@@ -54,8 +54,57 @@ test.describe('ADO rendered review surface', () => {
     expect(pageErrors).toEqual([]);
   });
 
+  test('excludes non-Markdown threads and discards their stale pending jumps', async ({ page }) => {
+    const threads = fixtures.defaultThreads();
+    threads.push({
+      id: 104,
+      status: 'active',
+      threadContext: {
+        filePath: '/src/worker.js',
+        rightFileStart: { line: 12, offset: 1 },
+        rightFileEnd: { line: 12, offset: 1 },
+      },
+      comments: [{
+        id: 1,
+        parentCommentId: 0,
+        commentType: 1,
+        content: 'A source-code thread outside rendered Markdown review.',
+        author: fixtures.OTHER_USER,
+        publishedDate: '2026-08-20T13:00:00.000Z',
+        lastContentUpdatedDate: '2026-08-20T13:00:00.000Z',
+        isDeleted: false,
+      }],
+    });
+    await setupAdoExtensionPage(page, { threads, waitForReady: false });
+
+    await expect(page.locator('.adrc-sidebar-thread-card')).toHaveCount(3);
+    await expect(page.locator('.adrc-sidebar-thread-card[data-path="/src/worker.js"]')).toHaveCount(0);
+    await expect(page.locator('[data-count="threads"]')).toHaveText('3');
+
+    await page.evaluate(() => {
+      sessionStorage.setItem('adrc-pending-thread-jump-v1', JSON.stringify({
+        id: 104,
+        path: '/src/worker.js',
+        identity: window.ADORC_probe.prIdentity,
+        requirePreview: true,
+        expiresAt: Date.now() + 90000,
+      }));
+      const url = new URL(location.href);
+      url.searchParams.set('path', '/src/worker.js');
+      history.pushState({}, '', url.href);
+      window.__ADO_FIXTURE__.preview.style.display = 'none';
+      window.__ADO_FIXTURE__.preview.innerHTML = '';
+      document.querySelector('.fixture-view-mode').textContent = 'Inline';
+    });
+
+    await expect(page.locator('.adrc-sidebar-setup')).toBeVisible({ timeout: 2000 });
+    await expect(page.locator('.adrc-sidebar-open-preview')).toHaveText('Open Markdown Preview');
+    expect((await page.evaluate(() => window.ADORC_probe.viewMode())).pendingThreadJump).toBeNull();
+  });
+
   test('posts a single-line comment with the exact ADO thread payload and refreshes the UI', async ({ page }) => {
     const { server } = await setupAdoExtensionPage(page);
+    expect(matchingRequests(server, 'GET', '/threads')).toHaveLength(1);
     const h1 = page.locator('.markdown-preview-container h1', { hasText: 'Design Review' });
     await clickCommentButton(h1);
 
@@ -78,6 +127,7 @@ test.describe('ADO rendered review surface', () => {
 
     await expect(page.locator('.adrc-thread-badge')).toHaveCount(3);
     await expect(page.locator('[data-count="threads"]')).toHaveText('4');
+    expect(matchingRequests(server, 'GET', '/threads')).toHaveLength(2);
   });
 
   test('tracks individual source lines inside an ADO-rendered code fence', async ({ page }) => {
