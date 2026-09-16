@@ -575,18 +575,19 @@ outside Azure DevOps' virtualized materialized range.
   recycle a still-connected row element for another index, so the exact index
   must also be present in the current paint and the row must be revalidated
   immediately before every activation gesture.
-- Activate a freshly revalidated exact leaf with the complete pointer/mouse
+- Treat ADO's selected-file model as authoritative and distinct from the URL.
+  TreeEx selection occurs at the List/Table root: its click dispatcher derives
+  the row index, runs `onSelect` with the real row payload, then runs activation.
+  Invoke that one current list-level dispatcher with the exact revalidated leaf
+  as the event target before considering the navigation accepted. Do not call
+  arbitrary row/cell callbacks without their required row argument.
+- If the current list dispatcher is unavailable or produces no transition,
+  activate the revalidated leaf with the complete pointer/mouse
   press-release-click sequence. Some TreeEx consumers handle selection during
   press events and ignore a standalone programmatic click.
-- If the exact row ignores all untrusted DOM gestures, invoke its current React
-  click/press callback as the final SPA-native activation path before trying a
-  full-page reload. Revalidate row index/path immediately beforehand and emulate
-  bubbling through delegated parent table/tree callbacks.
-- For the last-resort same-PR navigation, submit a clean browser-level GET form
-  containing only the exact file path and `_a=files`. Live ADO accepts that URL
-  from the address bar but rewrites script-driven assign/replace/reload flows.
-  Track the requested path briefly across navigation and release the pending
-  sidebar jump if ADO restores a different folder.
+- Retain the clean GET form only as a final fallback when the native tree cannot
+  expose the requested file. Track the requested path briefly across navigation
+  and release the pending sidebar jump if ADO restores a different folder.
 - Render cross-file Changes, Threads, and Outline destinations as clean exact
   links. Preserve the browser default for a trusted click when the native leaf
   is not currently materialized; save pending state synchronously first. Keep
@@ -626,7 +627,10 @@ slower pending sidebar jump and restores the setup action when Preview is not
 active; non-Markdown threads never appear or start Preview navigation; mutations
 still refresh thread data from Azure DevOps. The header uses the same hamburger
 and book affordances as GitHub, Preview transitions explain their progress, and
-a failed or superseded transition always releases navigation control.
+a failed or superseded transition always releases navigation control. Starting
+on a selected non-Markdown file and choosing **Open Markdown Preview** must
+replace ADO's selected-file state with the first changed Markdown file; selecting
+another non-Markdown file and using sidebar navigation must do the same again.
 
 ### 7.10 Iteration R — immediate Files-page sidebar and one-click Preview (v1.0.1)
 

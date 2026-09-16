@@ -60,6 +60,41 @@ test.describe('ADO SPA lifecycle and cross-file navigation', () => {
     await expect(page.locator('.adrc-sidebar-setup')).toBeHidden();
   });
 
+  test('native TreeEx selection releases and re-releases a non-Markdown file lock', async ({ page }) => {
+    const initialUrl = `${FAKE_PR_FILES_URL}&path=${encodeURIComponent(fixtures.NON_MARKDOWN_PATH)}`;
+    const { server } = await setupAdoExtensionPage(page, {
+      initialUrl,
+      hideInitialPreview: true,
+      keepInitialPathWithoutPreview: true,
+      waitForReady: false,
+    });
+    await page.evaluate((path) => window.__ADO_FIXTURE__.enableSelectionLock(path), fixtures.NON_MARKDOWN_PATH);
+
+    await expect(page.locator('.adrc-sidebar-open-preview')).toHaveText('Open Markdown Preview', { timeout: 4000 });
+    await page.locator('.adrc-sidebar-open-preview').click();
+    await waitForAdoReady(page, fixtures.DESIGN_PATH, userThreadCount(server.threads));
+
+    expect(new URL(page.url()).searchParams.get('path')).toBe(fixtures.DESIGN_PATH);
+    expect(await page.evaluate(() => window.__ADO_FIXTURE__.selectedPath())).toBe(fixtures.DESIGN_PATH);
+    expect(server.pageLoads).toBe(1);
+    expect((await page.evaluate(() => window.ADORC_probe.viewMode())).currentMode).toBe('preview');
+
+    await page.locator('#tree-non-markdown').click();
+    await expect.poll(() => new URL(page.url()).searchParams.get('path'))
+      .toBe(fixtures.NON_MARKDOWN_PATH);
+    expect(await page.evaluate(() => window.__ADO_FIXTURE__.selectedPath())).toBe(fixtures.NON_MARKDOWN_PATH);
+
+    await page.keyboard.press('2');
+    await page.locator(`.adrc-sidebar-thread-card[data-path="${fixtures.OTHER_PATH}"]`).click();
+    await waitForAdoReady(page, fixtures.OTHER_PATH, userThreadCount(server.threads));
+
+    expect(new URL(page.url()).searchParams.get('path')).toBe(fixtures.OTHER_PATH);
+    expect(await page.evaluate(() => window.__ADO_FIXTURE__.selectedPath())).toBe(fixtures.OTHER_PATH);
+    expect(server.pageLoads).toBe(1);
+    const trace = await page.evaluate(() => window.ADORC_probe.navigationTrace());
+    expect(trace.entries.filter((entry) => entry.event === 'tree.selection-model-accepted')).toHaveLength(2);
+  });
+
   test('immediate sidebar stays hidden outside the PR Files tab', async ({ page }) => {
     await setupAdoExtensionPage(page);
     await page.evaluate(() => {
@@ -296,7 +331,7 @@ test.describe('ADO SPA lifecycle and cross-file navigation', () => {
     expect(server.pageLoads).toBe(1);
   });
 
-  test('bubbles through current React TreeEx callbacks when untrusted DOM gestures are ignored', async ({ page }) => {
+  test('invokes the current TreeEx list dispatcher when DOM gestures are ignored', async ({ page }) => {
     const { server } = await setupAdoExtensionPage(page);
     await page.evaluate((path) => {
       const staleRow = document.querySelector('#tree-other');

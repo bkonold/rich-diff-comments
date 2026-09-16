@@ -14,7 +14,7 @@
   'use strict';
 
   const LOG = '[ADRC]';
-  const RUNTIME_REVISION = '2026-09-15-fallback-catalog-cache-r12';
+  const RUNTIME_REVISION = '2026-09-16-native-selection-r15';
   const adapter = (typeof window !== 'undefined' && window.ADORC) || null;
   const startupTiming = {
     scriptLoadedAt: performance.now(),
@@ -3569,7 +3569,7 @@
     return true;
   }
 
-  function invokeAdoReactTreeActivation(fileTarget) {
+  function invokeAdoTreeExSelection(fileTarget) {
     const row = fileTarget?.row;
     const eventTarget = fileTarget?.target;
     if (!row?.isConnected || !eventTarget?.isConnected) return false;
@@ -3595,52 +3595,62 @@
         .find((value) => value?.memoizedProps);
       return fiber?.memoizedProps || null;
     };
-    const phases = [
-      ['pointerdown', 'onPointerDown'],
-      ['mousedown', 'onMouseDown'],
-      ['click', 'onClick']
-    ];
-    const invoked = new Set();
-    const invokedDetails = [];
+    // TreeEx delegates row selection to the List/Table root. Calling arbitrary
+    // row/cell callbacks with only an event can change the URL without updating
+    // ADO's selected-file model. Invoke the current list click dispatcher once;
+    // it derives the exact row index from event.target, performs onSelect, then
+    // performs single-click activation with the real ITreeRow payload.
+    const treeHost = ancestry.find((element) =>
+      element.matches?.('[role="tree"], [role="treegrid"], table.bolt-list, .bolt-table') &&
+      typeof propsForNode(element)?.onClick === 'function'
+    );
+    const handler = treeHost && propsForNode(treeHost)?.onClick;
+    if (typeof handler !== 'function') return false;
 
-    for (const [eventType, propName] of phases) {
-      let propagationStopped = false;
-      for (const currentTarget of ancestry) {
-        const handler = propsForNode(currentTarget)?.[propName];
-        if (typeof handler !== 'function' || invoked.has(handler)) continue;
-        invoked.add(handler);
-        const event = {
-          type: eventType,
-          button: 0,
-          buttons: eventType === 'click' ? 0 : 1,
-          pointerId: 1,
-          pointerType: 'mouse',
-          isPrimary: true,
-          target: eventTarget,
-          currentTarget,
-          nativeEvent: { button: 0, target: eventTarget, isTrusted: false },
-          defaultPrevented: false,
-          preventDefault() { this.defaultPrevented = true; },
-          stopPropagation() { propagationStopped = true; },
-          persist() {},
-          isDefaultPrevented() { return this.defaultPrevented; },
-          isPropagationStopped() { return propagationStopped; }
-        };
-        try {
-          handler(event);
-          invokedDetails.push(`${eventType}:${currentTarget.className || currentTarget.tagName}`);
-        } catch (err) {
-          console.warn(`${LOG} React TreeEx ${propName} handler failed`, err);
-        }
-        if (propagationStopped) break;
-      }
+    let propagationStopped = false;
+    const nativeEvent = {
+      altKey: false,
+      button: 0,
+      buttons: 0,
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      srcElement: eventTarget,
+      target: eventTarget,
+      composedPath() { return ancestry; }
+    };
+    const event = {
+      type: 'click',
+      altKey: false,
+      button: 0,
+      buttons: 0,
+      bubbles: true,
+      cancelable: true,
+      ctrlKey: false,
+      detail: 1,
+      metaKey: false,
+      shiftKey: false,
+      target: eventTarget,
+      currentTarget: treeHost,
+      nativeEvent,
+      defaultPrevented: false,
+      preventDefault() { this.defaultPrevented = true; },
+      stopPropagation() { propagationStopped = true; },
+      persist() {},
+      isDefaultPrevented() { return this.defaultPrevented; },
+      isPropagationStopped() { return propagationStopped; }
+    };
+    try {
+      handler(event);
+    } catch (err) {
+      console.warn(`${LOG} TreeEx selection handler failed`, err);
+      return false;
     }
-    if (invokedDetails.length === 0) return false;
-    console.log(`${LOG} invoked current React TreeEx activation handlers`, {
+    console.log(`${LOG} invoked current TreeEx selection model`, {
       rowId: row.id,
       rowIndex: fileTarget.rowIndex,
       reconstructedPath: fileTarget.reconstructedPath,
-      handlers: invokedDetails
+      host: treeHost.className || treeHost.tagName
     });
     return true;
   }
@@ -3650,6 +3660,23 @@
       ? currentAdoFileTreeTarget(fileTarget, path)
       : null;
     if (!currentTarget) return false;
+    recordNavigationTrace('tree.selection-model-activation', {
+      requestedPath: path,
+      sequence,
+      rowId: currentTarget.row.id || null,
+      rowIndex: currentTarget.rowIndex,
+      reconstructedPath: currentTarget.reconstructedPath
+    });
+    if (invokeAdoTreeExSelection(currentTarget) &&
+        await waitForAdoFilePath(path, sequence, 800)) {
+      recordNavigationTrace('tree.selection-model-accepted', { requestedPath: path, sequence });
+      return true;
+    }
+    currentTarget = sequence === adoFileNavigationSequence
+      ? currentAdoFileTreeTarget(fileTarget, path)
+      : null;
+    if (!currentTarget) return false;
+
     recordNavigationTrace('tree.dom-activation', {
       requestedPath: path,
       sequence,
@@ -3660,19 +3687,6 @@
     dispatchAdoTreeActivation(currentTarget.target);
     if (await waitForAdoFilePath(path, sequence, 1800)) {
       recordNavigationTrace('tree.dom-accepted', { requestedPath: path, sequence });
-      return true;
-    }
-    currentTarget = sequence === adoFileNavigationSequence
-      ? currentAdoFileTreeTarget(fileTarget, path)
-      : null;
-    if (!currentTarget) return false;
-
-    // ADO's legacy TreeEx may disregard every untrusted DOM event even though
-    // the exact virtual row is visible. Invoke React's current row callback as
-    // a final SPA-native path before resorting to a full-page URL reload.
-    if (invokeAdoReactTreeActivation(currentTarget) &&
-        await waitForAdoFilePath(path, sequence, 1800)) {
-      recordNavigationTrace('tree.react-accepted', { requestedPath: path, sequence });
       return true;
     }
     currentTarget = sequence === adoFileNavigationSequence

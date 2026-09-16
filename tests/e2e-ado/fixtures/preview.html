@@ -32,7 +32,7 @@
 </head>
 <body>
   <div class="fixture-shell">
-    <nav class="fixture-tree" aria-label="Changed files">
+    <nav class="fixture-tree bolt-list" role="tree" aria-label="Changed files">
       <div id="tree-design" class="bolt-tree-row fixture-active" role="treeitem" aria-label="docs/design.md" data-path="/docs/design.md">
         <div class="bolt-tree-cell"><div class="bolt-table-cell-content">design.md</div></div>
       </div>
@@ -47,6 +47,9 @@
       </div>
       <div id="tree-renamed" class="bolt-tree-row" role="treeitem" aria-label="docs/renamed.md" data-path="/docs/renamed.md">
         <div class="bolt-tree-cell"><div class="bolt-table-cell-content">renamed.md</div></div>
+      </div>
+      <div id="tree-non-markdown" class="bolt-tree-row" role="treeitem" aria-label="src/ignored.js" data-path="/src/ignored.js">
+        <div class="bolt-tree-cell"><div class="bolt-table-cell-content">ignored.js</div></div>
       </div>
     </nav>
 
@@ -94,11 +97,18 @@
         '/docs/renamed.md': [
           '<h1 id="user-content-renamed-notes">Renamed Notes<a class="shareHeaderAnchor" href="#renamed-notes"></a></h1>',
           '<p>Updated wording after the rename.</p>'
-        ].join('')
+        ].join(''),
+        '/src/ignored.js': null
       };
 
       const preview = document.getElementById('ado-preview');
       const rows = Array.from(document.querySelectorAll('.bolt-tree-row[data-path]'));
+      const selectionLockKey = 'fixture-ado-selection-lock';
+      const selectedPathKey = 'fixture-ado-selected-path';
+
+      function selectionLockEnabled() {
+        return sessionStorage.getItem(selectionLockKey) === '1';
+      }
 
       function openPath(path) {
         if (!Object.prototype.hasOwnProperty.call(fragments, path)) throw new Error('Unknown fixture path: ' + path);
@@ -109,6 +119,31 @@
         rows.forEach((row) => row.classList.toggle('fixture-active', row.dataset.path === path));
         document.querySelector('.fixture-view-mode').textContent = renderable ? 'Preview' : 'Inline';
         document.getElementById('preview-scroll').scrollTop = 0;
+      }
+
+      function selectPath(path) {
+        if (selectionLockEnabled()) sessionStorage.setItem(selectedPathKey, path);
+        openPath(path);
+      }
+
+      function enableSelectionLock(path) {
+        sessionStorage.setItem(selectionLockKey, '1');
+        sessionStorage.setItem(selectedPathKey, path);
+        installSelectionHandler();
+        openPath(path);
+      }
+
+      function installSelectionHandler() {
+        document.querySelector('.fixture-tree').__reactProps$fixture = {
+          onClick: (event) => {
+            const row = event.target?.closest?.('.bolt-tree-row[data-path]');
+            if (row) selectPath(row.dataset.path);
+          }
+        };
+      }
+
+      function selectedPath() {
+        return sessionStorage.getItem(selectedPathKey);
       }
 
       function showViewOptions() {
@@ -140,11 +175,25 @@
         document.body.appendChild(menu);
       }
 
-      rows.forEach((row) => row.addEventListener('click', () => openPath(row.dataset.path)));
+      rows.forEach((row) => row.addEventListener('click', (event) => {
+        if (selectionLockEnabled() && !event.isTrusted) return;
+        selectPath(row.dataset.path);
+      }));
       document.querySelector('.bolt-split-button-option').addEventListener('click', showViewOptions);
-      window.__ADO_FIXTURE__ = { fragments, openPath, preview };
+      window.__ADO_FIXTURE__ = {
+        fragments,
+        openPath,
+        selectPath,
+        selectedPath,
+        enableSelectionLock,
+        preview
+      };
 
-      const initialPath = new URLSearchParams(location.search).get('path') || '/docs/design.md';
+      const requestedPath = new URLSearchParams(location.search).get('path') || '/docs/design.md';
+      const initialPath = selectionLockEnabled() && selectedPath()
+        ? selectedPath()
+        : requestedPath;
+      if (selectionLockEnabled()) installSelectionHandler();
       openPath(initialPath);
     })();
   </script>

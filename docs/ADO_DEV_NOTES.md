@@ -257,27 +257,38 @@ Remembered entries are path snapshots only: activation requires the matched row
 index to be present in the current paint, and the row is revalidated immediately
 before each click, Enter, or double-click gesture.
 
+**2026-09-16 root cause: ADO's selected-file model is separate from the URL.**
+The repeatable sequence is: select a non-Markdown file, use extension navigation
+to request Markdown, and observe ADO remain pinned to the non-Markdown file;
+manually selecting a Markdown file and choosing Preview releases the lock until
+another non-Markdown file is selected. URL changes, document reloads, and
+browser-level tab updates all failed to replace that native selection. The
+earlier startup explanation based on a recycled collapsed ancestor was therefore
+incorrect, and that speculative ancestor-specific code was removed.
+
 **An exact materialized row can require press events, not only `click()`.** A
 live probe reconstructed the correct deeply nested Markdown leaf at score 240,
 yet click-only activation left the route unchanged and forced the rejected URL
-fallback. Activation now targets the freshly revalidated cell with a complete
-pointer/mouse press-release-click sequence before trying keyboard and
-double-click fallbacks. This accommodates TreeEx consumers that select or
-activate from `pointerdown` / `mousedown`.
+fallback. When the list-level selection path is unavailable or produces no
+transition, the DOM fallback targets the freshly revalidated cell with a
+complete pointer/mouse press-release-click sequence before trying keyboard and
+double-click. This accommodates TreeEx consumers that select or activate from
+`pointerdown` / `mousedown`.
 
-**Some legacy TreeEx rows ignore all browser-synthesized events.** The exact
-row can remain selected visually while every dispatched pointer, mouse, and
-keyboard event is untrusted and therefore produces no route transition. Before
-attempting a page reload, the adapter now discovers the current React props on
-the freshly revalidated row/cell and invokes its active click/press callback.
-This preserves ADO's own SPA navigation closure and avoids guessing another URL.
-The private React path is deliberately last-resort and is skipped when no
-current handler is discoverable.
+**TreeEx selection and activation are distinct operations.** The published
+`azure-devops-ui` List/TreeEx implementation handles a row click at the list
+root, derives the row index from `event.target`, calls the selection model, and
+only then performs single-click activation. The prior private-React fallback
+walked arbitrary row/cell ancestors and called event handlers with only a
+fabricated event. It could appear to request the right URL without supplying
+the list row that ADO needs to replace its selected-file state.
 
-The handler is not necessarily stored on the row itself. TreeEx can delegate
-selection to a parent table/tree host, so callback discovery walks the bounded
-DOM ancestry and emulates pointer-down, mouse-down, and click bubbling with the
-exact leaf cell retained as `event.target`.
+The native path now locates the current TreeEx list root and invokes its single
+click dispatcher once with the exact, freshly revalidated leaf as the event
+target before trying DOM activation fallbacks. The list itself constructs the
+real row payload and runs selection before activation. If no current list
+dispatcher is discoverable, this private path is skipped rather than guessing
+at component callbacks.
 
 **Commit the exact fallback URL before reloading.** Live testing also showed the
 legacy PR viewer restoring its previously selected folder during a direct
@@ -335,6 +346,13 @@ retaining lightweight file/version inventory whenever possible. Failure is
 non-fatal: navigation still completes and the new document falls back to the
 normal service requests. Trace events `catalog-cache.saved`,
 `catalog-cache.restored`, and `catalog-cache.skipped` expose which path ran.
+
+The isolated content-script/service-worker navigation experiment was removed.
+Live testing showed that changing the browser URL from outside the page still
+left ADO's selected-file model pinned, so the extra manifest surface did not
+address the failure. The exact-route GET remains only as a final fallback when
+the native tree cannot expose a target; it is not used as a substitute for a
+known materialized row's selection transition.
 
 ## Changes tab — source diff, not DOM markers
 

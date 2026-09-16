@@ -36,8 +36,15 @@ test('ADO manifest loads shared sidebar and Changes helpers before content.js', 
 });
 
 test('ADO exposes a runtime revision for live loaded-script verification', () => {
-  assert.match(content, /const RUNTIME_REVISION = '2026-09-15-fallback-catalog-cache-r12'/);
+  assert.match(content, /const RUNTIME_REVISION = '2026-09-16-native-selection-r15'/);
   assert.match(content, /revision: RUNTIME_REVISION/);
+});
+
+test('ADO exact TreeEx activation reaches the list selection model', () => {
+  assert.match(content, /function invokeAdoTreeExSelection\(fileTarget\)/);
+  assert.match(content, /\[role="tree"\], \[role="treegrid"\], table\.bolt-list, \.bolt-table/);
+  assert.match(content, /const handler = treeHost && propsForNode\(treeHost\)\?\.onClick/);
+  assert.match(content, /navigateToExactAdoFileRoute\(normalizedPath\)/);
 });
 
 test('ADO exposes a bounded navigation trace that survives exact-route reloads', () => {
@@ -335,9 +342,9 @@ test('ADO cross-file navigation requires exact tree paths and uses a same-PR fal
   assert.match(content, /new PointerEvent\('pointerdown'/);
   assert.match(content, /new MouseEvent\('mousedown'/);
   assert.match(content, /dispatchAdoTreeActivation\(currentTarget\.target\)/);
-  assert.match(content, /function invokeAdoReactTreeActivation\(fileTarget\)/);
+  assert.match(content, /function invokeAdoTreeExSelection\(fileTarget\)/);
   assert.match(content, /Object\.getOwnPropertyNames\(element\)/);
-  assert.match(content, /invokeAdoReactTreeActivation\(currentTarget\)/);
+  assert.match(content, /invokeAdoTreeExSelection\(currentTarget\)/);
   assert.match(content, /function navigateToExactAdoFileRoute\(path\)/);
   assert.match(content, /rememberExactRouteFallback\(normalizedPath\)/);
   assert.match(content, /form\.method = 'GET'/);
