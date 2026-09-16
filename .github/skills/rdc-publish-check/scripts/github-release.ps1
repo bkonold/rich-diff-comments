@@ -87,13 +87,20 @@ if ((Test-Path $notesPath) -and -not $Force) {
   Write-Host "  notes: reusing existing $notesPath (use -Force to regenerate)"
 } else {
   $changelogName = if ($Target -eq 'ado') { 'CHANGELOG_ADO.md' } else { 'CHANGELOG.md' }
-  $changelog = Get-Content (Join-Path $repoRoot $changelogName) -Raw
+  $changelogPath = Join-Path $repoRoot $changelogName
+  # Windows PowerShell 5.1 treats BOM-less UTF-8 as the active ANSI code page
+  # when -Encoding is omitted, turning punctuation such as an em dash into
+  # mojibake in the generated GitHub Release body. Read and write through .NET
+  # with explicit UTF-8 and no BOM so PowerShell versions behave identically.
+  $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+  $changelog = [System.IO.File]::ReadAllText($changelogPath, [System.Text.Encoding]::UTF8)
   $escapedVersion = [regex]::Escape($version)
   $pattern = "(?ms)(^## \[$escapedVersion\][^\n]*\n.*?)(?=^## \[|\z)"
   if ($changelog -notmatch $pattern) {
     throw "No '## [$version]' section found in $changelogName. Add an entry before releasing."
   }
-  $matches[1].TrimEnd() | Out-File -Encoding utf8 $notesPath
+  $notes = $matches[1].TrimEnd() + [Environment]::NewLine
+  [System.IO.File]::WriteAllText($notesPath, $notes, $utf8NoBom)
   Write-Host "  notes: wrote $notesPath"
 }
 
