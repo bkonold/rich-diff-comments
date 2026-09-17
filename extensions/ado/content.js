@@ -4813,7 +4813,23 @@
       loading.textContent = `Loading pull request outline… ${entries.length}/${prMarkdownChanges.length} files`;
       body.appendChild(loading);
     }
-    updateActiveOutline();
+    // Clearing `body.innerHTML` clamps this scroll container back to zero.
+    // During a cross-file jump, restore the pending destination after every
+    // rebuild—not only when Preview finishes—because catalog completion can
+    // render the rows again after the pending jump has already scrolled them.
+    // Once the pending state is cleared, `outlineActiveId` preserves the same
+    // destination for any subsequent rebuild. `setActiveOutlineRow` scrolls
+    // only when the row is outside the Outline viewport, so natural document
+    // scroll-follow remains undisturbed.
+    const pending = readPendingOutlineJump();
+    const followId = pending && sameAdoFilePath(pending.path, activePath) && pending.key
+      ? pending.key
+      : outlineActiveId;
+    if (followId) {
+      const explicitNavigation = !!pending || Date.now() < sidebarFollowSuppressedUntil;
+      setActiveOutlineRow(followId, explicitNavigation ? 'center' : 'nearest');
+    }
+    else updateActiveOutline();
   }
 
   function resolveLiveOutlineHeading(key) {
@@ -4873,8 +4889,8 @@
     if (!heading || !heading.el?.isConnected) return false;
     revealChangedBlock(heading.el);
     outlineActiveId = heading.key || heading.id;
-    setActiveOutlineRow(outlineActiveId);
     sidebarFollowSuppressedUntil = Date.now() + 1500;
+    setActiveOutlineRow(outlineActiveId, 'center');
     return scrollToWithStickyOffset(heading.el);
   }
 
@@ -4906,7 +4922,7 @@
     return true;
   }
 
-  function setActiveOutlineRow(id) {
+  function setActiveOutlineRow(id, position) {
     outlineActiveId = id;
     if (!outlinePanel) return;
     outlinePanel.querySelectorAll('.adrc-outline-row.adrc-outline-active')
@@ -4922,8 +4938,9 @@
       if (body) {
         const rowRect = row.getBoundingClientRect();
         const bodyRect = body.getBoundingClientRect();
-        if (rowRect.top < bodyRect.top || rowRect.bottom > bodyRect.bottom) {
-          row.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+        const center = position === 'center';
+        if (center || rowRect.top < bodyRect.top || rowRect.bottom > bodyRect.bottom) {
+          row.scrollIntoView({ block: center ? 'center' : 'nearest', behavior: 'auto' });
         }
       }
     }

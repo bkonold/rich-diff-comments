@@ -185,6 +185,12 @@ Priority applies to the shared user outcome:
 
 ### Navigation and focus
 
+- [x] **P1 — Keep the Outline focused on a cross-file heading destination**
+  - **Outcome:** clicking a heading under another file opens that file and centers the selected heading in the Outline, providing context above and below instead of resetting the list to its top.
+  - **GitHub:** ✅ All rendered files share one live document and Outline position follows the selected heading.
+  - **ADO:** 🧪 Live validated: Outline rebuilds restore and center the selected destination after Preview reaches the requested file and heading. Queued for the next ADO release.
+  - Preserve stable file order and resume normal scroll-follow behavior after the explicit navigation completes.
+
 - [ ] **P2 — Make bulk section-folding scope explicit and predictable**
   - **Outcome:** reviewers can tell whether Fold H1/H2/H3 and Expand all affect the current file or every Markdown file before applying the action.
   - **GitHub:** △ Shipped with PR-wide scope across all rendered Markdown files.

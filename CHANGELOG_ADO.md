@@ -4,6 +4,10 @@ All notable user-visible changes to the Azure DevOps browser extension are recor
 
 ## [Unreleased]
 
+### Fixed
+
+- **Cross-file Outline navigation now keeps the selected section centered in the sidebar.** After opening a heading in another Markdown file, the Outline stays with that destination and shows nearby sections for context instead of returning to the top.
+
 ## [1.1.0] — 2026-09-15
 
 ### Added

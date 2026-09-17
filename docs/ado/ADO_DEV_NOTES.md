@@ -528,6 +528,14 @@ source descriptors and gain the same stable key. Cross-file Outline clicks save
 that key, activate the native ADO file-tree row, preserve/restore Preview, and
 resolve the key against the newly mounted live headings before scrolling.
 
+Rebuilding the PR-wide rows empties the Outline scroll container, which resets
+its scroll position before the new rows are inserted. Every rebuild therefore
+reapplies the pending destination key, or the retained active key after pending
+navigation clears. This follows the destination element rather than restoring
+an obsolete numeric offset. Explicit navigation centers the row to provide
+context above and below; ordinary Preview scroll-follow resumes with minimal
+nearest-edge movement so reading does not make the sidebar jump unnecessarily.
+
 Per-heading thread counts use the shared source-line attribution helper and are
 file-scoped. Per-row folds can be requested before a file is opened; the stable
 fold-key set applies that intent when its live Preview mounts. Bulk Fold H1/H2/

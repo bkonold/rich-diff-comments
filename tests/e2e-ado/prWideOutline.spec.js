@@ -60,6 +60,11 @@ test.describe('ADO PR-wide Outline', () => {
 
   test('clicking a cached cross-file heading preserves Preview and lands on its live row', async ({ page }) => {
     const { server } = await setupOutline(page);
+    // Force the PR-wide Outline to overflow so the cross-file target is not
+    // simultaneously visible with the first file after rows are rebuilt.
+    await page.locator('.adrc-sidebar').evaluate((element) => {
+      element.style.height = '220px';
+    });
     await page.evaluate(() => { window.__initialOutlinePreview = window.__ADO_FIXTURE__.preview; });
     const notes = page.locator(
       `.adrc-outline-row[data-path="${fixtures.OTHER_PATH}"]`,
@@ -76,6 +81,23 @@ test.describe('ADO PR-wide Outline', () => {
     await expect(notes).toHaveClass(/adrc-outline-active/);
     await expect(page.locator('.adrc-outline-file').nth(0)).not.toHaveClass(/adrc-outline-file-current/);
     await expect(page.locator('.adrc-outline-file').nth(1)).toHaveClass(/adrc-outline-file-current/);
+    const outlinePosition = await page.evaluate(() => {
+      const body = document.querySelector('.adrc-outline-body');
+      const row = document.querySelector('.adrc-outline-row.adrc-outline-active');
+      const bodyRect = body.getBoundingClientRect();
+      const rowRect = row.getBoundingClientRect();
+      return {
+        scrollTop: body.scrollTop,
+        rowVisible: rowRect.top >= bodyRect.top && rowRect.bottom <= bodyRect.bottom,
+        rowCenter: rowRect.top + rowRect.height / 2,
+        bodyCenter: bodyRect.top + bodyRect.height / 2,
+        rowHeight: rowRect.height,
+      };
+    });
+    expect(outlinePosition.scrollTop).toBeGreaterThan(0);
+    expect(outlinePosition.rowVisible).toBe(true);
+    expect(Math.abs(outlinePosition.rowCenter - outlinePosition.bodyCenter))
+      .toBeLessThanOrEqual(outlinePosition.rowHeight);
     expect((await page.evaluate(() => window.ADORC_probe.viewMode())).pendingOutlineJump).toBeNull();
   });
 
