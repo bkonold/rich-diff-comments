@@ -3,7 +3,7 @@
 This is the authoritative product roadmap for both browser-extension targets:
 
 - **Markdown PR — Markdown PR Comments for GitHub**
-- **Markdown PR Comments for Azure DevOps**
+- **Markdown PR — Azure DevOps PR Comments**
 
 The goal is the same reviewer outcome on both services whenever the host platform makes that possible. Implementations do not need to be identical: GitHub rich diff and Azure DevOps Preview expose different DOM, navigation, identity, and API models.
 

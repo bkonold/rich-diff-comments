@@ -3,7 +3,7 @@
 Two separate Chrome/Edge extensions that let you leave **and view** inline pull-request review comments directly in rendered Markdown:
 
 - **Markdown PR — Markdown PR Comments for GitHub** targets GitHub rich diff.
-- **Markdown PR Comments for Azure DevOps** targets Azure DevOps Preview mode.
+- **Markdown PR — Azure DevOps PR Comments** targets Azure DevOps Preview mode.
 
 Install only the target you use; each package requests access solely to its own service.
 

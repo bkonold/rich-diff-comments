@@ -1,8 +1,8 @@
-# Privacy Policy — Markdown PR Comments for Azure DevOps
+# Privacy Policy — Markdown PR — Azure DevOps PR Comments
 
 **Effective date:** September 17, 2026
 
-Markdown PR Comments for Azure DevOps is a browser extension that adds inline review commenting and navigation to rendered Markdown in Azure DevOps pull request Preview mode.
+Markdown PR — Azure DevOps PR Comments is a browser extension that adds inline review commenting and navigation to rendered Markdown in Azure DevOps pull request Preview mode.
 
 ## What data the extension accesses
 

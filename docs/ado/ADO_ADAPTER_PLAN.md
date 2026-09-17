@@ -915,7 +915,7 @@ and inspect the promising ones.
 7. **Private alpha** — install locally, dogfood on the sandbox and one or two internal test PRs.
 8. **P1 features** (matrix rows 4–9, 12–13, 20). Second alpha build.
 9. **Store submission prep** — new `CHROME_SUBMISSION_ADO.md` / `EDGE_SUBMISSION_ADO.md`, new privacy statement scoped to ADO endpoints, new listing copy, new promo tiles reusing the existing icon design.
-10. **Public v1.0** — ship to Web Store + Edge Add-ons under a distinct extension name (e.g. "Markdown PR Comments for Azure DevOps").
+10. **Public v1.0** — ship to Web Store + Edge Add-ons under a distinct extension name (now "Markdown PR — Azure DevOps PR Comments").
 11. **P2 features** as follow-up minor releases, driven by user feedback.
 
 ## 13. Risks & unknowns (short version)

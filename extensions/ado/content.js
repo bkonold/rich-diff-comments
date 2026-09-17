@@ -1,5 +1,5 @@
 /**
- * Markdown PR Comments for Azure DevOps
+ * Markdown PR — Azure DevOps PR Comments
  *
  * Maps rendered Preview blocks back to Markdown source lines, adds inline
  * comment / thread UI, supports range comments and section folding, and

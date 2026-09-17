@@ -19,7 +19,7 @@ Version 1.2.0 highlights added and modified content directly in Markdown Preview
 ### Title
 
 ```
-Markdown PR Comments for Azure DevOps
+Markdown PR — Azure DevOps PR Comments
 ```
 
 ### Summary (132-character limit)
@@ -183,6 +183,10 @@ https://github.com/chienyuanchang/rich-diff-comments/blob/main/PRIVACY_ADO.md
 - Added and modified sections are highlighted directly in Markdown Preview, while completely new files receive a subtle **NEW FILE** marker.
 - Type `@` in comments, replies, or edits to find and mention teammates; posted conversations and the Threads sidebar show readable names.
 - Loading progress remains clear in both collapsed and expanded sidebar states.
+
+#### Changed
+
+- The extension is now named **Markdown PR — Azure DevOps PR Comments**, making Azure DevOps easier to identify in browser and store displays.
 
 #### Fixed
 

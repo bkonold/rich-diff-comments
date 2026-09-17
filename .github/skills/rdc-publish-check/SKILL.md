@@ -4,7 +4,7 @@ description: Pre-publish audit and packaging for the separate GitHub and Azure D
 
 # Pre-publish check & package the extension
 
-This skill prepares either **Markdown PR Comments for GitHub** or **Markdown PR Comments for Azure DevOps** for submission to the Chrome Web Store and / or Microsoft Edge Add-ons. Always keep the targets separate: manifests, privacy policies, changelogs, zips, release folders, store listings, and git tags are target-specific.
+This skill prepares either **Markdown PR — Markdown PR Comments for GitHub** or **Markdown PR — Azure DevOps PR Comments** for submission to the Chrome Web Store and / or Microsoft Edge Add-ons. Always keep the targets separate: manifests, privacy policies, changelogs, zips, release folders, store listings, and git tags are target-specific.
 
 ## When to use
 

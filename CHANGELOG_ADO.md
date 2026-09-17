@@ -1,4 +1,4 @@
-# Changelog — Markdown PR Comments for Azure DevOps
+# Changelog — Markdown PR — Azure DevOps PR Comments
 
 All notable user-visible changes to the Azure DevOps browser extension are recorded here. Versions follow SemVer.
 
@@ -11,6 +11,10 @@ All notable user-visible changes to the Azure DevOps browser extension are recor
 - **Changed content is now visible directly in Markdown Preview.** Added sections use a green highlight, modified sections use a warm warning highlight, and completely new files receive a subtle **NEW FILE** marker without tinting the entire document.
 - **Mention teammates while reviewing rendered Markdown.** Type `@` in a new comment, reply, or edit to search for people—including multi-word names—and select them with the keyboard or mouse. Posted conversations and the Threads sidebar show readable names instead of identity codes.
 - **Loading progress remains clear when the sidebar is collapsed or still gathering review data.** The compact header shows **Loading…**, while expanded Changes, Threads, and Outline panes describe what they are loading instead of briefly showing an empty state.
+
+### Changed
+
+- **The extension is now named “Markdown PR — Azure DevOps PR Comments.”** The shorter name identifies Azure DevOps sooner in browser and store displays; existing installations update automatically with no action required.
 
 ### Fixed
 
