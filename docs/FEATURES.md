@@ -151,8 +151,11 @@ Priority applies to the shared user outcome:
 ### Review and collaboration
 
 - [ ] **P2 — ADO `@mention` autocomplete parity**
+  - **Outcome:** typing `@` in a new comment, reply, or edit shows relevant people, supports keyboard selection, inserts the native ADO mention form, and preserves real linking and notifications after submission.
   - **GitHub:** ✅ Available with pre-warmed collaborator suggestions.
-  - **ADO:** 📋 Planned; validate identity search, permissions, ranking, result size, and insertion syntax before implementation.
+  - **ADO:** △ Implemented and live validated for multi-word search, keyboard/mouse selection, native submission, readable inline rendering, Threads snippets, edits, and cross-file navigation. Notification delivery still needs confirmation from the mentioned account.
+  - Use active user identities from IdentityPicker results, insert native GUID tokens for submission, and render readable display names in the extension instead of exposing tokens.
+  - Reuse one accessible dropdown interaction across new comments, replies, and edits; cache successful lookups without exposing organization identities outside the active signed-in session.
 
 - [ ] **P2 — Reactions on comments**
   - **GitHub:** 📋 Planned; mutation endpoint needs validation.

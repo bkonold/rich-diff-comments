@@ -14,7 +14,7 @@
   'use strict';
 
   const LOG = '[ADRC]';
-  const RUNTIME_REVISION = '2026-09-17-preview-change-highlights-r20';
+  const RUNTIME_REVISION = '2026-09-17-persistent-thread-mentions-r25';
   const adapter = (typeof window !== 'undefined' && window.ADORC) || null;
   const startupTiming = {
     scriptLoadedAt: performance.now(),
@@ -711,6 +711,8 @@
   // uniqueName, displayName } — see isOwnComment() for why we keep three
   // matchable fields.
   let currentUserIdentity = null;
+  const mentionIdentityCache = new Map();
+  const ADO_MENTION_TOKEN_RE = window.GRDC.ADO_MENTION_TOKEN_RE;
 
   function escapeHtml(s) {
     const d = document.createElement('div');
@@ -748,6 +750,67 @@
     // Fallback if markdownPreview.js didn't load: at least don't inject
     // raw HTML — escape and preserve line breaks.
     return escapeHtml(src || '').replace(/\n/g, '<br>');
+  }
+
+  function cacheMentionIdentity(identity) {
+    if (!identity?.id || !identity.displayName) return null;
+    const normalized = { ...identity, id: String(identity.id).toLowerCase() };
+    mentionIdentityCache.set(normalized.id, normalized);
+    return normalized;
+  }
+
+  function mentionLabel(identity) {
+    return `@${identity.displayName}`;
+  }
+
+  function decodeMentionTokensForEditor(content, editor) {
+    const decoded = window.GRDC.decodeAdoMentions(
+      content,
+      (id) => mentionIdentityCache.get(id)
+    );
+    editor._adrcMentionTokens = decoded.mentions;
+    return decoded.content;
+  }
+
+  function encodeEditorMentions(content, editor) {
+    return window.GRDC.encodeAdoMentions(content, editor._adrcMentionTokens);
+  }
+
+  function renderMarkdownWithMentions(content) {
+    let html = renderMarkdown(content || '');
+    return html.replace(/@(?:&lt;|<)([0-9a-f-]{36})(?:&gt;|>)/gi, (token, id) => {
+      const identity = mentionIdentityCache.get(String(id).toLowerCase());
+      if (!identity) return token;
+      const detail = identity.mail || identity.scopeName || '';
+      return `<span class="adrc-mention" title="${escapeAttr(detail)}">${escapeHtml(mentionLabel(identity))}</span>`;
+    });
+  }
+
+  function readableMentionText(content) {
+    return String(content || '').replace(ADO_MENTION_TOKEN_RE, (token, id) => {
+      const identity = mentionIdentityCache.get(String(id).toLowerCase());
+      return identity ? mentionLabel(identity) : token;
+    });
+  }
+
+  async function hydrateMentionIdentities(threads) {
+    if (typeof adapter.searchIdentities !== 'function') return;
+    const ids = new Set();
+    (threads || []).forEach((thread) => (thread.comments || []).forEach((comment) => {
+      String(comment.content || '').replace(ADO_MENTION_TOKEN_RE, (_, id) => {
+        const normalized = String(id).toLowerCase();
+        if (!mentionIdentityCache.has(normalized)) ids.add(normalized);
+        return _;
+      });
+    }));
+    await Promise.all(Array.from(ids).map(async (id) => {
+      try {
+        const matches = await adapter.searchIdentities(ctx, id.toUpperCase(), { queryTypeHint: 'uid' });
+        matches.forEach(cacheMentionIdentity);
+      } catch (err) {
+        console.warn(`${LOG} mention identity lookup failed for ${id}:`, err);
+      }
+    }));
   }
 
   function renderCommentHtml(c) {
@@ -791,7 +854,7 @@
 
     // Render comment content as markdown so **bold**, code, lists, links
     // render like they do in the actual review.
-    const bodyHtml = renderMarkdown(c.content || '');
+    const bodyHtml = renderMarkdownWithMentions(c.content || '');
 
     return `<div class="adrc-thread-comment" data-comment-id="${c.id}">${meta}<div class="adrc-thread-comment-body">${bodyHtml}</div></div>`;
   }
@@ -949,9 +1012,12 @@
     ].join('\n');
 
     const textarea = editor.querySelector('.adrc-editor-textarea');
-    if (opts.initialValue) textarea.value = opts.initialValue;
+    if (opts.initialValue) textarea.value = decodeMentionTokensForEditor(opts.initialValue, editor);
+    else editor._adrcMentionTokens = [];
+    editor._adrcMentionPreviousValue = textarea.value;
 
     wireEditor(editor);
+    attachMentionsTo(textarea, editor);
 
     const submitBtn = editor.querySelector('.adrc-editor-submit');
     const cancelBtn = editor.querySelector('.adrc-editor-cancel');
@@ -972,7 +1038,8 @@
     });
 
     submitBtn.addEventListener('click', async () => {
-      const content = textarea.value.trim();
+      const visibleContent = textarea.value.trim();
+      const content = encodeEditorMentions(visibleContent, editor).trim();
       if (!content) { textarea.focus(); return; }
       const oldError = editor.querySelector('.adrc-editor-error');
       if (oldError) oldError.remove();
@@ -994,6 +1061,146 @@
     });
 
     return { editor, textarea, submitBtn, cancelBtn };
+  }
+
+  function attachMentionsTo(textarea, editor) {
+    let dropdown = null;
+    let triggerStart = -1;
+    let matches = [];
+    let activeIndex = 0;
+    let requestSequence = 0;
+    let searchTimer = null;
+    let ignoreNextMentionInput = false;
+
+    const close = () => {
+      if (searchTimer) clearTimeout(searchTimer);
+      searchTimer = null;
+      requestSequence++;
+      dropdown?.remove();
+      dropdown = null;
+      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('resize', place);
+      triggerStart = -1;
+      matches = [];
+      activeIndex = 0;
+    };
+    const place = () => {
+      if (!dropdown) return;
+      const rect = textarea.getBoundingClientRect();
+      dropdown.style.left = `${rect.left}px`;
+      dropdown.style.top = `${rect.bottom + 2}px`;
+      dropdown.style.width = `${rect.width}px`;
+    };
+    const render = () => {
+      if (!dropdown) {
+        dropdown = document.createElement('div');
+        dropdown.className = 'adrc-mention-dropdown';
+        dropdown.setAttribute('role', 'listbox');
+        document.body.appendChild(dropdown);
+        window.addEventListener('scroll', place, true);
+        window.addEventListener('resize', place);
+      }
+      place();
+      dropdown.innerHTML = '';
+      matches.slice(0, 8).forEach((identity, index) => {
+        const option = document.createElement('div');
+        option.className = `adrc-mention-item${index === activeIndex ? ' adrc-mention-active' : ''}`;
+        option.setAttribute('role', 'option');
+        option.setAttribute('aria-selected', String(index === activeIndex));
+        const name = document.createElement('strong');
+        name.textContent = identity.displayName;
+        const detail = document.createElement('span');
+        detail.className = 'adrc-mention-detail';
+        detail.textContent = identity.mail || identity.scopeName || identity.entityType;
+        option.append(name, detail);
+        option.addEventListener('mousedown', (event) => {
+          event.preventDefault();
+          select(index);
+        });
+        dropdown.appendChild(option);
+      });
+    };
+    const select = (index) => {
+      const identity = matches[index];
+      if (!identity) return close();
+      cacheMentionIdentity(identity);
+      const value = textarea.value;
+      const cursor = textarea.selectionStart;
+      const label = mentionLabel(identity);
+      textarea.value = value.slice(0, triggerStart) + label + ' ' + value.slice(cursor);
+      editor._adrcMentionTokens.push({
+        start: triggerStart,
+        end: triggerStart + label.length,
+        label,
+        token: `@<${identity.id.toUpperCase()}>`
+      });
+      editor._adrcMentionPreviousValue = textarea.value;
+      const next = triggerStart + label.length + 1;
+      textarea.setSelectionRange(next, next);
+      close();
+      textarea.focus();
+      ignoreNextMentionInput = true;
+      textarea.dispatchEvent(new Event('input'));
+    };
+    const search = (query) => {
+      if (searchTimer) clearTimeout(searchTimer);
+      const sequence = ++requestSequence;
+      searchTimer = setTimeout(async () => {
+        try {
+          const identities = await adapter.searchIdentities(ctx, query);
+          if (sequence !== requestSequence || triggerStart < 0) return;
+          matches = Array.from(new Map(
+            identities.map(cacheMentionIdentity).filter(Boolean).map((identity) => [identity.id, identity])
+          ).values());
+          if (!matches.length) return close();
+          activeIndex = 0;
+          render();
+        } catch (err) {
+          if (sequence === requestSequence) close();
+          console.warn(`${LOG} mention search failed:`, err);
+        }
+      }, 180);
+    };
+
+    textarea.addEventListener('keydown', (event) => {
+      if (!dropdown || !matches.length) return;
+      const count = Math.min(matches.length, 8);
+      if (event.key === 'ArrowDown') activeIndex = (activeIndex + 1) % count;
+      else if (event.key === 'ArrowUp') activeIndex = (activeIndex - 1 + count) % count;
+      else if (event.key === 'Enter' || event.key === 'Tab') return event.preventDefault(), event.stopImmediatePropagation(), select(activeIndex);
+      else if (event.key === 'Escape') return event.preventDefault(), event.stopImmediatePropagation(), close();
+      else return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      render();
+    });
+    textarea.addEventListener('input', () => {
+      const value = textarea.value;
+      editor._adrcMentionTokens = window.GRDC.rebaseAdoMentions(
+        editor._adrcMentionPreviousValue,
+        value,
+        editor._adrcMentionTokens
+      );
+      editor._adrcMentionPreviousValue = value;
+      if (ignoreNextMentionInput) {
+        ignoreNextMentionInput = false;
+        return;
+      }
+      const cursor = textarea.selectionStart;
+      const before = value.slice(0, cursor);
+      const at = before.lastIndexOf('@');
+      const query = at >= 0 ? before.slice(at + 1) : '';
+      const hasBoundary = at === 0 || (at > 0 && /[\s([{]/.test(before[at - 1]));
+      if (!hasBoundary || /[@\r\n]/.test(query) || query.length > 100) return close();
+      triggerStart = at;
+      if (query.length < 2) {
+        if (dropdown) close();
+        triggerStart = at;
+        return;
+      }
+      search(query);
+    });
+    textarea.addEventListener('blur', () => setTimeout(close, 150));
   }
 
   function buildThreadPanel(thread) {
@@ -1305,6 +1512,9 @@
       return;
     }
 
+    const userThreads = sidebarThreadItems.map((item) => item.thread).filter(Boolean);
+    await hydrateMentionIdentities(userThreads);
+
     // The route may have changed while a forced mutation refresh was in
     // flight. Never clear or paint the newly active Preview with stale work.
     if (renderPath !== currentFilePathCached ||
@@ -1317,8 +1527,6 @@
       .forEach((el) => el.remove());
     renderContainer.querySelectorAll('.adrc-range-permanent')
       .forEach((el) => el.classList.remove('adrc-range-permanent'));
-
-    const userThreads = sidebarThreadItems.map((item) => item.thread).filter(Boolean);
 
     // Filter to threads that (a) aren't system-generated, (b) target the
     // current file, and (c) have a mapped anchor block. Then sort by
@@ -2468,7 +2676,9 @@
     const visibleComments = comments.filter((comment) => !comment.isDeleted);
     const head = visibleComments[0] || comments[0] || {};
     const author = head.author || {};
-    const snippetSource = head.isDeleted ? '(This comment was deleted.)' : (head.content || '');
+    const snippetSource = head.isDeleted
+      ? '(This comment was deleted.)'
+      : readableMentionText(head.content || '');
     return {
       id: thread.id,
       thread,
@@ -2508,8 +2718,9 @@
         ADO_REQUEST_TIMEOUT_MS,
         'Review-thread inventory'
       ))
-      .then((data) => {
+      .then(async (data) => {
         const threads = ((data && data.value) || []).filter((thread) => !adapter.isSystemThread(thread));
+        await hydrateMentionIdentities(threads);
         if (generation === sidebarThreadsLoadGeneration) {
           sidebarThreadsReady = true;
           setSidebarThreads(threads);
@@ -4229,9 +4440,16 @@
     }
 
     if (Array.isArray(snapshot.threads)) {
-      sidebarThreadsReady = true;
-      setSidebarThreads(snapshot.threads);
-      sidebarThreadsLoadPromise = Promise.resolve(snapshot.threads);
+      // Identity display metadata is intentionally not persisted in the
+      // session snapshot. Resolve native mention GUIDs before rebuilding the
+      // sidebar so an exact-route document fallback cannot regress readable
+      // snippets back to raw tokens.
+      sidebarThreadsReady = false;
+      sidebarThreadsLoadPromise = hydrateMentionIdentities(snapshot.threads).then(() => {
+        sidebarThreadsReady = true;
+        setSidebarThreads(snapshot.threads);
+        return snapshot.threads;
+      });
       sidebarActiveThreadId = readPendingThreadJump()?.id || null;
     }
 

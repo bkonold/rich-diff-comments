@@ -31,6 +31,7 @@
         "src/lib/sidebar.js",
         "src/lib/outline.js",
         "src/lib/changes.js",
+        "src/lib/mentions.js",
         "src/lib/lineMap.js",
         "src/adapters/ado.js",
         "content.js"

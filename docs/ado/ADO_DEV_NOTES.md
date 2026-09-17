@@ -123,6 +123,42 @@ Threads are returned by `GET /threads`:
 
 **Comment deletion** is soft. DELETE returns 200 with an empty body; the comment stays in the thread with `isDeleted: true`. We render it as `(This comment was deleted.)`.
 
+## Native `@mention` discovery — endpoint verified, payload pending
+
+A live native ADO PR comment capture on 2026-09-17 showed that typing a mention
+uses `POST /_apis/IdentityPicker/Identities`, not the previously assumed
+`GET /_apis/identities?searchFilter=General&filterValue=...`. Selecting a person
+also sends `PATCH /_apis/IdentityPicker/Identities/me/mru/common`, apparently to
+update the current user's recent identities. The actual review comment still
+posts through the normal pull-request `POST .../threads` endpoint.
+
+`browser.events.data.microsoft.com/OneCollector` and `_apis/ClientTrace/Events`
+are telemetry and are not part of mention behavior. The observed Contribution
+Hierarchy query may support page context but should not be copied into the
+extension unless payload evidence proves it is required.
+
+The verified search request body contains `query`, identity types `user` and
+`group`, operation scopes `ims` and `source`, result bounds 5–40, and requested
+display/directory properties. The response is
+`{ results: [{ queryToken, identities, pagingToken }] }`; useful fields include
+`localId`, `displayName`, `entityType`, `active`, `subjectDescriptor`, `mail`,
+`signInAddress`, `scopeName`, and `isMru`.
+
+The native editor performs a second IdentityPicker lookup with the selected
+uppercase `localId` and `queryTypeHint: "uid"`. It then stores the mention in
+thread comment content as `@<LOCAL-ID-GUID>`. The create-thread response retains
+that token verbatim and reports `identities: null`; therefore our inline renderer
+must retain cached identity metadata or resolve unknown GUID tokens by UID to
+show a readable name. No separate mention collection is required in the thread
+payload. Extension requests must explicitly include
+`?api-version=7.1-preview.1`; an ordinary JSON `POST` without a version is
+rejected with HTTP 400, and stable `7.1` is rejected because IdentityPicker is a
+preview resource. Keep this version separate from the adapter's stable API
+version. Identity display metadata is resolved again when a short-lived PR
+catalog snapshot is restored after cross-file route fallback; only raw thread
+data is persisted, so snippets must not be built before UID hydration completes.
+Notification delivery still needs explicit live confirmation.
+
 ## DOM quirks — table rows
 
 **`<tr>` elements can't host children directly** (invalid HTML), so `GRDC.buttonAnchor(row)` returns the row's first `<td>` or `<th>` and we append the `+` button there.

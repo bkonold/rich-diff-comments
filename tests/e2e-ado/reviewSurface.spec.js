@@ -155,6 +155,37 @@ test.describe('ADO rendered review surface', () => {
     expect(matchingRequests(server, 'GET', '/threads')).toHaveLength(2);
   });
 
+  test('autocompletes an ADO identity and posts the native mention token', async ({ page }) => {
+    const { server } = await setupAdoExtensionPage(page);
+    const h1 = page.locator('.markdown-preview-container h1', { hasText: 'Design Review' });
+    await clickCommentButton(h1);
+
+    const editor = page.locator('.adrc-compose-editor');
+    const textarea = editor.locator('textarea');
+    await textarea.fill('@Example Mention');
+    const option = page.locator('.adrc-mention-item', { hasText: fixtures.MENTION_USER.displayName });
+    await expect(option).toBeVisible();
+    await textarea.press('ArrowDown');
+    await textarea.press('Enter');
+    await expect(textarea).toHaveValue(`@${fixtures.MENTION_USER.displayName} `);
+    await textarea.fill(`@${fixtures.MENTION_USER.displayName} please review this.`);
+    await editor.locator('.adrc-editor-submit').click();
+
+    await expect.poll(() => matchingRequests(server, 'POST', '/threads').length).toBe(1);
+    expect(matchingRequests(server, 'POST', '/threads')[0].body.comments[0].content)
+      .toBe(`@<${fixtures.MENTION_USER.localId.toUpperCase()}> please review this.`);
+    const mentionSearch = server.requests.find((request) =>
+      request.method === 'POST' &&
+      request.pathname.endsWith('/_apis/IdentityPicker/Identities') &&
+      request.body.queryTypeHint !== 'uid'
+    );
+    expect(mentionSearch.body.query).toBe('Example Mention');
+    expect(mentionSearch.body.identityTypes).toEqual(['user', 'group']);
+    expect(mentionSearch.body.operationScopes).toEqual(['ims', 'source']);
+    await expect(page.locator('.adrc-thread-comment-body .adrc-mention').last())
+      .toHaveText(`@${fixtures.MENTION_USER.displayName}`);
+  });
+
   test('posts from the third list item on its bullet line rather than the matching section heading', async ({ page }) => {
     const { server } = await setupAdoExtensionPage(page);
     const thirdBullet = page.locator('.markdown-preview-container li').nth(2);
@@ -289,6 +320,46 @@ test.describe('ADO rendered review surface', () => {
       .toHaveText('browser coverage');
     await expect(page.locator('.adrc-thread-panel[data-thread-id="101"] .adrc-thread-comment-edited'))
       .toContainText('edited');
+  });
+
+  test('hydrates and preserves an existing native mention while editing', async ({ page }) => {
+    const threads = fixtures.defaultThreads();
+    const token = `@<${fixtures.MENTION_USER.localId.toUpperCase()}>`;
+    threads[0].comments[0].content = `${token} please review this.`;
+    const { server } = await setupAdoExtensionPage(page, { threads });
+
+    const panel = page.locator('.adrc-thread-panel[data-thread-id="101"]');
+    await expect(panel.locator('.adrc-thread-comment-body .adrc-mention'))
+      .toHaveText(`@${fixtures.MENTION_USER.displayName}`);
+    await page.keyboard.press('2');
+    await expect(page.locator('.adrc-sidebar-thread-card[data-thread-id="101"] .adrc-sidebar-thread-snippet'))
+      .toContainText(`@${fixtures.MENTION_USER.displayName}`);
+    await expect(page.locator('.adrc-sidebar-thread-card[data-thread-id="101"] .adrc-sidebar-thread-snippet'))
+      .not.toContainText(fixtures.MENTION_USER.localId);
+    const uidLookup = server.requests.find((request) =>
+      request.method === 'POST' &&
+      request.pathname.endsWith('/_apis/IdentityPicker/Identities') &&
+      request.body.queryTypeHint === 'uid'
+    );
+    expect(uidLookup.body.query).toBe(fixtures.MENTION_USER.localId.toUpperCase());
+
+    await panel.locator('.adrc-edit-comment').click();
+    const editor = panel.locator('.adrc-inline-edit-editor');
+    const textarea = editor.locator('textarea');
+    await expect(textarea)
+      .toHaveValue(`@${fixtures.MENTION_USER.displayName} please review this.`);
+    await textarea.press('Home');
+    await textarea.type('Note: ');
+    await textarea.press('End');
+    await textarea.press('ArrowLeft');
+    await textarea.type(' update');
+    await editor.locator('.adrc-editor-submit').click();
+
+    await expect.poll(() => matchingRequests(server, 'PATCH', '/threads/101/comments/1').length).toBe(1);
+    expect(matchingRequests(server, 'PATCH', '/threads/101/comments/1')[0].body.content)
+      .toBe(`Note: ${token} please review this update.`);
+    await expect(panel.locator('.adrc-thread-comment-body .adrc-mention'))
+      .toHaveText(`@${fixtures.MENTION_USER.displayName}`);
   });
 
   test('requires inline confirmation before deleting an own comment', async ({ page }) => {

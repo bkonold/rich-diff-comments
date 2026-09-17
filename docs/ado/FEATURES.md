@@ -34,7 +34,7 @@ For the original port sequence and detailed acceptance records, see the [ADO ada
 - Shared frontmatter masking is loaded by the ADO target, but ADO-specific frontmatter rendering and line mapping do not yet have dedicated fixture coverage; the shared roadmap therefore records partial confidence rather than full parity.
 - ADO has no direct equivalent of GitHub's author-association roles. Identity GUIDs can establish comment ownership but not Owner, Member, or Contributor badges.
 - ADO thread tracking differs from GitHub's outdated-thread model; status should be presented using ADO semantics rather than forced into GitHub labels.
-- `@mention` autocomplete is not implemented. Identity search must be validated for relevance, permissions, result size, and insertion syntax before parity can be claimed.
+- Mention autocomplete queries active IdentityPicker users and inserts ADO's native identity token in new comments, replies, and edits. Multi-word search, keyboard/mouse selection, readable inline rendering, Threads snippets, edits, and cross-file navigation are live validated. Notification delivery from the mentioned account remains an acceptance check.
 - The sidebar intentionally lists Markdown-file threads only. Threads on other file types have no rendered Preview destination in this extension.
 - The sidebar header's × fully hides the panel. A small launcher restores its saved position and size and opens the Threads tab.
 
@@ -52,7 +52,7 @@ Unlike GitHub rich diff, ADO Preview provides no DOM for removed prose. Parity t
 
 ### Mentions and collaboration polish
 
-Before adding `@mention` suggestions, capture and validate the live identity-search behavior. Role badges should remain not applicable unless ADO exposes a stable relationship model. Reactions and live updates remain shared roadmap items but require ADO-specific endpoint investigation.
+Identity search uses `POST /_apis/IdentityPicker/Identities`; native comments store a selected person as `@<identity-guid>`. Search results provide the local identity GUID and display metadata. The extension resolves those tokens before rendering inline conversations or Threads snippets, including after a cross-file document fallback. Confirm notification delivery from the mentioned account. Role badges should remain not applicable unless ADO exposes a stable relationship model. Reactions and live updates remain shared roadmap items but require ADO-specific endpoint investigation.
 
 ### Navigation safety
 

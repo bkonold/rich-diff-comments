@@ -1187,6 +1187,50 @@ body.adrc-dragging {
   box-sizing: border-box;
 }
 
+.adrc-mention-dropdown {
+  position: fixed;
+  z-index: 10002;
+  max-height: min(260px, 50vh);
+  overflow-y: auto;
+  border: 1px solid var(--adrc-border);
+  border-radius: 5px;
+  color: var(--adrc-text);
+  background: var(--adrc-bg);
+  box-shadow: 0 8px 24px var(--adrc-shadow);
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.adrc-mention-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 9px;
+  cursor: pointer;
+}
+
+.adrc-mention-item:hover,
+.adrc-mention-active {
+  background: var(--adrc-accent-tint);
+}
+
+.adrc-mention-detail {
+  overflow: hidden;
+  color: var(--adrc-text-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adrc-mention {
+  display: inline;
+  padding: 1px 3px;
+  border-radius: 3px;
+  color: var(--adrc-accent);
+  background: var(--adrc-accent-tint);
+  font-weight: 600;
+}
+
 .adrc-editor-header {
   margin-bottom: 8px;
   color: var(--adrc-text-muted);
@@ -1750,6 +1794,11 @@ body.adrc-dragging {
   .adrc-toast,
   .adrc-comment-btn,
   .adrc-collapse-toggle {
+    forced-color-adjust: none;
+  }
+
+  .adrc-mention-dropdown,
+  .adrc-mention {
     forced-color-adjust: none;
   }
 

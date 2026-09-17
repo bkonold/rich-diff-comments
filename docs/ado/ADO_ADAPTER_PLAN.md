@@ -173,7 +173,7 @@ This is the planning snapshot used to scope the initial port. For current GitHub
 | 8 | Table-row arithmetic | **P1** | Pure lib code; only needs adapter to hand it the right container |
 | 9 | Comment editor with markdown toolbar | **P1** | Reuse `src/lib/sidebar.js` toolbar; drop the Preview tab initially |
 | 10 | Preview tab (server-rendered) | **P2** | Depends on whether ADO exposes a `POST /_apis/git/.../preview` equivalent (probably not — likely need to render locally with `src/lib/markdownPreview.js`) |
-| 11 | `@mention` autocomplete | **P2** | `GET /_apis/identities?searchFilter=General&filterValue={q}` |
+| 11 | `@mention` autocomplete | **P2** | Native editor uses `POST /_apis/IdentityPicker/Identities`; request/response and submitted mention shapes still need capture. |
 | 12 | Threads sidebar | **P1** | Pure UI — port as-is |
 | 13 | Outline tab | **P1** | Pure lib code |
 | 14 | Section collapse by heading | **P2** | Pure lib code — trivial once §11.A is answered |

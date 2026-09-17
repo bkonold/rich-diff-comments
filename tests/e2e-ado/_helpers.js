@@ -142,6 +142,17 @@ async function installAdoRoutes(page, options) {
       return fulfillJson(route, { authenticatedUser: clone(fixtureData.CURRENT_USER) });
     }
 
+    if (method === 'POST' && url.pathname === `/${ORG}/_apis/IdentityPicker/Identities`) {
+      const query = String(body.query || '').toLowerCase();
+      const identity = fixtureData.MENTION_USER;
+      const matches = query.includes(identity.localId) ||
+        identity.displayName.toLowerCase().includes(query) ||
+        identity.mail.toLowerCase().includes(query);
+      return fulfillJson(route, {
+        results: [{ queryToken: query, identities: matches ? [clone(identity)] : [], pagingToken: '' }],
+      });
+    }
+
     const prMatch = url.pathname.match(new RegExp(
       `^/${ORG}/_apis/git/repositories/${REPO_ID}/pullRequests/(\\d+)$`
     ));

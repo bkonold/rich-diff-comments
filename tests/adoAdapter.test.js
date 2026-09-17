@@ -174,6 +174,47 @@ test('connectionDataUrl - builds the org-scoped connection-data endpoint', () =>
   assert.match(url, /api-version=7\.1-preview\.1/);
 });
 
+test('identityPickerUrl - builds the native org-scoped mention endpoint', () => {
+  assert.equal(ado.IDENTITY_PICKER_API_VERSION, '7.1-preview.1');
+  assert.equal(ado.identityPickerUrl(CTX), '/myorg/_apis/IdentityPicker/Identities?api-version=7.1-preview.1');
+});
+
+test('normalizeIdentityPickerResults - flattens active identities and keeps mention fields', () => {
+  assert.deepEqual(ado.normalizeIdentityPickerResults({ results: [{ identities: [
+    {
+      localId: '12732DD0-F63B-4121-AB06-3D4FC7DD6A1A',
+      displayName: 'Example User', entityType: 'User', active: true,
+      mail: 'user@example.test', scopeName: 'Example',
+      subjectDescriptor: 'aad.example', isMru: true
+    },
+    { localId: 'inactive', displayName: 'Inactive User', active: false }
+  ] }] }), [{
+    id: '12732dd0-f63b-4121-ab06-3d4fc7dd6a1a',
+    displayName: 'Example User', entityType: 'User', mail: 'user@example.test',
+    scopeName: 'Example', subjectDescriptor: 'aad.example', isMru: true
+  }]);
+});
+
+test('searchIdentities - posts captured search and UID lookup shapes', async () => {
+  const requests = [];
+  const fetchImpl = async (url, options) => {
+    requests.push({ url, options, body: JSON.parse(options.body) });
+    return { ok: true, status: 200, text: async () => JSON.stringify({ results: [{ identities: [{
+      localId: 'IDENTITY-GUID', displayName: 'Example User', active: true
+    }] }] }) };
+  };
+  assert.equal((await ado.searchIdentities(CTX, 'exam', {}, fetchImpl))[0].displayName, 'Example User');
+  await ado.searchIdentities(CTX, 'identity-guid', { queryTypeHint: 'uid' }, fetchImpl);
+  assert.equal(requests[0].url, '/myorg/_apis/IdentityPicker/Identities?api-version=7.1-preview.1');
+  assert.deepEqual(requests[0].body.identityTypes, ['user', 'group']);
+  assert.deepEqual(requests[0].body.operationScopes, ['ims', 'source']);
+  assert.deepEqual(requests[0].body.options, { MinResults: 5, MaxResults: 40 });
+  assert.ok(requests[0].body.properties.includes('SubjectDescriptor'));
+  assert.equal(requests[1].body.query, 'IDENTITY-GUID');
+  assert.equal(requests[1].body.queryTypeHint, 'uid');
+  assert.deepEqual(requests[1].body.identityTypes, ['user']);
+});
+
 test('itemUrl - builds the file-content endpoint with project scope + branch version', () => {
   const url = ado.itemUrl(CTX_WITH_PROJECT, '/README.md', { version: 'test_pr', versionType: 'branch' });
   assert.match(url, /^\/myorg\/PROJ-GUID\/_apis\/git\/repositories\/REPO-GUID\/items\?/);

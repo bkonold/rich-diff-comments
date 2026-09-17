@@ -124,6 +124,18 @@ const OTHER_USER = {
   displayName: 'Document Author',
 };
 
+const MENTION_USER = {
+  localId: '12732dd0-f63b-4121-ab06-3d4fc7dd6a1a',
+  displayName: 'Example Mention User',
+  entityType: 'User',
+  active: true,
+  mail: 'mention@example.test',
+  signInAddress: 'mention@example.test',
+  scopeName: 'Example Org',
+  subjectDescriptor: 'aad.example-mention',
+  isMru: false,
+};
+
 function comment(id, content, author, publishedDate) {
   return {
     id,
@@ -245,6 +257,7 @@ module.exports = {
   RENAMED_BASE_SOURCE,
   CURRENT_USER,
   OTHER_USER,
+  MENTION_USER,
   defaultThreads,
   defaultChanges,
 };
