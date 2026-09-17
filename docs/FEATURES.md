@@ -185,6 +185,12 @@ Priority applies to the shared user outcome:
 
 ### Navigation and focus
 
+- [ ] **P3 — Evaluate active-file prioritization during startup**
+  - **Outcome:** reviewers can begin commenting sooner without making Changes, Threads, or Outline feel noticeably slower or incomplete.
+  - **GitHub:** — Rich diff supplies the rendered review surface and source positions directly; the same ADO startup tradeoff does not apply.
+  - **ADO:** 📋 Deferred pending real timing evidence and UX evaluation.
+  - Compare current parallel loading with active-file-first scheduling using `ADORC_probe.startup()` on small and large pull requests. Do not change scheduling unless the improvement in comment readiness clearly outweighs delayed PR-wide sidebar readiness.
+
 - [x] **P1 — Keep the Outline focused on a cross-file heading destination**
   - **Outcome:** clicking a heading under another file opens that file and centers the selected heading in the Outline, providing context above and below instead of resetting the list to its top.
   - **GitHub:** ✅ All rendered files share one live document and Outline position follows the selected heading.
@@ -232,10 +238,12 @@ Priority applies to the shared user outcome:
 
 ### Target-specific opportunities
 
-- [ ] **P2 — Persistent rendered-diff highlighting in ADO Preview**
+- [x] **P2 — Persistent rendered-diff highlighting in ADO Preview**
   - **GitHub:** ↔ Native rich diff already shows additions and removals.
-  - **ADO:** 📋 Planned. Reuse the existing source comparison to add persistent change rails or tints to mapped blocks.
-  - Removed content remains out of scope until ADO has a safe rendered representation for it.
+  - **ADO:** 🧪 Live validated: added and modified Preview highlights follow progressive analysis, file remounts, and ADO themes. Queued for the next ADO release.
+  - Show a subtle green file-level marker for a newly added Markdown file rather than tinting its entire document; for edited files, highlight only blocks mapped to added or mixed hunks.
+  - Keep text readable in light, dark, and forced-colors themes, preserve comment/selection affordances, and reapply highlights after Preview remounts or progressive Changes analysis.
+  - Removed content remains out of scope until ADO has a safe rendered representation for it; do not mark an unrelated surviving block as removed.
 
 ### Engineering quality backlog
 

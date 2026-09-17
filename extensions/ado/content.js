@@ -14,7 +14,7 @@
   'use strict';
 
   const LOG = '[ADRC]';
-  const RUNTIME_REVISION = '2026-09-16-pr-identity-reset-r19';
+  const RUNTIME_REVISION = '2026-09-17-preview-change-highlights-r20';
   const adapter = (typeof window !== 'undefined' && window.ADORC) || null;
   const startupTiming = {
     scriptLoadedAt: performance.now(),
@@ -4332,6 +4332,7 @@
           sidebarActiveChangeIndex = currentFileIndex >= 0 ? currentFileIndex : 0;
         }
         renderChangesSidebar();
+        applyPreviewChangeHighlights();
         updateSidebarSetupState();
         return group;
       });
@@ -4354,6 +4355,7 @@
           : (sidebarChangeStops.length > 0 ? 0 : -1);
       }
       renderChangesSidebar();
+      applyPreviewChangeHighlights();
       updateSidebarSetupState();
       updateActiveSidebarChange();
       resumePendingChangeJump(0);
@@ -4584,6 +4586,54 @@
       if (block && block.isConnected && preview.contains(block)) return block;
     }
     return null;
+  }
+
+  /**
+   * Apply persistent diff context to the active rendered document using the
+   * Changes catalog that is already being built. This performs no fetches.
+   * Progressive catalog publication and Preview initialization both call it,
+   * so whichever side becomes ready second completes the visual state.
+   */
+  function applyPreviewChangeHighlights() {
+    const preview = getCurrentPreviewContainer();
+    if (!preview) return;
+    preview.classList.remove('adrc-preview-new-file');
+    preview.querySelectorAll(
+      '.adrc-preview-change-added, .adrc-preview-change-modified'
+    ).forEach((block) => block.classList.remove(
+      'adrc-preview-change-added',
+      'adrc-preview-change-modified'
+    ));
+
+    const activePath = currentFilePathCached;
+    if (!activePath || currentBlockInfo.size === 0) return;
+    const activeStops = sidebarChangeStops.filter((stop) =>
+      stop && stop.path === activePath && stop.lifecycle !== 'delete'
+    );
+    const addedFile = activeStops.some((stop) =>
+      stop.stopType === 'summary' && stop.lifecycle === 'add'
+    );
+    if (addedFile) {
+      preview.classList.add('adrc-preview-new-file');
+      return;
+    }
+
+    const blockKinds = new Map();
+    activeStops.forEach((stop) => {
+      if (stop.stopType !== 'hunk' || (stop.kind !== 'added' && stop.kind !== 'mixed')) return;
+      const block = resolveCurrentChangeBlock(stop);
+      if (!block) return;
+      // A rendered block can cover multiple source hunks (especially fenced
+      // code). Mixed takes precedence so replacement content is never shown
+      // as a pure addition merely because another hunk shares the block.
+      const prior = blockKinds.get(block);
+      if (stop.kind === 'mixed' || !prior) blockKinds.set(block, stop.kind);
+    });
+    blockKinds.forEach((kind, block) => {
+      block.classList.add(kind === 'added'
+        ? 'adrc-preview-change-added'
+        : 'adrc-preview-change-modified');
+    });
   }
 
   function scrollToCurrentChange(index) {
@@ -5128,7 +5178,7 @@
       delete el.dataset.adrcOutlineKey;
     });
     document.querySelectorAll(
-      '.adrc-hoverable, .adrc-collapsible, .adrc-section-collapsed, .adrc-collapsed-hidden, .adrc-range-permanent, .adrc-range-hover'
+      '.adrc-hoverable, .adrc-collapsible, .adrc-section-collapsed, .adrc-collapsed-hidden, .adrc-range-permanent, .adrc-range-hover, .adrc-preview-change-added, .adrc-preview-change-modified, .adrc-preview-new-file'
     ).forEach((el) => {
       el.classList.remove(
         'adrc-hoverable',
@@ -5136,7 +5186,10 @@
         'adrc-section-collapsed',
         'adrc-collapsed-hidden',
         'adrc-range-permanent',
-        'adrc-range-hover'
+        'adrc-range-hover',
+        'adrc-preview-change-added',
+        'adrc-preview-change-modified',
+        'adrc-preview-new-file'
       );
     });
 
@@ -5267,6 +5320,7 @@
           ensureCollapseToggle(block);
         }
       });
+      applyPreviewChangeHighlights();
       container.dataset.adrcInitialized = routeKey;
       currentPreviewInitStatus = 'ready';
       startupTiming.activeFileReadyAt = startupTiming.activeFileReadyAt || performance.now();

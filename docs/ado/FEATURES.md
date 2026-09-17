@@ -44,6 +44,8 @@ For the original port sequence and detailed acceptance records, see the [ADO ada
 
 ADO Preview renders only the final document. The extension already compares target and source text for the Changes pane, so a future ADO-only enhancement can add persistent added/modified rails or tints to mapped rendered blocks. Removed content cannot be displayed without introducing a separate rendered representation.
 
+The MVP uses green for additions and the existing warning/brown treatment for modified blocks. A newly added file receives a subtle file-level green marker instead of an all-green document; edited files highlight only added and mixed hunks. Highlights follow progressive Changes analysis and Preview remounts without adding another source fetch. Browser, theme, and live validation pass; the feature is queued for the next release.
+
 ### Deleted-line comments
 
 Unlike GitHub rich diff, ADO Preview provides no DOM for removed prose. Parity therefore depends on first designing a safe representation for removed blocks; REST payload support alone is insufficient.

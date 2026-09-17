@@ -22,6 +22,8 @@ body.adrc-theme-host {
   --adrc-danger-bg: var(--status-error-background, rgba(218, 10, 0, 0.10));
   --adrc-danger-border: var(--status-error-foreground, rgba(209, 52, 56, 0.45));
   --adrc-success: var(--status-success-text, rgba(16, 124, 16, 1));
+  --adrc-success-bg: var(--status-success-background, rgba(16, 124, 16, 0.10));
+  --adrc-success-border: var(--status-success-foreground, rgba(16, 124, 16, 0.55));
   --adrc-warning: var(--status-warning-text, rgba(202, 80, 16, 1));
   --adrc-warning-bg: var(--status-warning-background, rgba(255, 191, 0, 0.16));
   --adrc-warning-border: var(--status-warning-foreground, rgba(230, 175, 20, 0.75));
@@ -52,6 +54,8 @@ body.adrc-theme-host {
     --adrc-danger-bg: var(--status-error-background, rgba(255, 99, 99, 0.18));
     --adrc-danger-border: var(--status-error-foreground, rgba(255, 120, 120, 0.75));
     --adrc-success: var(--status-success-text, rgba(126, 201, 126, 1));
+    --adrc-success-bg: var(--status-success-background, rgba(126, 201, 126, 0.16));
+    --adrc-success-border: var(--status-success-foreground, rgba(126, 201, 126, 0.75));
     --adrc-warning: var(--status-warning-text, rgba(255, 185, 80, 1));
     --adrc-warning-bg: var(--status-warning-background, rgba(255, 185, 80, 0.20));
     --adrc-warning-border: var(--status-warning-foreground, rgba(255, 185, 80, 0.75));
@@ -179,6 +183,55 @@ li.adrc-hoverable .adrc-comment-btn {
   line-height: inherit;
   top: calc((1lh - 22px) / 2);
   transform: none;
+}
+
+/* Persistent rendered-diff context. ADO Preview contains only the head
+   document, so additions can be green and mixed replacement hunks use the
+   same warning/brown family as the Changes pane. Removed-only hunks have no
+   rendered block and intentionally receive no marker. */
+.adrc-preview-change-added {
+  background-color: var(--adrc-success-bg) !important;
+  box-shadow: inset 3px 0 0 0 var(--adrc-success-border);
+}
+
+.adrc-preview-change-modified {
+  background-color: var(--adrc-warning-bg) !important;
+  box-shadow: inset 3px 0 0 0 var(--adrc-warning-border);
+}
+
+.adrc-preview-new-file {
+  position: relative;
+  box-shadow: inset 3px 0 0 0 var(--adrc-success-border);
+}
+
+.adrc-preview-new-file::before {
+  content: 'NEW FILE';
+  display: block;
+  width: max-content;
+  margin: 0 0 12px 0;
+  padding: 2px 7px;
+  border: 1px solid var(--adrc-success-border);
+  border-radius: 10px;
+  color: var(--adrc-success);
+  background: var(--adrc-success-bg);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  letter-spacing: 0.03em;
+}
+
+/* Table cells and syntax-highlighted code commonly own an opaque background;
+   carry the row/block state into those descendants without rewriting markup. */
+tr.adrc-preview-change-added > th,
+tr.adrc-preview-change-added > td,
+.adrc-preview-change-added > code {
+  background-color: var(--adrc-success-bg) !important;
+}
+
+tr.adrc-preview-change-modified > th,
+tr.adrc-preview-change-modified > td,
+.adrc-preview-change-modified > code {
+  background-color: var(--adrc-warning-bg) !important;
 }
 
 /* ── Multi-line range drag highlight ─────────────────────────────────
@@ -1671,6 +1724,8 @@ body.adrc-dragging {
     --adrc-danger-bg: Canvas;
     --adrc-danger-border: CanvasText;
     --adrc-success: CanvasText;
+    --adrc-success-bg: Canvas;
+    --adrc-success-border: CanvasText;
     --adrc-warning: CanvasText;
     --adrc-warning-bg: Canvas;
     --adrc-warning-border: CanvasText;
@@ -1715,5 +1770,19 @@ body.adrc-dragging {
     color: HighlightText;
     background: Highlight !important;
     box-shadow: inset 3px 0 0 ButtonText !important;
+  }
+
+  .adrc-preview-change-added,
+  .adrc-preview-change-modified,
+  .adrc-preview-new-file {
+    forced-color-adjust: none;
+    background: Canvas;
+    box-shadow: inset 3px 0 0 ButtonText;
+  }
+
+  .adrc-preview-new-file::before {
+    color: CanvasText;
+    background: Canvas;
+    border-color: CanvasText;
   }
 }

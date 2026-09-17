@@ -515,6 +515,24 @@ starts. Before scrolling a Changes target, it also:
 snippet, tag, display, geometry, folded/connected state, and `lastScroll`
 before/after diagnostics. `ADORC_probe.changes(index)` invokes a specific card.
 
+### Persistent Preview change context reuses the Changes catalog
+
+Preview highlighting performs no additional source requests. As each file's
+Changes group is published, the active file's hunk stops are resolved through
+the same live line-to-block map used by Changes navigation. Pure additions use
+the success/green theme family and mixed replacement hunks use the existing
+warning/brown family. If multiple hunks resolve to one rendered block—most
+commonly a fenced code block—mixed takes precedence over added.
+
+A newly added Markdown file has a summary stop rather than useful individual
+hunks. Its Preview therefore receives one subtle file-level marker instead of
+tinting every rendered block green; block-level color would add no location
+information and would compete with reading and comment selection. Removed-only
+hunks and deleted files have no head-side rendered block and are intentionally
+not projected onto unrelated surviving content. Highlights are reapplied both
+when progressive analysis publishes a group and when Preview remounts, making
+the result independent of which operation finishes first.
+
 ## PR-wide Outline — source catalog, live active-file binding
 
 ADO renders one Markdown Preview at a time, but Iteration M already fetches the

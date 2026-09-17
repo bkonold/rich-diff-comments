@@ -4,6 +4,10 @@ All notable user-visible changes to the Azure DevOps browser extension are recor
 
 ## [Unreleased]
 
+### Added
+
+- **Changed content is now visible directly in Markdown Preview.** Added sections use a green highlight, modified sections use a warm warning highlight, and completely new files receive a subtle **NEW FILE** marker without tinting the entire document.
+
 ### Fixed
 
 - **Cross-file Outline navigation now keeps the selected section centered in the sidebar.** After opening a heading in another Markdown file, the Outline stays with that destination and shows nearby sections for context instead of returning to the top.

@@ -35,6 +35,7 @@ test.describe('ADO PR-wide Changes', () => {
     expect(during.analyzedFiles).toBeGreaterThan(0);
     expect(during.analyzedFiles).toBeLessThan(during.markdownFiles);
     await expect(page.locator('.adrc-sidebar-changes-summary')).toContainText('files analyzed');
+    await expect(page.locator('.markdown-preview-container .adrc-preview-change-modified')).toHaveCount(3);
 
     await expect.poll(
       () => page.evaluate(() => window.ADORC_probe.startup().changesStatus),
@@ -107,6 +108,33 @@ test.describe('ADO PR-wide Changes', () => {
     await expect(page.locator('.markdown-preview-container .adrc-change-target-pulse')).toHaveCount(1);
     await expect(page.locator('.adrc-sidebar-changes-count span')).toHaveText(`1/1 (${EXPECTED_STOP_COUNT})`);
     expect((await page.evaluate(() => window.ADORC_probe.viewMode())).pendingChangeJump).toBeNull();
+  });
+
+  test('highlights modified blocks and marks a newly added file without tinting every block', async ({ page }) => {
+    const { server } = await setupAdoExtensionPage(page);
+    const preview = page.locator('.markdown-preview-container');
+    await expect(preview.locator('.adrc-preview-change-modified')).toHaveCount(3);
+    await expect(preview.locator('p', { hasText: 'durable queue' }))
+      .toHaveClass(/adrc-preview-change-modified/);
+    await expect(preview.locator('li', { hasText: 'Emit delivery metrics' }))
+      .toHaveClass(/adrc-preview-change-modified/);
+    await expect(preview.locator('pre')).toHaveClass(/adrc-preview-change-modified/);
+    await expect(preview.locator('p', { hasText: 'This document explains' }))
+      .not.toHaveClass(/adrc-preview-change-(?:added|modified)/);
+
+    await page.evaluate((path) => window.__ADO_FIXTURE__.openPath(path), fixtures.NEW_PATH);
+    await waitForAdoReady(page, fixtures.NEW_PATH, userThreadCount(server.threads));
+    await expect(preview).toHaveClass(/adrc-preview-new-file/);
+    await expect(preview.locator('.adrc-preview-change-added')).toHaveCount(0);
+    await expect(preview.locator('h1')).not.toHaveClass(/adrc-preview-change-added/);
+    await expect(preview.locator('p')).not.toHaveClass(/adrc-preview-change-added/);
+    await expect(preview.locator('.adrc-preview-change-modified')).toHaveCount(0);
+
+    await page.evaluate((path) => window.__ADO_FIXTURE__.openPath(path), fixtures.DESIGN_PATH);
+    await waitForAdoReady(page, fixtures.DESIGN_PATH, userThreadCount(server.threads));
+    await expect(preview).not.toHaveClass(/adrc-preview-new-file/);
+    await expect(preview.locator('.adrc-preview-change-added')).toHaveCount(0);
+    await expect(preview.locator('.adrc-preview-change-modified')).toHaveCount(3);
   });
 
   test('cross-file navigation preserves the selected change and reuses PR-wide catalogs', async ({ page }) => {
