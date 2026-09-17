@@ -82,6 +82,41 @@
     return Math.max(1, newlines + 1);
   }
 
+  // A rendered list item can have the same visible text as a heading. If an
+  // earlier host-rendered block failed to advance the generic forward matcher,
+  // an unconstrained search can therefore resolve the <li> to the heading (or
+  // repeatedly nudge it from the previous block). Restrict list-item hits to
+  // source lines that actually begin with a Markdown list marker.
+  function findListItemInSource(index, sourceLines, text, lastOffset, cleanRenderedText) {
+    const fallback = { line: 1, offset: lastOffset, matched: false };
+    if (!index || !Array.isArray(index.lineOffsets) || !Array.isArray(sourceLines) ||
+        typeof cleanRenderedText !== 'function') return fallback;
+
+    const needle = cleanRenderedText(text || '');
+    if (!needle) return fallback;
+
+    const markerRe = /^\s*(?:>\s*)*(?:[-+*]|\d+[.)])\s+(?:\[[ xX]\]\s+)?/;
+    const lengths = Array.from(new Set([80, 50, 30, 20, 12, needle.length]))
+      .map((length) => Math.min(length, needle.length))
+      .filter((length) => length > 0)
+      .sort((a, b) => b - a);
+
+    for (const length of lengths) {
+      const chunk = needle.slice(0, length);
+      let pos = index.concat.indexOf(chunk, Math.max(0, lastOffset + 1));
+      while (pos !== -1) {
+        let lineIndex = index.lineOffsets.length - 1;
+        while (lineIndex > 0 && index.lineOffsets[lineIndex] > pos) lineIndex--;
+        if (markerRe.test(sourceLines[lineIndex] || '')) {
+          return { line: lineIndex + 1, offset: pos, matched: true };
+        }
+        pos = index.concat.indexOf(chunk, pos + 1);
+      }
+    }
+
+    return fallback;
+  }
+
   // ── The matching loop ─────────────────────────────────────────────────
 
   /**
@@ -99,6 +134,7 @@
    *     load the full extension surface). Required keys:
    *       - buildSourceIndex(lines) → { concat, lineOffsets }
    *       - findTextInSource(index, text, lastOffset) → { line, offset }
+  *       - cleanRenderedText(text) → normalized string
    *       - computeTableRowLine(headerLine, rowIndex, hri) → number
    *       - findFrontmatterRange(lines) → { start, end, keyLines } | null
    * @param {(...args) => void} [log]  Optional logger (defaults to no-op for
@@ -113,6 +149,7 @@
     const {
       buildSourceIndex,
       findTextInSource,
+      cleanRenderedText,
       computeTableRowLine,
       findFrontmatterRange,
     } = deps || {};
@@ -220,7 +257,13 @@
       }
 
       if (sourceIndex) {
-        const result = findTextInSource(sourceIndex, rawText, lastOffset);
+        const listResult = block.tagName === 'LI'
+          ? findListItemInSource(sourceIndex, sourceLines, rawText, lastOffset, cleanRenderedText)
+          : null;
+        // Never feed an unmatched <li> back into the generic prose matcher:
+        // the same text can legitimately belong to a heading. An unmatched
+        // constrained result instead follows the normal one-line fallback.
+        const result = listResult || findTextInSource(sourceIndex, rawText, lastOffset);
         if (result.offset > lastOffset) {
           line = result.line;
           lastOffset = result.offset;
@@ -263,6 +306,7 @@
     isDiagramBlock,
     isInDeletedBlock,
     estimateLines,
+    findListItemInSource,
     mapBlocksToSourceLines,
     buttonAnchor,
   };

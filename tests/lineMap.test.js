@@ -27,6 +27,7 @@ const { mapBlocksToSourceLines, isDiagramBlock, isInDeletedBlock } = require('..
 const deps = {
   buildSourceIndex: textMatch.buildSourceIndex,
   findTextInSource: textMatch.findTextInSource,
+  cleanRenderedText: textMatch.cleanRenderedText,
   computeTableRowLine: tableRows.computeTableRowLine,
   findFrontmatterRange: textMatch.findFrontmatterRange,
 };
@@ -71,6 +72,32 @@ test('plain markdown body: each block anchors to its real source line', () => {
   assert.equal(lineOf(map, rd, 'p', 0), 3);
   assert.equal(lineOf(map, rd, 'h2'), 5);
   assert.equal(lineOf(map, rd, 'p', 1), 7);
+});
+
+test('list item anchors to its Markdown marker line when the same text appears in an unmatched heading', () => {
+  const source = [
+    '# Review',                 // 1
+    '',                         // 2
+    '## Deployment options',    // 3 ← same text as the third bullet
+    '',                         // 4
+    '1. Use the hosted agent',  // 5
+    '2. Use a private agent',   // 6
+    '3. Deployment options',    // 7 ← intended anchor
+  ];
+  // ADO can include host-rendered heading text that is absent from Markdown.
+  // If that heading does not advance the generic matcher, the old list-item
+  // lookup accepts the heading's source text before reaching the list marker.
+  const rd = richDiff(`
+    <h1>Review</h1>
+    <h2>Deployment options permalink</h2>
+    <ol>
+      <li>Hosted pool supplied by Azure DevOps</li>
+      <li>Self-hosted pool supplied by the team</li>
+      <li>Deployment options</li>
+    </ol>
+  `);
+  const map = mapBlocksToSourceLines(rd, source, 'doc.md', deps);
+  assert.equal(lineOf(map, rd, 'li', 2), 7, 'third bullet must not inherit the heading line');
 });
 
 // ── Regression: YAML frontmatter (the 1.5.1 bug) ────────────────────────

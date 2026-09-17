@@ -3,7 +3,7 @@
 This is the authoritative product roadmap for both browser-extension targets:
 
 - **Markdown PR — Markdown PR Comments for GitHub**
-- **Markdown PR Comments for Azure DevOps**
+- **Markdown PR — Azure DevOps PR Comments**
 
 The goal is the same reviewer outcome on both services whenever the host platform makes that possible. Implementations do not need to be identical: GitHub rich diff and Azure DevOps Preview expose different DOM, navigation, identity, and API models.
 
@@ -47,7 +47,7 @@ Priority applies to the shared user outcome:
 
 | Capability | GitHub | Azure DevOps |
 |---|---|---|
-| Add a review comment from rendered paragraphs, headings, list items, table rows, and code blocks | ✅ GitHub v1.0.0 | ✅ ADO v1.0.0 |
+| Add a review comment from rendered paragraphs, headings, list items, table rows, and code blocks | ✅ GitHub v1.0.0 | ✅ ADO v1.2.0 |
 | Create single-line and multi-line comments with editable source-line targets | ✅ GitHub v1.0.0 | ✅ ADO v1.0.0 |
 | Track a specific line inside a fenced code block from the pointer position | ✅ | ✅ |
 | Show new comments inline immediately without a manual refresh | ✅ | ✅ |
@@ -74,7 +74,7 @@ Priority applies to the shared user outcome:
 | Show one summary card for a newly added, deleted, or renamed Markdown file where applicable | ✅ | ✅ |
 | Navigate threads globally and filter to unresolved conversations | ✅ | ✅ |
 | Browse headings across changed Markdown files with per-section thread counts | ✅ | ✅ |
-| Fold individual sections or fold by H1/H2/H3 level and expand all | ✅ | ✅ |
+| Fold individual sections or bulk-fold by H1/H2/H3 level and expand all | ✅ Bulk actions affect all rendered files | ✅ Bulk actions affect the current file |
 | Show file-scoped position with a PR-wide total and jump header icons to the current file first | ✅ | ✅ |
 | Follow native file navigation and keep sidebar selection synchronized | ✅ | ✅ |
 | Hide or stand down outside the host's changed-files review surface | ✅ | ✅ |
@@ -87,6 +87,7 @@ Priority applies to the shared user outcome:
 | Move between changed Markdown files without rebuilding all PR-wide review data | ✅ | ✅ ADO v1.1.0 |
 | Reject stale navigation and review state when the pull-request identity changes | ✅ | ✅ ADO v1.1.0 |
 | Preserve sidebar layout and user preferences across navigation | ✅ | ✅ |
+| Show compact loading feedback when the sidebar starts collapsed | — | ✅ ADO v1.2.0 |
 | Support light and dark themes | ✅ | ✅ |
 | Support Windows forced-colors/high-contrast mode | △ Browser fallback | ✅ |
 
@@ -106,6 +107,16 @@ Priority applies to the shared user outcome:
 ## 🚧 Planned / nice-to-have
 
 ### Correctness
+
+- [x] **P0 — Keep ADO list-item comments anchored to the selected bullet**
+  - **Outcome:** clicking `+` on an ordered or unordered list item creates the comment on that item's source line, never on the preceding section heading or another bullet.
+  - **GitHub:** ✅ List items, including nested items, have dedicated mapping coverage.
+  - **ADO:** ✅ ADO v1.2.0. List matching is restricted to Markdown list-marker lines so the selected bullet supplies the create-thread anchor.
+
+- [x] **P2 — Center the comment button on single-line highlighted blocks**
+  - **Outcome:** the `+` affordance is vertically centered on the text line and its hover/change highlight instead of appearing below it.
+  - **GitHub:** ✅ No equivalent alignment issue observed.
+  - **ADO:** ✅ ADO v1.2.0. List-item buttons center on the first rendered line, including items with nested content.
 
 - [ ] **P0 — Inline markers for table rows and code lines that already have comments**
   - **Outcome:** a reviewer can see which exact row or code line has a conversation even though the thread body must remain below the containing table or code block.
@@ -141,8 +152,11 @@ Priority applies to the shared user outcome:
 ### Review and collaboration
 
 - [ ] **P2 — ADO `@mention` autocomplete parity**
+  - **Outcome:** typing `@` in a new comment, reply, or edit shows relevant people, supports keyboard selection, inserts the native ADO mention form, and preserves real linking and notifications after submission.
   - **GitHub:** ✅ Available with pre-warmed collaborator suggestions.
-  - **ADO:** 📋 Planned; validate identity search, permissions, ranking, result size, and insertion syntax before implementation.
+  - **ADO:** △ ADO v1.2.0 ships multi-word search, keyboard/mouse selection, native submission, readable inline rendering, Threads snippets, edits, and cross-file navigation. Notification delivery still needs confirmation from the mentioned account.
+  - Use active user identities from IdentityPicker results, insert native GUID tokens for submission, and render readable display names in the extension instead of exposing tokens.
+  - Reuse one accessible dropdown interaction across new comments, replies, and edits; cache successful lookups without exposing organization identities outside the active signed-in session.
 
 - [ ] **P2 — Reactions on comments**
   - **GitHub:** 📋 Planned; mutation endpoint needs validation.
@@ -175,6 +189,29 @@ Priority applies to the shared user outcome:
 
 ### Navigation and focus
 
+- [ ] **P3 — Evaluate active-file prioritization during startup**
+  - **Outcome:** reviewers can begin commenting sooner without making Changes, Threads, or Outline feel noticeably slower or incomplete.
+  - **GitHub:** — Rich diff supplies the rendered review surface and source positions directly; the same ADO startup tradeoff does not apply.
+  - **ADO:** 📋 Deferred pending real timing evidence and UX evaluation.
+  - Compare current parallel loading with active-file-first scheduling using `ADORC_probe.startup()` on small and large pull requests. Do not change scheduling unless the improvement in comment readiness clearly outweighs delayed PR-wide sidebar readiness.
+
+- [x] **P1 — Keep the Outline focused on a cross-file heading destination**
+  - **Outcome:** clicking a heading under another file opens that file and centers the selected heading in the Outline, providing context above and below instead of resetting the list to its top.
+  - **GitHub:** ✅ All rendered files share one live document and Outline position follows the selected heading.
+  - **ADO:** ✅ ADO v1.2.0. Outline rebuilds restore and center the selected destination after Preview reaches the requested file and heading.
+  - Preserve stable file order and resume normal scroll-follow behavior after the explicit navigation completes.
+
+- [ ] **P2 — Make bulk section-folding scope explicit and predictable**
+  - **Outcome:** reviewers can tell whether Fold H1/H2/H3 and Expand all affect the current file or every Markdown file before applying the action.
+  - **GitHub:** △ Shipped with PR-wide scope across all rendered Markdown files.
+  - **ADO:** △ Shipped with current-file scope because Preview renders one file at a time.
+  - Do not force identical mechanics without user evidence. First clarify the labels or expose an explicit scope choice; current-file scope is safer for focused review, while all-files scope is useful for PR-wide triage.
+
+- [ ] **P2 — Dismiss and restore the sidebar without losing its layout**
+  - **Outcome:** reviewers can remove the sidebar completely when they need the full page width, then restore it from a small launcher without losing its saved position and size.
+  - **GitHub:** 📋 Planned; collapse and keyboard toggle are available, but there is no full-dismiss control or launcher.
+  - **ADO:** ✅ The header × hides the sidebar and a launcher restores it.
+
 - [ ] **P1 — Current-file focus for Changes and Threads**
   - **Outcome:** reduce sidebar clutter while reviewing one file without corrupting global navigation state.
   - **GitHub:** 📋 Planned; a rebuild-on-scroll implementation was attempted and reverted.
@@ -205,10 +242,12 @@ Priority applies to the shared user outcome:
 
 ### Target-specific opportunities
 
-- [ ] **P2 — Persistent rendered-diff highlighting in ADO Preview**
+- [x] **P2 — Persistent rendered-diff highlighting in ADO Preview**
   - **GitHub:** ↔ Native rich diff already shows additions and removals.
-  - **ADO:** 📋 Planned. Reuse the existing source comparison to add persistent change rails or tints to mapped blocks.
-  - Removed content remains out of scope until ADO has a safe rendered representation for it.
+  - **ADO:** ✅ ADO v1.2.0. Added and modified Preview highlights follow progressive analysis, file remounts, and ADO themes.
+  - Show a subtle green file-level marker for a newly added Markdown file rather than tinting its entire document; for edited files, highlight only blocks mapped to added or mixed hunks.
+  - Keep text readable in light, dark, and forced-colors themes, preserve comment/selection affordances, and reapply highlights after Preview remounts or progressive Changes analysis.
+  - Removed content remains out of scope until ADO has a safe rendered representation for it; do not mark an unrelated surviving block as removed.
 
 ### Engineering quality backlog
 

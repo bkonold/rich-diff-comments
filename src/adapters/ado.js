@@ -33,6 +33,7 @@
   'use strict';
 
   const API_VERSION = '7.1';
+  const IDENTITY_PICKER_API_VERSION = '7.1-preview.1';
 
   // ── URL parsing ────────────────────────────────────────────────────────
 
@@ -148,6 +149,32 @@
    */
   function connectionDataUrl(ctx) {
     return `/${ctx.org}/_apis/connectionData?connectOptions=IncludeServices&api-version=7.1-preview.1`;
+  }
+
+  function identityPickerUrl(ctx) {
+    return `/${ctx.org}/_apis/IdentityPicker/Identities?api-version=${IDENTITY_PICKER_API_VERSION}`;
+  }
+
+  const IDENTITY_PICKER_PROPERTIES = [
+    'DisplayName', 'IsMru', 'ScopeName', 'SamAccountName', 'Active',
+    'SubjectDescriptor', 'Department', 'JobTitle', 'Mail', 'MailNickname',
+    'PhysicalDeliveryOfficeName', 'SignInAddress', 'Surname', 'Guest',
+    'TelephoneNumber', 'Manager', 'Description'
+  ];
+
+  function normalizeIdentityPickerResults(data) {
+    const groups = Array.isArray(data?.results) ? data.results : [];
+    return groups.flatMap((group) => Array.isArray(group?.identities) ? group.identities : [])
+      .filter((identity) => identity && identity.localId && identity.displayName && identity.active !== false)
+      .map((identity) => ({
+        id: String(identity.localId).toLowerCase(),
+        displayName: String(identity.displayName),
+        entityType: String(identity.entityType || ''),
+        mail: String(identity.mail || identity.signInAddress || ''),
+        scopeName: String(identity.scopeName || ''),
+        subjectDescriptor: String(identity.subjectDescriptor || ''),
+        isMru: identity.isMru === true
+      }));
   }
 
   /**
@@ -342,6 +369,30 @@
     return _json(resp);
   }
 
+  /** Search ADO's native IdentityPicker using the request shape captured from
+   * the PR comment editor. A UID hint resolves mention tokens after reload. */
+  async function searchIdentities(ctx, query, opts, fetchImpl) {
+    fetchImpl = fetchImpl || fetch;
+    const text = String(query || '').trim();
+    if (!text) return [];
+    const uid = opts && opts.queryTypeHint === 'uid';
+    const body = {
+      query: uid ? text.toUpperCase() : text,
+      identityTypes: uid ? ['user'] : ['user', 'group'],
+      operationScopes: ['ims', 'source'],
+      options: { MinResults: 5, MaxResults: 40 },
+      properties: IDENTITY_PICKER_PROPERTIES
+    };
+    if (uid) body.queryTypeHint = 'uid';
+    const resp = await fetchImpl(identityPickerUrl(ctx), {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: JSON_HEADERS,
+      body: JSON.stringify(body)
+    });
+    return normalizeIdentityPickerResults(await _json(resp));
+  }
+
   /**
    * Fetch a file's raw source text at a given branch/commit. ADO's items
    * endpoint returns JSON with a `content` field (when `includeContent=true`).
@@ -487,6 +538,7 @@
   return {
     // Constants
     API_VERSION,
+    IDENTITY_PICKER_API_VERSION,
 
     // URL / context helpers
     parsePRUrl,
@@ -500,11 +552,13 @@
     iterationsUrl,
     iterationChangesUrl,
     connectionDataUrl,
+    identityPickerUrl,
     itemUrl,
 
     // Predicates / normalizers
     isSystemThread,
     normalizePullRequestChange,
+    normalizeIdentityPickerResults,
 
     // Endpoint wrappers (all cookie-authenticated)
     listThreads,
@@ -513,6 +567,7 @@
     getIterationChanges,
     listPullRequestChanges,
     getConnectionData,
+    searchIdentities,
     getFileSource,
     createThread,
     reply,

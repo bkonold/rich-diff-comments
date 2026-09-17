@@ -21,6 +21,8 @@ const REQUIRED_ALIASES = [
   '--adrc-danger-bg',
   '--adrc-danger-border',
   '--adrc-success',
+  '--adrc-success-bg',
+  '--adrc-success-border',
   '--adrc-warning',
   '--adrc-warning-bg',
   '--adrc-warning-border',
@@ -49,6 +51,8 @@ test('ADO theme aliases consume official semantic properties before palette fall
     '--status-error-text',
     '--status-error-background',
     '--status-success-text',
+    '--status-success-background',
+    '--status-success-foreground',
     '--status-warning-text',
     '--panel-shadow-color',
   ];
@@ -89,6 +93,7 @@ test('dark fallback overrides all core opaque, text, border, accent, and status 
   const dark = /@media\s*\(prefers-color-scheme:\s*dark\)\s*\{([\s\S]*?)\n\}/.exec(css)?.[1] || '';
   [
     '--adrc-accent', '--adrc-accent-tint', '--adrc-danger', '--adrc-success',
+    '--adrc-success-bg', '--adrc-success-border',
     '--adrc-warning', '--adrc-renamed', '--adrc-border', '--adrc-text',
     '--adrc-text-muted', '--adrc-bg', '--adrc-bg-subtle', '--adrc-bg-hover',
     '--adrc-code-bg', '--adrc-shadow'

@@ -19,7 +19,7 @@ const DESIGN_SOURCE = [
   '',                                           // 8
   '- Retry failed work',                        // 9
   '- Emit delivery metrics',                    // 10
-  '',                                           // 11
+  '- Architecture',                             // 11
   '## Implementation',                          // 12
   '',                                           // 13
   'The worker starts with three attempts.',      // 14
@@ -48,7 +48,7 @@ const DESIGN_BASE_SOURCE = [
   '',
   '- Retry failed work',
   '- Emit basic metrics',
-  '',
+  '- Architecture',
   '## Implementation',
   '',
   'The worker starts with three attempts.',
@@ -122,6 +122,18 @@ const OTHER_USER = {
   descriptor: 'aad.other-user',
   uniqueName: 'author@example.test',
   displayName: 'Document Author',
+};
+
+const MENTION_USER = {
+  localId: '12732dd0-f63b-4121-ab06-3d4fc7dd6a1a',
+  displayName: 'Example Mention User',
+  entityType: 'User',
+  active: true,
+  mail: 'mention@example.test',
+  signInAddress: 'mention@example.test',
+  scopeName: 'Example Org',
+  subjectDescriptor: 'aad.example-mention',
+  isMru: false,
 };
 
 function comment(id, content, author, publishedDate) {
@@ -245,6 +257,7 @@ module.exports = {
   RENAMED_BASE_SOURCE,
   CURRENT_USER,
   OTHER_USER,
+  MENTION_USER,
   defaultThreads,
   defaultChanges,
 };

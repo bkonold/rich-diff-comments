@@ -1,5 +1,5 @@
 /**
- * Markdown PR Comments for Azure DevOps
+ * Markdown PR — Azure DevOps PR Comments
  *
  * Maps rendered Preview blocks back to Markdown source lines, adds inline
  * comment / thread UI, supports range comments and section folding, and
@@ -14,7 +14,7 @@
   'use strict';
 
   const LOG = '[ADRC]';
-  const RUNTIME_REVISION = '2026-09-16-pr-identity-reset-r19';
+  const RUNTIME_REVISION = '2026-09-17-thread-loading-message-r27';
   const adapter = (typeof window !== 'undefined' && window.ADORC) || null;
   const startupTiming = {
     scriptLoadedAt: performance.now(),
@@ -284,7 +284,7 @@
     const sourceLines = source.split('\n');
 
     const GRDC = window.GRDC || {};
-    const { mapBlocksToSourceLines, buildSourceIndex, findTextInSource, findFrontmatterRange, computeTableRowLine } = GRDC;
+    const { mapBlocksToSourceLines, buildSourceIndex, findTextInSource, cleanRenderedText, findFrontmatterRange, computeTableRowLine } = GRDC;
     if (typeof mapBlocksToSourceLines !== 'function') {
       throw new Error('window.GRDC.mapBlocksToSourceLines missing — check manifest content_scripts.js order');
     }
@@ -293,7 +293,7 @@
       container,
       sourceLines,
       filePath,
-      { buildSourceIndex, findTextInSource, findFrontmatterRange, computeTableRowLine },
+      { buildSourceIndex, findTextInSource, cleanRenderedText, findFrontmatterRange, computeTableRowLine },
       console.log.bind(console)
     );
     return { map, source };
@@ -711,6 +711,8 @@
   // uniqueName, displayName } — see isOwnComment() for why we keep three
   // matchable fields.
   let currentUserIdentity = null;
+  const mentionIdentityCache = new Map();
+  const ADO_MENTION_TOKEN_RE = window.GRDC.ADO_MENTION_TOKEN_RE;
 
   function escapeHtml(s) {
     const d = document.createElement('div');
@@ -748,6 +750,67 @@
     // Fallback if markdownPreview.js didn't load: at least don't inject
     // raw HTML — escape and preserve line breaks.
     return escapeHtml(src || '').replace(/\n/g, '<br>');
+  }
+
+  function cacheMentionIdentity(identity) {
+    if (!identity?.id || !identity.displayName) return null;
+    const normalized = { ...identity, id: String(identity.id).toLowerCase() };
+    mentionIdentityCache.set(normalized.id, normalized);
+    return normalized;
+  }
+
+  function mentionLabel(identity) {
+    return `@${identity.displayName}`;
+  }
+
+  function decodeMentionTokensForEditor(content, editor) {
+    const decoded = window.GRDC.decodeAdoMentions(
+      content,
+      (id) => mentionIdentityCache.get(id)
+    );
+    editor._adrcMentionTokens = decoded.mentions;
+    return decoded.content;
+  }
+
+  function encodeEditorMentions(content, editor) {
+    return window.GRDC.encodeAdoMentions(content, editor._adrcMentionTokens);
+  }
+
+  function renderMarkdownWithMentions(content) {
+    let html = renderMarkdown(content || '');
+    return html.replace(/@(?:&lt;|<)([0-9a-f-]{36})(?:&gt;|>)/gi, (token, id) => {
+      const identity = mentionIdentityCache.get(String(id).toLowerCase());
+      if (!identity) return token;
+      const detail = identity.mail || identity.scopeName || '';
+      return `<span class="adrc-mention" title="${escapeAttr(detail)}">${escapeHtml(mentionLabel(identity))}</span>`;
+    });
+  }
+
+  function readableMentionText(content) {
+    return String(content || '').replace(ADO_MENTION_TOKEN_RE, (token, id) => {
+      const identity = mentionIdentityCache.get(String(id).toLowerCase());
+      return identity ? mentionLabel(identity) : token;
+    });
+  }
+
+  async function hydrateMentionIdentities(threads) {
+    if (typeof adapter.searchIdentities !== 'function') return;
+    const ids = new Set();
+    (threads || []).forEach((thread) => (thread.comments || []).forEach((comment) => {
+      String(comment.content || '').replace(ADO_MENTION_TOKEN_RE, (_, id) => {
+        const normalized = String(id).toLowerCase();
+        if (!mentionIdentityCache.has(normalized)) ids.add(normalized);
+        return _;
+      });
+    }));
+    await Promise.all(Array.from(ids).map(async (id) => {
+      try {
+        const matches = await adapter.searchIdentities(ctx, id.toUpperCase(), { queryTypeHint: 'uid' });
+        matches.forEach(cacheMentionIdentity);
+      } catch (err) {
+        console.warn(`${LOG} mention identity lookup failed for ${id}:`, err);
+      }
+    }));
   }
 
   function renderCommentHtml(c) {
@@ -791,7 +854,7 @@
 
     // Render comment content as markdown so **bold**, code, lists, links
     // render like they do in the actual review.
-    const bodyHtml = renderMarkdown(c.content || '');
+    const bodyHtml = renderMarkdownWithMentions(c.content || '');
 
     return `<div class="adrc-thread-comment" data-comment-id="${c.id}">${meta}<div class="adrc-thread-comment-body">${bodyHtml}</div></div>`;
   }
@@ -949,9 +1012,12 @@
     ].join('\n');
 
     const textarea = editor.querySelector('.adrc-editor-textarea');
-    if (opts.initialValue) textarea.value = opts.initialValue;
+    if (opts.initialValue) textarea.value = decodeMentionTokensForEditor(opts.initialValue, editor);
+    else editor._adrcMentionTokens = [];
+    editor._adrcMentionPreviousValue = textarea.value;
 
     wireEditor(editor);
+    attachMentionsTo(textarea, editor);
 
     const submitBtn = editor.querySelector('.adrc-editor-submit');
     const cancelBtn = editor.querySelector('.adrc-editor-cancel');
@@ -972,7 +1038,8 @@
     });
 
     submitBtn.addEventListener('click', async () => {
-      const content = textarea.value.trim();
+      const visibleContent = textarea.value.trim();
+      const content = encodeEditorMentions(visibleContent, editor).trim();
       if (!content) { textarea.focus(); return; }
       const oldError = editor.querySelector('.adrc-editor-error');
       if (oldError) oldError.remove();
@@ -994,6 +1061,146 @@
     });
 
     return { editor, textarea, submitBtn, cancelBtn };
+  }
+
+  function attachMentionsTo(textarea, editor) {
+    let dropdown = null;
+    let triggerStart = -1;
+    let matches = [];
+    let activeIndex = 0;
+    let requestSequence = 0;
+    let searchTimer = null;
+    let ignoreNextMentionInput = false;
+
+    const close = () => {
+      if (searchTimer) clearTimeout(searchTimer);
+      searchTimer = null;
+      requestSequence++;
+      dropdown?.remove();
+      dropdown = null;
+      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('resize', place);
+      triggerStart = -1;
+      matches = [];
+      activeIndex = 0;
+    };
+    const place = () => {
+      if (!dropdown) return;
+      const rect = textarea.getBoundingClientRect();
+      dropdown.style.left = `${rect.left}px`;
+      dropdown.style.top = `${rect.bottom + 2}px`;
+      dropdown.style.width = `${rect.width}px`;
+    };
+    const render = () => {
+      if (!dropdown) {
+        dropdown = document.createElement('div');
+        dropdown.className = 'adrc-mention-dropdown';
+        dropdown.setAttribute('role', 'listbox');
+        document.body.appendChild(dropdown);
+        window.addEventListener('scroll', place, true);
+        window.addEventListener('resize', place);
+      }
+      place();
+      dropdown.innerHTML = '';
+      matches.slice(0, 8).forEach((identity, index) => {
+        const option = document.createElement('div');
+        option.className = `adrc-mention-item${index === activeIndex ? ' adrc-mention-active' : ''}`;
+        option.setAttribute('role', 'option');
+        option.setAttribute('aria-selected', String(index === activeIndex));
+        const name = document.createElement('strong');
+        name.textContent = identity.displayName;
+        const detail = document.createElement('span');
+        detail.className = 'adrc-mention-detail';
+        detail.textContent = identity.mail || identity.scopeName || identity.entityType;
+        option.append(name, detail);
+        option.addEventListener('mousedown', (event) => {
+          event.preventDefault();
+          select(index);
+        });
+        dropdown.appendChild(option);
+      });
+    };
+    const select = (index) => {
+      const identity = matches[index];
+      if (!identity) return close();
+      cacheMentionIdentity(identity);
+      const value = textarea.value;
+      const cursor = textarea.selectionStart;
+      const label = mentionLabel(identity);
+      textarea.value = value.slice(0, triggerStart) + label + ' ' + value.slice(cursor);
+      editor._adrcMentionTokens.push({
+        start: triggerStart,
+        end: triggerStart + label.length,
+        label,
+        token: `@<${identity.id.toUpperCase()}>`
+      });
+      editor._adrcMentionPreviousValue = textarea.value;
+      const next = triggerStart + label.length + 1;
+      textarea.setSelectionRange(next, next);
+      close();
+      textarea.focus();
+      ignoreNextMentionInput = true;
+      textarea.dispatchEvent(new Event('input'));
+    };
+    const search = (query) => {
+      if (searchTimer) clearTimeout(searchTimer);
+      const sequence = ++requestSequence;
+      searchTimer = setTimeout(async () => {
+        try {
+          const identities = await adapter.searchIdentities(ctx, query);
+          if (sequence !== requestSequence || triggerStart < 0) return;
+          matches = Array.from(new Map(
+            identities.map(cacheMentionIdentity).filter(Boolean).map((identity) => [identity.id, identity])
+          ).values());
+          if (!matches.length) return close();
+          activeIndex = 0;
+          render();
+        } catch (err) {
+          if (sequence === requestSequence) close();
+          console.warn(`${LOG} mention search failed:`, err);
+        }
+      }, 180);
+    };
+
+    textarea.addEventListener('keydown', (event) => {
+      if (!dropdown || !matches.length) return;
+      const count = Math.min(matches.length, 8);
+      if (event.key === 'ArrowDown') activeIndex = (activeIndex + 1) % count;
+      else if (event.key === 'ArrowUp') activeIndex = (activeIndex - 1 + count) % count;
+      else if (event.key === 'Enter' || event.key === 'Tab') return event.preventDefault(), event.stopImmediatePropagation(), select(activeIndex);
+      else if (event.key === 'Escape') return event.preventDefault(), event.stopImmediatePropagation(), close();
+      else return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      render();
+    });
+    textarea.addEventListener('input', () => {
+      const value = textarea.value;
+      editor._adrcMentionTokens = window.GRDC.rebaseAdoMentions(
+        editor._adrcMentionPreviousValue,
+        value,
+        editor._adrcMentionTokens
+      );
+      editor._adrcMentionPreviousValue = value;
+      if (ignoreNextMentionInput) {
+        ignoreNextMentionInput = false;
+        return;
+      }
+      const cursor = textarea.selectionStart;
+      const before = value.slice(0, cursor);
+      const at = before.lastIndexOf('@');
+      const query = at >= 0 ? before.slice(at + 1) : '';
+      const hasBoundary = at === 0 || (at > 0 && /[\s([{]/.test(before[at - 1]));
+      if (!hasBoundary || /[@\r\n]/.test(query) || query.length > 100) return close();
+      triggerStart = at;
+      if (query.length < 2) {
+        if (dropdown) close();
+        triggerStart = at;
+        return;
+      }
+      search(query);
+    });
+    textarea.addEventListener('blur', () => setTimeout(close, 150));
   }
 
   function buildThreadPanel(thread) {
@@ -1305,6 +1512,9 @@
       return;
     }
 
+    const userThreads = sidebarThreadItems.map((item) => item.thread).filter(Boolean);
+    await hydrateMentionIdentities(userThreads);
+
     // The route may have changed while a forced mutation refresh was in
     // flight. Never clear or paint the newly active Preview with stale work.
     if (renderPath !== currentFilePathCached ||
@@ -1317,8 +1527,6 @@
       .forEach((el) => el.remove());
     renderContainer.querySelectorAll('.adrc-range-permanent')
       .forEach((el) => el.classList.remove('adrc-range-permanent'));
-
-    const userThreads = sidebarThreadItems.map((item) => item.thread).filter(Boolean);
 
     // Filter to threads that (a) aren't system-generated, (b) target the
     // current file, and (c) have a mapped anchor block. Then sort by
@@ -1574,6 +1782,7 @@
   let sidebarThreadsLoadPromise = null;
   let sidebarThreadsLoadGeneration = 0;
   let sidebarThreadsReady = false;
+  let sidebarThreadsStatus = 'idle'; // idle | loading | ready | error
   let sidebarActiveThreadId = null;
   // Stable, DOM-free PR-wide cards. Live target elements are resolved from
   // `currentLineToBlock` only when a card belongs to the active Preview.
@@ -1903,6 +2112,7 @@
     }
     setSidebarTab(sidebarState.tab, false);
     updateSidebarFilterUI();
+    updateSidebarNavigation();
 
     if (sidebarState.visible !== false) attachOutlineScrollListener();
     else detachOutlineScrollListener();
@@ -2096,7 +2306,7 @@
       '    <button type="button" class="adrc-sidebar-nav-button adrc-sidebar-prev-thread" aria-label="Previous thread" title="Previous thread (k) \u2014 first thread (h)">\u2039</button>',
       '    <button type="button" class="adrc-sidebar-nav-button adrc-sidebar-next-thread" aria-label="Next thread" title="Next thread (j) \u2014 last thread (l)">\u203a</button>',
       '  </span>',
-      '  <span class="adrc-sidebar-header-spacer"></span>',
+      '  <span class="adrc-sidebar-header-spacer"><span class="adrc-sidebar-loading-hint" role="status" aria-live="polite">Loading&hellip;</span></span>',
       '  <button type="button" class="adrc-sidebar-icon adrc-sidebar-filter" aria-pressed="false" title="Show unresolved threads only">',
       '    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12l-4.5 5v4l-3 1V8L2 3z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>',
       '  </button>',
@@ -2308,6 +2518,16 @@
   function updateSidebarNavigation() {
     if (!sidebarPanel) return;
 
+    const loadingHint = sidebarPanel.querySelector('.adrc-sidebar-loading-hint');
+    if (loadingHint) {
+      const isLoading = sidebarChangesStatus === 'idle' || sidebarChangesStatus === 'loading' ||
+        sidebarThreadsStatus === 'idle' || sidebarThreadsStatus === 'loading';
+      loadingHint.classList.toggle(
+        'adrc-sidebar-loading-hint-visible',
+        sidebarState?.collapsed === true && isLoading
+      );
+    }
+
     const activePath = currentFilePath() || currentFilePathCached;
     const GRDC = window.GRDC || {};
     const buildCounter = typeof GRDC.buildScopedCounterState === 'function'
@@ -2468,7 +2688,9 @@
     const visibleComments = comments.filter((comment) => !comment.isDeleted);
     const head = visibleComments[0] || comments[0] || {};
     const author = head.author || {};
-    const snippetSource = head.isDeleted ? '(This comment was deleted.)' : (head.content || '');
+    const snippetSource = head.isDeleted
+      ? '(This comment was deleted.)'
+      : readableMentionText(head.content || '');
     return {
       id: thread.id,
       thread,
@@ -2499,8 +2721,12 @@
     if (options?.force === true) {
       sidebarThreadsLoadPromise = null;
       sidebarThreadsReady = false;
+      sidebarThreadsStatus = 'idle';
     }
     if (sidebarThreadsLoadPromise) return sidebarThreadsLoadPromise;
+    sidebarThreadsStatus = 'loading';
+    renderThreadsSidebar();
+    updateSidebarNavigation();
     const generation = ++sidebarThreadsLoadGeneration;
     const request = resolveIdsOnce()
       .then(() => withTimeout(
@@ -2508,10 +2734,12 @@
         ADO_REQUEST_TIMEOUT_MS,
         'Review-thread inventory'
       ))
-      .then((data) => {
+      .then(async (data) => {
         const threads = ((data && data.value) || []).filter((thread) => !adapter.isSystemThread(thread));
+        await hydrateMentionIdentities(threads);
         if (generation === sidebarThreadsLoadGeneration) {
           sidebarThreadsReady = true;
+          sidebarThreadsStatus = 'ready';
           setSidebarThreads(threads);
         }
         return threads;
@@ -2520,6 +2748,9 @@
         if (generation === sidebarThreadsLoadGeneration) {
           sidebarThreadsLoadPromise = null;
           sidebarThreadsReady = false;
+          sidebarThreadsStatus = 'error';
+          renderThreadsSidebar();
+          updateSidebarNavigation();
         }
         console.warn(`${LOG} sidebar thread inventory unavailable:`, err);
         throw err;
@@ -2563,9 +2794,17 @@
     if (visible.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'adrc-sidebar-empty';
-      empty.textContent = sidebarState?.unresolvedOnly
-        ? 'No unresolved threads.'
-        : 'No review threads yet.';
+      if (sidebarThreadsStatus === 'idle' || sidebarThreadsStatus === 'loading') {
+        empty.setAttribute('role', 'status');
+        empty.setAttribute('aria-live', 'polite');
+        empty.textContent = 'Loading review threads\u2026';
+      } else if (sidebarThreadsStatus === 'error') {
+        empty.textContent = 'Could not load review threads.';
+      } else {
+        empty.textContent = sidebarState?.unresolvedOnly
+          ? 'No unresolved threads.'
+          : 'No review threads yet.';
+      }
       list.appendChild(empty);
       return;
     }
@@ -4229,9 +4468,18 @@
     }
 
     if (Array.isArray(snapshot.threads)) {
-      sidebarThreadsReady = true;
-      setSidebarThreads(snapshot.threads);
-      sidebarThreadsLoadPromise = Promise.resolve(snapshot.threads);
+      // Identity display metadata is intentionally not persisted in the
+      // session snapshot. Resolve native mention GUIDs before rebuilding the
+      // sidebar so an exact-route document fallback cannot regress readable
+      // snippets back to raw tokens.
+      sidebarThreadsReady = false;
+      sidebarThreadsStatus = 'loading';
+      sidebarThreadsLoadPromise = hydrateMentionIdentities(snapshot.threads).then(() => {
+        sidebarThreadsReady = true;
+        sidebarThreadsStatus = 'ready';
+        setSidebarThreads(snapshot.threads);
+        return snapshot.threads;
+      });
       sidebarActiveThreadId = readPendingThreadJump()?.id || null;
     }
 
@@ -4332,6 +4580,7 @@
           sidebarActiveChangeIndex = currentFileIndex >= 0 ? currentFileIndex : 0;
         }
         renderChangesSidebar();
+        applyPreviewChangeHighlights();
         updateSidebarSetupState();
         return group;
       });
@@ -4354,6 +4603,7 @@
           : (sidebarChangeStops.length > 0 ? 0 : -1);
       }
       renderChangesSidebar();
+      applyPreviewChangeHighlights();
       updateSidebarSetupState();
       updateActiveSidebarChange();
       resumePendingChangeJump(0);
@@ -4586,6 +4836,54 @@
     return null;
   }
 
+  /**
+   * Apply persistent diff context to the active rendered document using the
+   * Changes catalog that is already being built. This performs no fetches.
+   * Progressive catalog publication and Preview initialization both call it,
+   * so whichever side becomes ready second completes the visual state.
+   */
+  function applyPreviewChangeHighlights() {
+    const preview = getCurrentPreviewContainer();
+    if (!preview) return;
+    preview.classList.remove('adrc-preview-new-file');
+    preview.querySelectorAll(
+      '.adrc-preview-change-added, .adrc-preview-change-modified'
+    ).forEach((block) => block.classList.remove(
+      'adrc-preview-change-added',
+      'adrc-preview-change-modified'
+    ));
+
+    const activePath = currentFilePathCached;
+    if (!activePath || currentBlockInfo.size === 0) return;
+    const activeStops = sidebarChangeStops.filter((stop) =>
+      stop && stop.path === activePath && stop.lifecycle !== 'delete'
+    );
+    const addedFile = activeStops.some((stop) =>
+      stop.stopType === 'summary' && stop.lifecycle === 'add'
+    );
+    if (addedFile) {
+      preview.classList.add('adrc-preview-new-file');
+      return;
+    }
+
+    const blockKinds = new Map();
+    activeStops.forEach((stop) => {
+      if (stop.stopType !== 'hunk' || (stop.kind !== 'added' && stop.kind !== 'mixed')) return;
+      const block = resolveCurrentChangeBlock(stop);
+      if (!block) return;
+      // A rendered block can cover multiple source hunks (especially fenced
+      // code). Mixed takes precedence so replacement content is never shown
+      // as a pure addition merely because another hunk shares the block.
+      const prior = blockKinds.get(block);
+      if (stop.kind === 'mixed' || !prior) blockKinds.set(block, stop.kind);
+    });
+    blockKinds.forEach((kind, block) => {
+      block.classList.add(kind === 'added'
+        ? 'adrc-preview-change-added'
+        : 'adrc-preview-change-modified');
+    });
+  }
+
   function scrollToCurrentChange(index) {
     const stop = sidebarChangeStops[index];
     const block = resolveCurrentChangeBlock(stop);
@@ -4813,7 +5111,23 @@
       loading.textContent = `Loading pull request outline… ${entries.length}/${prMarkdownChanges.length} files`;
       body.appendChild(loading);
     }
-    updateActiveOutline();
+    // Clearing `body.innerHTML` clamps this scroll container back to zero.
+    // During a cross-file jump, restore the pending destination after every
+    // rebuild—not only when Preview finishes—because catalog completion can
+    // render the rows again after the pending jump has already scrolled them.
+    // Once the pending state is cleared, `outlineActiveId` preserves the same
+    // destination for any subsequent rebuild. `setActiveOutlineRow` scrolls
+    // only when the row is outside the Outline viewport, so natural document
+    // scroll-follow remains undisturbed.
+    const pending = readPendingOutlineJump();
+    const followId = pending && sameAdoFilePath(pending.path, activePath) && pending.key
+      ? pending.key
+      : outlineActiveId;
+    if (followId) {
+      const explicitNavigation = !!pending || Date.now() < sidebarFollowSuppressedUntil;
+      setActiveOutlineRow(followId, explicitNavigation ? 'center' : 'nearest');
+    }
+    else updateActiveOutline();
   }
 
   function resolveLiveOutlineHeading(key) {
@@ -4873,8 +5187,8 @@
     if (!heading || !heading.el?.isConnected) return false;
     revealChangedBlock(heading.el);
     outlineActiveId = heading.key || heading.id;
-    setActiveOutlineRow(outlineActiveId);
     sidebarFollowSuppressedUntil = Date.now() + 1500;
+    setActiveOutlineRow(outlineActiveId, 'center');
     return scrollToWithStickyOffset(heading.el);
   }
 
@@ -4906,7 +5220,7 @@
     return true;
   }
 
-  function setActiveOutlineRow(id) {
+  function setActiveOutlineRow(id, position) {
     outlineActiveId = id;
     if (!outlinePanel) return;
     outlinePanel.querySelectorAll('.adrc-outline-row.adrc-outline-active')
@@ -4922,8 +5236,9 @@
       if (body) {
         const rowRect = row.getBoundingClientRect();
         const bodyRect = body.getBoundingClientRect();
-        if (rowRect.top < bodyRect.top || rowRect.bottom > bodyRect.bottom) {
-          row.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+        const center = position === 'center';
+        if (center || rowRect.top < bodyRect.top || rowRect.bottom > bodyRect.bottom) {
+          row.scrollIntoView({ block: center ? 'center' : 'nearest', behavior: 'auto' });
         }
       }
     }
@@ -5111,7 +5426,7 @@
       delete el.dataset.adrcOutlineKey;
     });
     document.querySelectorAll(
-      '.adrc-hoverable, .adrc-collapsible, .adrc-section-collapsed, .adrc-collapsed-hidden, .adrc-range-permanent, .adrc-range-hover'
+      '.adrc-hoverable, .adrc-collapsible, .adrc-section-collapsed, .adrc-collapsed-hidden, .adrc-range-permanent, .adrc-range-hover, .adrc-preview-change-added, .adrc-preview-change-modified, .adrc-preview-new-file'
     ).forEach((el) => {
       el.classList.remove(
         'adrc-hoverable',
@@ -5119,7 +5434,10 @@
         'adrc-section-collapsed',
         'adrc-collapsed-hidden',
         'adrc-range-permanent',
-        'adrc-range-hover'
+        'adrc-range-hover',
+        'adrc-preview-change-added',
+        'adrc-preview-change-modified',
+        'adrc-preview-new-file'
       );
     });
 
@@ -5250,6 +5568,7 @@
           ensureCollapseToggle(block);
         }
       });
+      applyPreviewChangeHighlights();
       container.dataset.adrcInitialized = routeKey;
       currentPreviewInitStatus = 'ready';
       startupTiming.activeFileReadyAt = startupTiming.activeFileReadyAt || performance.now();

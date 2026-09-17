@@ -25,6 +25,8 @@ const DARK_TOKENS = {
   '--status-error-text': 'rgb(255, 155, 155)',
   '--status-error-background': 'rgb(80, 35, 35)',
   '--status-success-text': 'rgb(140, 210, 140)',
+  '--status-success-background': 'rgb(30, 70, 30)',
+  '--status-success-foreground': 'rgb(140, 210, 140)',
   '--status-warning-text': 'rgb(255, 190, 90)',
   '--status-warning-background': 'rgb(75, 60, 25)',
   '--status-info-foreground': 'rgb(195, 166, 255)',
@@ -48,6 +50,8 @@ const LIGHT_TOKENS = {
   '--status-error-text': 'rgb(218, 10, 0)',
   '--status-error-background': 'rgb(253, 236, 234)',
   '--status-success-text': 'rgb(16, 124, 16)',
+  '--status-success-background': 'rgb(223, 246, 221)',
+  '--status-success-foreground': 'rgb(16, 124, 16)',
   '--status-warning-text': 'rgb(202, 80, 16)',
   '--status-warning-background': 'rgb(255, 244, 206)',
   '--status-info-foreground': 'rgb(0, 120, 212)',
@@ -105,6 +109,26 @@ test.describe('ADO theme integration', () => {
       window.__themeSidebar === document.querySelector('.adrc-sidebar') &&
       window.__themeButtonCount === document.querySelectorAll('.adrc-comment-btn').length
     )).toBe(true);
+  });
+
+  test('updates persistent added and modified highlighting with ADO theme tokens', async ({ page }) => {
+    await setupAdoExtensionPage(page);
+    const changed = page.locator('.markdown-preview-container p', { hasText: 'durable queue' });
+    await expect(changed).toHaveClass(/adrc-preview-change-modified/);
+
+    await setAdoThemeTokens(page, DARK_TOKENS);
+    await expect.poll(() => computed(changed, 'backgroundColor')).toBe('rgb(75, 60, 25)');
+    await setAdoThemeTokens(page, LIGHT_TOKENS);
+    await expect.poll(() => computed(changed, 'backgroundColor')).toBe('rgb(255, 244, 206)');
+    await expect(changed).toHaveClass(/adrc-preview-change-modified/);
+
+    await page.evaluate(() => window.__ADO_FIXTURE__.openPath('/docs/new.md'));
+    const added = page.locator('.markdown-preview-container');
+    await expect(added).toHaveClass(/adrc-preview-new-file/);
+    await setAdoThemeTokens(page, DARK_TOKENS);
+    await expect.poll(() => added.evaluate((element) =>
+      getComputedStyle(element, '::before').backgroundColor
+    )).toBe('rgb(30, 70, 30)');
   });
 
   test('uses system colors and visible focus in forced-colors mode', async ({ page }) => {

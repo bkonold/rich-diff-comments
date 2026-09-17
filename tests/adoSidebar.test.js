@@ -36,7 +36,7 @@ test('ADO manifest loads shared sidebar and Changes helpers before content.js', 
 });
 
 test('ADO exposes a runtime revision for live loaded-script verification', () => {
-  assert.match(content, /const RUNTIME_REVISION = '2026-09-16-pr-identity-reset-r19'/);
+  assert.match(content, /const RUNTIME_REVISION = '2026-09-17-thread-loading-message-r27'/);
   assert.match(content, /revision: RUNTIME_REVISION/);
 });
 
@@ -68,7 +68,8 @@ test('ADO preserves compact PR catalogs across an exact-route document fallback'
   assert.match(content, /prChangesInventoryPromise = Promise\.resolve\(prMarkdownChanges\)/);
   assert.match(content, /prChangesPromise = Promise\.resolve\(sidebarChangeStops\)/);
   assert.match(content, /prOutlinePromise = Promise\.resolve\(prOutlineCatalog\)/);
-  assert.match(content, /sidebarThreadsLoadPromise = Promise\.resolve\(snapshot\.threads\)/);
+  assert.match(content, /sidebarThreadsLoadPromise = hydrateMentionIdentities\(snapshot\.threads\)\.then/);
+  assert.match(content, /hydrateMentionIdentities\(snapshot\.threads\)[\s\S]*?setSidebarThreads\(snapshot\.threads\)/);
   assert.match(content, /snapshot\.threads = null;[\s\S]*?snapshot\.outline = null;[\s\S]*?snapshot\.changes = null;/);
   assert.match(content, /baseLines: stop\.hunk\.baseLines\?\.length \? \[''\] : \[\]/);
   assert.match(content, /headLines: stop\.hunk\.headLines\?\.length \? \[''\] : \[\]/);

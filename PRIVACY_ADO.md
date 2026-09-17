@@ -1,8 +1,8 @@
-# Privacy Policy — Markdown PR Comments for Azure DevOps
+# Privacy Policy — Markdown PR — Azure DevOps PR Comments
 
-**Effective date:** August 27, 2026
+**Effective date:** September 17, 2026
 
-Markdown PR Comments for Azure DevOps is a browser extension that adds inline review commenting and navigation to rendered Markdown in Azure DevOps pull request Preview mode.
+Markdown PR — Azure DevOps PR Comments is a browser extension that adds inline review commenting and navigation to rendered Markdown in Azure DevOps pull request Preview mode.
 
 ## What data the extension accesses
 
@@ -16,6 +16,7 @@ While on those pages, it reads:
 - The rendered Markdown Preview content needed to position comment buttons, threads, change navigation, and the document outline.
 - The raw Markdown source of changed files and pull request metadata needed to map rendered blocks to source lines and identify changed sections.
 - Existing pull request review threads, comments, statuses, and the current signed-in Azure DevOps identity needed to display and manage review conversations.
+- Azure DevOps organization identity search results, such as display names and sign-in addresses, only while you use `@mention` autocomplete or while the extension resolves an existing mention for display.
 
 ## What data the extension sends
 
@@ -25,6 +26,7 @@ The extension sends data **only to the Azure DevOps origin currently open in you
 - Edits and deletes are sent only when you choose those actions on your own comments.
 - Resolve and unresolve actions are sent when you change a thread's status.
 - Read requests fetch pull request metadata, changed-file information, Markdown source, review threads, and the current signed-in identity.
+- Mention searches send the text typed after `@` to the current Azure DevOps organization and retrieve matching identities. Selected mentions are included in the review comment sent to Azure DevOps.
 
 No data is sent to any other server, analytics provider, advertising network, or third party. The extension has no telemetry and no backend service.
 

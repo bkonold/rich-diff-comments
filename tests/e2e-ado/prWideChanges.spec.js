@@ -19,6 +19,42 @@ function requestsEndingWith(server, suffix) {
 }
 
 test.describe('ADO PR-wide Changes', () => {
+  test('shows a loading message instead of an empty Threads state during startup', async ({ page }) => {
+    await setupAdoExtensionPage(page, {
+      waitForReady: false,
+      sidebarState: { tab: 'threads' },
+      threadsDelay: 1200,
+    });
+
+    const empty = page.locator('.adrc-sidebar-thread-list .adrc-sidebar-empty');
+    await expect(empty).toHaveText('Loading review threads…');
+    await expect(empty).toHaveAttribute('role', 'status');
+    await expect(page.locator('.adrc-sidebar-thread-card')).toHaveCount(3, { timeout: 4000 });
+    await expect(empty).toHaveCount(0);
+  });
+
+  test('shows Loading in a collapsed sidebar until initial review data is ready', async ({ page }) => {
+    await setupAdoExtensionPage(page, {
+      waitForReady: false,
+      sidebarState: { collapsed: true },
+      sourceDelays: {
+        [`${SOURCE_COMMIT}:${fixtures.OTHER_PATH}`]: 1800,
+        [`${COMMON_COMMIT}:${fixtures.OTHER_PATH}`]: 1800,
+      },
+    });
+
+    const sidebar = page.locator('.adrc-sidebar');
+    const hint = sidebar.locator('.adrc-sidebar-loading-hint');
+    await expect(sidebar).toHaveClass(/adrc-sidebar-collapsed/);
+    await expect(hint).toBeVisible();
+    await expect(hint).toHaveText('Loading…');
+    await expect.poll(
+      () => page.evaluate(() => window.ADORC_probe.startup().changesStatus),
+      { timeout: 8000 }
+    ).toBe('ready');
+    await expect(hint).toBeHidden();
+  });
+
   test('publishes completed file changes while a slow Markdown file is still loading', async ({ page }) => {
     await setupAdoExtensionPage(page, {
       waitForReady: false,
@@ -35,6 +71,7 @@ test.describe('ADO PR-wide Changes', () => {
     expect(during.analyzedFiles).toBeGreaterThan(0);
     expect(during.analyzedFiles).toBeLessThan(during.markdownFiles);
     await expect(page.locator('.adrc-sidebar-changes-summary')).toContainText('files analyzed');
+    await expect(page.locator('.markdown-preview-container .adrc-preview-change-modified')).toHaveCount(3);
 
     await expect.poll(
       () => page.evaluate(() => window.ADORC_probe.startup().changesStatus),
@@ -107,6 +144,33 @@ test.describe('ADO PR-wide Changes', () => {
     await expect(page.locator('.markdown-preview-container .adrc-change-target-pulse')).toHaveCount(1);
     await expect(page.locator('.adrc-sidebar-changes-count span')).toHaveText(`1/1 (${EXPECTED_STOP_COUNT})`);
     expect((await page.evaluate(() => window.ADORC_probe.viewMode())).pendingChangeJump).toBeNull();
+  });
+
+  test('highlights modified blocks and marks a newly added file without tinting every block', async ({ page }) => {
+    const { server } = await setupAdoExtensionPage(page);
+    const preview = page.locator('.markdown-preview-container');
+    await expect(preview.locator('.adrc-preview-change-modified')).toHaveCount(3);
+    await expect(preview.locator('p', { hasText: 'durable queue' }))
+      .toHaveClass(/adrc-preview-change-modified/);
+    await expect(preview.locator('li', { hasText: 'Emit delivery metrics' }))
+      .toHaveClass(/adrc-preview-change-modified/);
+    await expect(preview.locator('pre')).toHaveClass(/adrc-preview-change-modified/);
+    await expect(preview.locator('p', { hasText: 'This document explains' }))
+      .not.toHaveClass(/adrc-preview-change-(?:added|modified)/);
+
+    await page.evaluate((path) => window.__ADO_FIXTURE__.openPath(path), fixtures.NEW_PATH);
+    await waitForAdoReady(page, fixtures.NEW_PATH, userThreadCount(server.threads));
+    await expect(preview).toHaveClass(/adrc-preview-new-file/);
+    await expect(preview.locator('.adrc-preview-change-added')).toHaveCount(0);
+    await expect(preview.locator('h1')).not.toHaveClass(/adrc-preview-change-added/);
+    await expect(preview.locator('p')).not.toHaveClass(/adrc-preview-change-added/);
+    await expect(preview.locator('.adrc-preview-change-modified')).toHaveCount(0);
+
+    await page.evaluate((path) => window.__ADO_FIXTURE__.openPath(path), fixtures.DESIGN_PATH);
+    await waitForAdoReady(page, fixtures.DESIGN_PATH, userThreadCount(server.threads));
+    await expect(preview).not.toHaveClass(/adrc-preview-new-file/);
+    await expect(preview.locator('.adrc-preview-change-added')).toHaveCount(0);
+    await expect(preview.locator('.adrc-preview-change-modified')).toHaveCount(3);
   });
 
   test('cross-file navigation preserves the selected change and reuses PR-wide catalogs', async ({ page }) => {

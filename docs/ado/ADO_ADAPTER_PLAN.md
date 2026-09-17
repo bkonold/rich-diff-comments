@@ -173,7 +173,7 @@ This is the planning snapshot used to scope the initial port. For current GitHub
 | 8 | Table-row arithmetic | **P1** | Pure lib code; only needs adapter to hand it the right container |
 | 9 | Comment editor with markdown toolbar | **P1** | Reuse `src/lib/sidebar.js` toolbar; drop the Preview tab initially |
 | 10 | Preview tab (server-rendered) | **P2** | Depends on whether ADO exposes a `POST /_apis/git/.../preview` equivalent (probably not — likely need to render locally with `src/lib/markdownPreview.js`) |
-| 11 | `@mention` autocomplete | **P2** | `GET /_apis/identities?searchFilter=General&filterValue={q}` |
+| 11 | `@mention` autocomplete | **P2** | Native editor uses `POST /_apis/IdentityPicker/Identities`; request/response and submitted mention shapes still need capture. |
 | 12 | Threads sidebar | **P1** | Pure UI — port as-is |
 | 13 | Outline tab | **P1** | Pure lib code |
 | 14 | Section collapse by heading | **P2** | Pure lib code — trivial once §11.A is answered |
@@ -915,7 +915,7 @@ and inspect the promising ones.
 7. **Private alpha** — install locally, dogfood on the sandbox and one or two internal test PRs.
 8. **P1 features** (matrix rows 4–9, 12–13, 20). Second alpha build.
 9. **Store submission prep** — new `CHROME_SUBMISSION_ADO.md` / `EDGE_SUBMISSION_ADO.md`, new privacy statement scoped to ADO endpoints, new listing copy, new promo tiles reusing the existing icon design.
-10. **Public v1.0** — ship to Web Store + Edge Add-ons under a distinct extension name (e.g. "Markdown PR Comments for Azure DevOps").
+10. **Public v1.0** — ship to Web Store + Edge Add-ons under a distinct extension name (now "Markdown PR — Azure DevOps PR Comments").
 11. **P2 features** as follow-up minor releases, driven by user feedback.
 
 ## 13. Risks & unknowns (short version)

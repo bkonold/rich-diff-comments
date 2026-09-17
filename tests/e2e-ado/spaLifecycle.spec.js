@@ -351,7 +351,10 @@ test.describe('ADO SPA lifecycle and cross-file navigation', () => {
   });
 
   test('a pending change resumes after the exact-route reload fallback', async ({ page }) => {
-    const { server } = await setupAdoExtensionPage(page);
+    const threads = fixtures.defaultThreads();
+    threads[0].comments[0].content =
+      `@<${fixtures.MENTION_USER.localId.toUpperCase()}> please review this.`;
+    const { server } = await setupAdoExtensionPage(page, { threads });
     const countRequests = (suffix) => server.requests.filter((request) =>
       request.method === 'GET' && request.pathname.endsWith(suffix)
     ).length;
@@ -375,6 +378,12 @@ test.describe('ADO SPA lifecycle and cross-file navigation', () => {
     await injectAdoExtension(page);
     await waitForAdoReady(page, fixtures.OTHER_PATH, userThreadCount(server.threads));
     await expect(page.locator('.markdown-preview-container .adrc-change-target-pulse')).toHaveCount(1);
+    await page.keyboard.press('2');
+    const mentionSnippet = page.locator(
+      '.adrc-sidebar-thread-card[data-thread-id="101"] .adrc-sidebar-thread-snippet'
+    );
+    await expect(mentionSnippet).toContainText(`@${fixtures.MENTION_USER.displayName}`);
+    await expect(mentionSnippet).not.toContainText(fixtures.MENTION_USER.localId);
     expect((await page.evaluate(() => window.ADORC_probe.viewMode())).currentMode).toBe('preview');
     expect((await page.evaluate(() => window.ADORC_probe.viewMode())).pendingChangeJump).toBeNull();
     expect(server.pageLoads).toBe(2);

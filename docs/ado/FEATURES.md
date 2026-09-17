@@ -27,11 +27,17 @@ For the original port sequence and detailed acceptance records, see the [ADO ada
 ## Current platform constraints
 
 - Preview omits deleted content and does not visually distinguish changed blocks. Changes navigation is calculated by the extension, but persistent rendered-diff highlighting remains an ADO-specific opportunity.
+- List-item mapping now accepts only Markdown list-marker lines, preventing matching bullet text from being assigned to a section heading. Automated coverage verifies the third bullet's posted ADO line; the original live PR still needs manual confirmation before release.
+- List-item `+` buttons use the first rendered line's height, keeping single-line and nested-list controls centered on the bullet text. Automated geometry coverage also protects ordinary single-line paragraphs; live confirmation remains pending.
+- Cross-file Outline clicks restore and center the selected destination after every PR-wide row rebuild, keeping nearby headings visible while Preview opens the destination. Ordinary Preview scroll-follow still uses minimal nearest-edge movement.
+- Outline bulk controls apply Fold H1/H2/H3 and Expand all only to the current file. This matches ADO's one-file-at-a-time Preview surface but differs from GitHub's all-rendered-files scope.
 - Shared frontmatter masking is loaded by the ADO target, but ADO-specific frontmatter rendering and line mapping do not yet have dedicated fixture coverage; the shared roadmap therefore records partial confidence rather than full parity.
 - ADO has no direct equivalent of GitHub's author-association roles. Identity GUIDs can establish comment ownership but not Owner, Member, or Contributor badges.
 - ADO thread tracking differs from GitHub's outdated-thread model; status should be presented using ADO semantics rather than forced into GitHub labels.
-- `@mention` autocomplete is not implemented. Identity search must be validated for relevance, permissions, result size, and insertion syntax before parity can be claimed.
+- Mention autocomplete queries active IdentityPicker users and inserts ADO's native identity token in new comments, replies, and edits. Multi-word search, keyboard/mouse selection, readable inline rendering, Threads snippets, edits, and cross-file navigation are live validated. Notification delivery from the mentioned account remains an acceptance check.
 - The sidebar intentionally lists Markdown-file threads only. Threads on other file types have no rendered Preview destination in this extension.
+- The sidebar header's × fully hides the panel. A small launcher restores its saved position and size and opens the Threads tab.
+- When the sidebar starts collapsed, its header shows **Loading…** until the initial Changes and Threads catalogs finish. Expanded panes report their own progress: **Finding changed Markdown files…**, **Loading review threads…**, or **Loading pull request outline…** instead of showing a premature empty state.
 
 ## Open ADO design notes
 
@@ -39,13 +45,15 @@ For the original port sequence and detailed acceptance records, see the [ADO ada
 
 ADO Preview renders only the final document. The extension already compares target and source text for the Changes pane, so a future ADO-only enhancement can add persistent added/modified rails or tints to mapped rendered blocks. Removed content cannot be displayed without introducing a separate rendered representation.
 
+The MVP uses green for additions and the existing warning/brown treatment for modified blocks. A newly added file receives a subtle file-level green marker instead of an all-green document; edited files highlight only added and mixed hunks. Highlights follow progressive Changes analysis and Preview remounts without adding another source fetch.
+
 ### Deleted-line comments
 
 Unlike GitHub rich diff, ADO Preview provides no DOM for removed prose. Parity therefore depends on first designing a safe representation for removed blocks; REST payload support alone is insufficient.
 
 ### Mentions and collaboration polish
 
-Before adding `@mention` suggestions, capture and validate the live identity-search behavior. Role badges should remain not applicable unless ADO exposes a stable relationship model. Reactions and live updates remain shared roadmap items but require ADO-specific endpoint investigation.
+Identity search uses `POST /_apis/IdentityPicker/Identities`; native comments store a selected person as `@<identity-guid>`. Search results provide the local identity GUID and display metadata. The extension resolves those tokens before rendering inline conversations or Threads snippets, including after a cross-file document fallback. Confirm notification delivery from the mentioned account. Role badges should remain not applicable unless ADO exposes a stable relationship model. Reactions and live updates remain shared roadmap items but require ADO-specific endpoint investigation.
 
 ### Navigation safety
 

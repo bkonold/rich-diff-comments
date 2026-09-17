@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Markdown PR Comments for Azure DevOps",
-  "version": "1.1.0",
+  "name": "Markdown PR — Azure DevOps PR Comments",
+  "version": "1.2.0",
   "description": "Comment on rendered Markdown in Azure DevOps PRs with inline threads, Changes, Outline, and keyboard navigation.",
   "author": "chienyuanchang",
 
@@ -31,6 +31,7 @@
         "src/lib/sidebar.js",
         "src/lib/outline.js",
         "src/lib/changes.js",
+        "src/lib/mentions.js",
         "src/lib/lineMap.js",
         "src/adapters/ado.js",
         "content.js"

@@ -123,6 +123,42 @@ Threads are returned by `GET /threads`:
 
 **Comment deletion** is soft. DELETE returns 200 with an empty body; the comment stays in the thread with `isDeleted: true`. We render it as `(This comment was deleted.)`.
 
+## Native `@mention` discovery — endpoint verified, payload pending
+
+A live native ADO PR comment capture on 2026-09-17 showed that typing a mention
+uses `POST /_apis/IdentityPicker/Identities`, not the previously assumed
+`GET /_apis/identities?searchFilter=General&filterValue=...`. Selecting a person
+also sends `PATCH /_apis/IdentityPicker/Identities/me/mru/common`, apparently to
+update the current user's recent identities. The actual review comment still
+posts through the normal pull-request `POST .../threads` endpoint.
+
+`browser.events.data.microsoft.com/OneCollector` and `_apis/ClientTrace/Events`
+are telemetry and are not part of mention behavior. The observed Contribution
+Hierarchy query may support page context but should not be copied into the
+extension unless payload evidence proves it is required.
+
+The verified search request body contains `query`, identity types `user` and
+`group`, operation scopes `ims` and `source`, result bounds 5–40, and requested
+display/directory properties. The response is
+`{ results: [{ queryToken, identities, pagingToken }] }`; useful fields include
+`localId`, `displayName`, `entityType`, `active`, `subjectDescriptor`, `mail`,
+`signInAddress`, `scopeName`, and `isMru`.
+
+The native editor performs a second IdentityPicker lookup with the selected
+uppercase `localId` and `queryTypeHint: "uid"`. It then stores the mention in
+thread comment content as `@<LOCAL-ID-GUID>`. The create-thread response retains
+that token verbatim and reports `identities: null`; therefore our inline renderer
+must retain cached identity metadata or resolve unknown GUID tokens by UID to
+show a readable name. No separate mention collection is required in the thread
+payload. Extension requests must explicitly include
+`?api-version=7.1-preview.1`; an ordinary JSON `POST` without a version is
+rejected with HTTP 400, and stable `7.1` is rejected because IdentityPicker is a
+preview resource. Keep this version separate from the adapter's stable API
+version. Identity display metadata is resolved again when a short-lived PR
+catalog snapshot is restored after cross-file route fallback; only raw thread
+data is persisted, so snippets must not be built before UID hydration completes.
+Notification delivery still needs explicit live confirmation.
+
 ## DOM quirks — table rows
 
 **`<tr>` elements can't host children directly** (invalid HTML), so `GRDC.buttonAnchor(row)` returns the row's first `<td>` or `<th>` and we append the `+` button there.
@@ -130,6 +166,29 @@ Threads are returned by `GET /threads`:
 **But** the `.adrc-hoverable:hover > .adrc-comment-btn { opacity: 1 }` CSS rule requires the button to be a **direct child** of the hovered `.adrc-hoverable`. If we put `.adrc-hoverable` on the `<tr>` (the mapped block), the button — one level down in a `<td>` — is *not* a direct child. Result: button stays at `opacity: 0` on hover.
 
 **Fix:** put `.adrc-hoverable` on the *host* returned by `buttonAnchor` (the first cell for `<tr>`, the block itself for everything else). Same DOM shape the GitHub extension uses. See `attachCommentButton()` in [extensions/ado/content.js](../../extensions/ado/content.js).
+
+## List-item button alignment — first-line centering
+
+Manual testing on 2026-09-16 captured a single-line list item where the circular `+` button sat slightly below the center of the bullet text and its highlighted row. This was separate from the same item's incorrect source anchor.
+
+List items cannot use the default `top: 50%` rule because an item may contain a nested list; centering against the complete subtree would move the parent button into its children. The old fixed `top: 4px` placed a 22px button three pixels below the center of ADO's 24px list line. The corrected rule inherits the list item's line height and calculates the top offset from one `lh`, centering on the first line regardless of the nested subtree's total height.
+
+ADO browser coverage compares button geometry with the first line box for both a normal single-line paragraph and a list item. Table-cell and code-block rules remain unchanged.
+
+## List-item mapping — prevent section-heading anchors
+
+Manual testing on 2026-09-16 captured an ordered-list item whose visible `+` control opened a comment that ADO ultimately displayed on the preceding section heading rather than on the selected bullet (reported on the third bullet in the list). This is a source-anchor correctness defect, separate from the nearby visual button-alignment issue.
+
+The shared mapper walks `p, h1–h6, li, tr, pre` in DOM order, removes nested-list text from a parent `<li>`, then forward-matches each block against the head source. Generic prose matching is unsafe for `<li>` because the same visible text can appear in a heading; failed earlier matches can also leave the search cursor before that heading.
+
+The fix constrains `<li>` candidates to source lines beginning with a Markdown unordered, ordered, or task-list marker. If no valid candidate exists, the item follows the bounded unmatched-block fallback instead of being passed to the generic prose matcher. This preserves monotonic source order and prevents a textual heading match from stealing the list item's anchor.
+
+Regression coverage includes both layers:
+
+1. a shared mapper fixture with an unmatched rendered heading followed by an ordered list whose third item repeats the heading text; and
+2. an ADO browser fixture that clicks the third unordered-list item and asserts `rightFileStart` and `rightFileEnd` both target that bullet's source line.
+
+The original live PR still needs manual confirmation before this is considered release-validated. If it differs from the covered failure shape, capture the list DOM, raw Markdown, `ADORC_probe.detectLines(filePath)` output, and create-thread payload before broadening the matcher further.
 
 ## DOM quirks — code blocks
 
@@ -492,6 +551,24 @@ starts. Before scrolling a Changes target, it also:
 snippet, tag, display, geometry, folded/connected state, and `lastScroll`
 before/after diagnostics. `ADORC_probe.changes(index)` invokes a specific card.
 
+### Persistent Preview change context reuses the Changes catalog
+
+Preview highlighting performs no additional source requests. As each file's
+Changes group is published, the active file's hunk stops are resolved through
+the same live line-to-block map used by Changes navigation. Pure additions use
+the success/green theme family and mixed replacement hunks use the existing
+warning/brown family. If multiple hunks resolve to one rendered block—most
+commonly a fenced code block—mixed takes precedence over added.
+
+A newly added Markdown file has a summary stop rather than useful individual
+hunks. Its Preview therefore receives one subtle file-level marker instead of
+tinting every rendered block green; block-level color would add no location
+information and would compete with reading and comment selection. Removed-only
+hunks and deleted files have no head-side rendered block and are intentionally
+not projected onto unrelated surviving content. Highlights are reapplied both
+when progressive analysis publishes a group and when Preview remounts, making
+the result independent of which operation finishes first.
+
 ## PR-wide Outline — source catalog, live active-file binding
 
 ADO renders one Markdown Preview at a time, but Iteration M already fetches the
@@ -504,6 +581,14 @@ When a file is active, its rendered headings are matched back to the exact
 source descriptors and gain the same stable key. Cross-file Outline clicks save
 that key, activate the native ADO file-tree row, preserve/restore Preview, and
 resolve the key against the newly mounted live headings before scrolling.
+
+Rebuilding the PR-wide rows empties the Outline scroll container, which resets
+its scroll position before the new rows are inserted. Every rebuild therefore
+reapplies the pending destination key, or the retained active key after pending
+navigation clears. This follows the destination element rather than restoring
+an obsolete numeric offset. Explicit navigation centers the row to provide
+context above and below; ordinary Preview scroll-follow resumes with minimal
+nearest-edge movement so reading does not make the sidebar jump unnecessarily.
 
 Per-heading thread counts use the shared source-line attribution helper and are
 file-scoped. Per-row folds can be requested before a file is opened; the stable
