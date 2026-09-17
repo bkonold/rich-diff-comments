@@ -99,12 +99,12 @@ GitHub uses the original dark speech-bubble icon. ADO uses the separate Fluent-b
 
 The Web Store accepts up to 5 screenshots at **1280×800 or 640×400** (use the higher resolution). Never reuse screenshots across targets when the service chrome differs.
 
-Suggested ADO v1.1.0 set, in order:
+Suggested ADO v1.2.0 set, in order:
 
-1. Changes tab with cards spanning multiple Markdown files.
-2. An expanded inline thread showing the reply and Resolve actions.
+1. Markdown Preview showing added and modified section highlights beside the Changes tab.
+2. An open comment editor showing `@mention` search results, plus a readable mention in an inline thread.
 3. Pull-request-wide Outline with heading navigation and fold controls.
-4. An open inline comment editor beside rendered Markdown.
+4. Changes cards spanning multiple Markdown files, including a new-file marker.
 5. The integrated sidebar and thread UI in Azure DevOps dark theme.
 
 Optional store assets:
@@ -281,7 +281,7 @@ Do not hand-build or hand-edit the zip. The checked-in packager synchronizes sha
 After release prep, verify the selected target package:
 
 ```powershell
-.\.github\skills\rdc-publish-check\scripts\preflight.ps1 -Target ado -VerifyZip .\releases\ado\1.1.0\rdc-ado-1.1.0.zip
+.\.github\skills\rdc-publish-check\scripts\preflight.ps1 -Target ado -VerifyZip .\releases\ado\1.2.0\rdc-ado-1.2.0.zip
 ```
 
 Verification checks the packaged target identity and hosts, top-level manifest, declared scripts/styles/icons, privacy policy, and absence of development-only files.

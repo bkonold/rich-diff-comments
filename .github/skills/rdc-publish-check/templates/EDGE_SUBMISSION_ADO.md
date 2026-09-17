@@ -1,4 +1,4 @@
-# Microsoft Edge Add-ons submission — Azure DevOps v1.1.0
+# Microsoft Edge Add-ons submission — Azure DevOps v1.2.0
 
 > Canonical living submission document for the separate Azure DevOps extension.
 > Paste each fenced section into Microsoft Partner Center.
@@ -6,13 +6,13 @@
 
 ## Submission notes
 
-Version 1.1.0 adds an immediate Files-page sidebar and **Open Markdown Preview** action, keeps navigation responsive and accurate across file switches, refreshes the page once when moving directly to another pull request, and prevents similarly named changed files from being mistaken for the Preview option. It remains separate from the GitHub extension, requests no new permissions, and has no backend, analytics, telemetry, advertising, or remote code.
+Version 1.2.0 highlights added and modified content directly in Markdown Preview, adds native Azure DevOps `@mention` autocomplete, improves cross-file Outline focus, and corrects list-item comment placement. It remains separate from the GitHub extension, requests no new permissions or hosts, and has no backend, analytics, telemetry, advertising, or remote code.
 
 ## Package
 
-- **Zip:** `rdc-ado-1.1.0.zip`
-- **Manifest version:** `1.1.0`
-- **Release folder:** `releases/ado/1.1.0/`
+- **Zip:** `rdc-ado-1.2.0.zip`
+- **Manifest version:** `1.2.0`
+- **Release folder:** `releases/ado/1.2.0/`
 
 ## Store listing
 
@@ -31,16 +31,19 @@ Comment on rendered Markdown in Azure DevOps PRs with inline threads, Changes, O
 ### Description
 
 ```
-🆕 What's new — v1.1.0 (2026-09-15)
+🆕 What's new — v1.2.0 (2026-09-17)
+
+• See added and modified sections highlighted directly in Markdown Preview, with a subtle marker for completely new files.
+• Mention teammates from comments, replies, and edits with multi-word search; conversations and the Threads sidebar keep names readable.
+
+v1.1.0 (2026-09-15)
 
 • Start rendered Markdown review from any pull request Files page with Open Markdown Preview. It opens the selected Markdown file—or an available one when necessary—and keeps Changes, Threads, and Outline ready as you move between files.
 • When moving directly to another pull request, the extension refreshes the page once to load that pull request's review data.
 
 v1.0.0 (2026-08-28)
 
-• Review rendered Markdown directly: comment on paragraphs, headings, lists, tables, and individual code-block lines without leaving Preview.
-• Navigate every Markdown change, thread, and heading across the pull request from one keyboard-friendly sidebar.
-• Reply, resolve, reopen, edit, and delete review comments inline; light, dark, and high-contrast themes are supported.
+• Review and comment on rendered Markdown while navigating every changed block, thread, and heading from one keyboard-friendly sidebar.
 
 📌 Just installed? Hard-refresh (Ctrl+Shift+R / Cmd+Shift+R) any Azure DevOps pull request tab that was already open when you clicked Get. New tabs work automatically.
 
@@ -55,7 +58,9 @@ What it does:
 • Drag between rendered blocks to comment on a multi-line range. Inside fenced code, move the “+” to target an individual source line.
 • See existing review conversations beside the rendered section they belong to. Expand a thread to reply, resolve or reopen it, and edit or delete your own comments.
 • Write in Markdown with formatting controls, Write/Preview tabs, automatic textarea growth, and Cmd/Ctrl+Enter submission.
+• Type @ in a comment, reply, or edit to search for teammates and insert a native Azure DevOps mention. Mentioned names remain readable in inline conversations and the Threads sidebar.
 • Changes tab: scan changed Markdown sections across every file in the pull request. New, deleted, and renamed files receive clear summaries; click a card or use keyboard shortcuts to navigate while remaining in Preview.
+• Added and modified sections are highlighted directly in Preview, while completely new files receive a subtle NEW FILE marker.
 • Threads tab: see all review threads in stable Azure DevOps file-tree order, filter to unresolved conversations, and jump directly to a thread in another file.
 • Outline tab: browse headings from every changed Markdown file, see section thread counts, jump across files, fold individual sections, or bulk-fold H1/H2/H3 sections.
 • Header icons jump to the first change or thread in the current file. Counters such as “2/4 (11)” show current-file progress and the pull-request total.
@@ -135,6 +140,7 @@ Select only:
 
 - ☑ **Authentication information** — relies on the browser-managed Azure DevOps session; never reads or stores passwords, raw session cookies, PATs, or OAuth tokens.
 - ☑ **Website content** — processes rendered Markdown, Markdown source, pull request metadata, changed-file information, review threads, and comments solely for the rendered review interface.
+- ☑ **Personally identifiable information** — when the user invokes `@mention` autocomplete, the extension processes Azure DevOps identity search results such as display names and sign-in addresses solely to show matching teammates and submit the selected native mention.
 
 Leave all other categories unchecked. Confirm that data is not sold, is not used outside the extension's purpose, and is not used for credit or lending decisions.
 
@@ -156,9 +162,10 @@ HOW TO TEST
 1. Sign in to Azure DevOps and open the test pull request (or any accessible PR that changes a .md file).
 2. Select Files while no Markdown Preview is open. The sidebar should appear immediately; choose Open Markdown Preview and confirm that it opens an available changed Markdown file in Preview.
 3. Hover a paragraph or heading. A blue “+” appears. Clicking it opens the Markdown comment editor. Posting requires normal comment permission; read-only navigation works without write permission.
-4. Existing conversations appear beside rendered content. The sidebar contains Changes, Threads, and Outline tabs. Cards and headings navigate between Markdown files while retaining Preview.
-5. Use 1/2/3 to switch tabs, j/k for threads, [ and ] for changes, and t to collapse/expand the sidebar.
-6. Change the Azure DevOps light/dark theme; the interface updates without remounting or losing a draft.
+4. In the editor, type `@` followed by at least two characters (spaces are supported). Select a person and confirm the posted conversation shows the readable name.
+5. Existing conversations appear beside rendered content. The sidebar contains Changes, Threads, and Outline tabs. Cards and headings navigate between Markdown files while retaining Preview.
+6. Use 1/2/3 to switch tabs, j/k for threads, [ and ] for changes, and t to collapse/expand the sidebar.
+7. Change the Azure DevOps light/dark theme; the interface updates without remounting or losing a draft.
 
 AUTHENTICATION
 No credentials are bundled or requested. Same-origin requests use the reviewer's existing browser-managed Azure DevOps session.
@@ -176,6 +183,19 @@ https://github.com/chienyuanchang/rich-diff-comments/blob/main/PRIVACY_ADO.md
 - **Markets:** All
 
 ## What's new in this version
+
+### v1.2.0 — 2026-09-17
+
+#### Added
+
+- Added and modified sections are highlighted directly in Markdown Preview, while completely new files receive a subtle **NEW FILE** marker.
+- Type `@` in comments, replies, or edits to find and mention teammates; posted conversations and the Threads sidebar show readable names.
+- Loading progress remains clear in both collapsed and expanded sidebar states.
+
+#### Fixed
+
+- Comments on list items stay attached to the selected bullet, with the comment button centered on its first rendered line.
+- Cross-file Outline navigation keeps the selected section centered with nearby headings visible.
 
 ### v1.1.0 — 2026-09-15
 

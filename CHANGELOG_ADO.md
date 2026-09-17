@@ -4,13 +4,17 @@ All notable user-visible changes to the Azure DevOps browser extension are recor
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-09-17
+
 ### Added
 
 - **Changed content is now visible directly in Markdown Preview.** Added sections use a green highlight, modified sections use a warm warning highlight, and completely new files receive a subtle **NEW FILE** marker without tinting the entire document.
 - **Mention teammates while reviewing rendered Markdown.** Type `@` in a new comment, reply, or edit to search for people—including multi-word names—and select them with the keyboard or mouse. Posted conversations and the Threads sidebar show readable names instead of identity codes.
+- **Loading progress remains clear when the sidebar is collapsed or still gathering review data.** The compact header shows **Loading…**, while expanded Changes, Threads, and Outline panes describe what they are loading instead of briefly showing an empty state.
 
 ### Fixed
 
+- **Comments on list items now stay attached to the selected bullet.** The comment button is also centered on the bullet's first rendered line, including list items with nested content.
 - **Cross-file Outline navigation now keeps the selected section centered in the sidebar.** After opening a heading in another Markdown file, the Outline stays with that destination and shows nearby sections for context instead of returning to the top.
 
 ## [1.1.0] — 2026-09-15

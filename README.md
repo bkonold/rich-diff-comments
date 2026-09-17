@@ -21,6 +21,8 @@ GitHub rich diff and Azure DevOps Preview render Markdown beautifully, but neith
 - **Outline tab** in the sidebar shows the heading tree of every changed `.md` file with comment-count pills, per-section folding, and bulk `Fold H1 / H2 / H3` / `Expand all` controls.
 - **Changes tab** in the sidebar lists every changed block (paragraph / list item / table row / code block / heading / blockquote) with a `+` / `−` / `±` kind glyph, file:line, and a snippet. The header also gets a `◀ N/M ▶` counter so you can step through changes without opening the tab. Best way to scan a Markdown PR for the first time without re-reading the unchanged prose.
 - **Start rendered review in one click:** GitHub can render every changed Markdown file as rich diff in one sweep; Azure DevOps can open the selected or first changed Markdown file in its sticky Preview mode.
+- **Azure DevOps Preview highlights:** added sections are green, modified sections use a warm warning highlight, and new files receive a subtle marker.
+- **Azure DevOps mentions:** type `@` in a comment, reply, or edit to find teammates and post a native Azure DevOps mention; inline conversations and sidebar snippets retain readable names.
 - **Keyboard shortcuts:** `j` / `k` next / previous thread, `h` / `l` first / last thread, `[` / `]` previous / next change, `{` / `}` (Shift+[, Shift+]) first / last change, `1` / `2` / `3` switch sidebar tab (Changes / Threads / Outline), `t` toggle the sidebar, `Shift+T` reset its position.
 - No PAT required — each target uses the existing signed-in session for its service.
 

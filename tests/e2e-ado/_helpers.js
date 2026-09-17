@@ -105,6 +105,7 @@ async function installAdoRoutes(page, options) {
     sourceDelays: Object.assign({}, opts.sourceDelays || {}),
     sourceFailures: Object.assign({}, opts.sourceFailures || {}),
     inventoryDelay: Number(opts.inventoryDelay || 0),
+    threadsDelay: Number(opts.threadsDelay || 0),
     nextThreadId: 1000,
   };
 
@@ -224,6 +225,9 @@ async function installAdoRoutes(page, options) {
     ));
     if (threadsMatch) {
       if (method === 'GET') {
+        if (state.threadsDelay > 0) {
+          await new Promise((resolve) => setTimeout(resolve, state.threadsDelay));
+        }
         return fulfillJson(route, { count: state.threads.length, value: clone(state.threads) });
       }
       if (method === 'POST') {
@@ -355,8 +359,8 @@ async function setupAdoExtensionPage(page, options) {
 
   await page.goto(opts.initialUrl || FAKE_PR_URL, { waitUntil: 'domcontentloaded' });
   await page.addStyleTag({ path: path.join(EXT_ROOT, 'styles.css') });
-  await page.evaluate(() => {
-    localStorage.setItem('adrc-sidebar-state-v1', JSON.stringify({
+  await page.evaluate((sidebarOverrides) => {
+    localStorage.setItem('adrc-sidebar-state-v1', JSON.stringify(Object.assign({
       visible: true,
       collapsed: false,
       tab: 'changes',
@@ -365,8 +369,8 @@ async function setupAdoExtensionPage(page, options) {
       top: 8,
       width: 420,
       height: 620,
-    }));
-  });
+    }, sidebarOverrides || {})));
+  }, opts.sidebarState || null);
   if (opts.hideInitialPreview) {
     await page.evaluate((keepPath) => {
       const url = new URL(location.href);

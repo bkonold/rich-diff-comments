@@ -47,7 +47,7 @@ Priority applies to the shared user outcome:
 
 | Capability | GitHub | Azure DevOps |
 |---|---|---|
-| Add a review comment from rendered paragraphs, headings, list items, table rows, and code blocks | ✅ GitHub v1.0.0 | 🧪 ADO fix implemented; awaiting live validation |
+| Add a review comment from rendered paragraphs, headings, list items, table rows, and code blocks | ✅ GitHub v1.0.0 | ✅ ADO v1.2.0 |
 | Create single-line and multi-line comments with editable source-line targets | ✅ GitHub v1.0.0 | ✅ ADO v1.0.0 |
 | Track a specific line inside a fenced code block from the pointer position | ✅ | ✅ |
 | Show new comments inline immediately without a manual refresh | ✅ | ✅ |
@@ -87,6 +87,7 @@ Priority applies to the shared user outcome:
 | Move between changed Markdown files without rebuilding all PR-wide review data | ✅ | ✅ ADO v1.1.0 |
 | Reject stale navigation and review state when the pull-request identity changes | ✅ | ✅ ADO v1.1.0 |
 | Preserve sidebar layout and user preferences across navigation | ✅ | ✅ |
+| Show compact loading feedback when the sidebar starts collapsed | — | ✅ ADO v1.2.0 |
 | Support light and dark themes | ✅ | ✅ |
 | Support Windows forced-colors/high-contrast mode | △ Browser fallback | ✅ |
 
@@ -110,12 +111,12 @@ Priority applies to the shared user outcome:
 - [x] **P0 — Keep ADO list-item comments anchored to the selected bullet**
   - **Outcome:** clicking `+` on an ordered or unordered list item creates the comment on that item's source line, never on the preceding section heading or another bullet.
   - **GitHub:** ✅ List items, including nested items, have dedicated mapping coverage.
-  - **ADO:** 🧪 List matching is now restricted to Markdown list-marker lines; unit coverage and an ADO browser test verify the third bullet's create-thread payload. Awaiting confirmation on the original live PR before release.
+  - **ADO:** ✅ ADO v1.2.0. List matching is restricted to Markdown list-marker lines so the selected bullet supplies the create-thread anchor.
 
 - [x] **P2 — Center the comment button on single-line highlighted blocks**
   - **Outcome:** the `+` affordance is vertically centered on the text line and its hover/change highlight instead of appearing below it.
   - **GitHub:** ✅ No equivalent alignment issue observed.
-  - **ADO:** 🧪 List-item buttons now center from the host's first-line height instead of a fixed offset; browser geometry coverage verifies single-line paragraphs and list items. Awaiting live confirmation.
+  - **ADO:** ✅ ADO v1.2.0. List-item buttons center on the first rendered line, including items with nested content.
 
 - [ ] **P0 — Inline markers for table rows and code lines that already have comments**
   - **Outcome:** a reviewer can see which exact row or code line has a conversation even though the thread body must remain below the containing table or code block.
@@ -153,7 +154,7 @@ Priority applies to the shared user outcome:
 - [ ] **P2 — ADO `@mention` autocomplete parity**
   - **Outcome:** typing `@` in a new comment, reply, or edit shows relevant people, supports keyboard selection, inserts the native ADO mention form, and preserves real linking and notifications after submission.
   - **GitHub:** ✅ Available with pre-warmed collaborator suggestions.
-  - **ADO:** △ Implemented and live validated for multi-word search, keyboard/mouse selection, native submission, readable inline rendering, Threads snippets, edits, and cross-file navigation. Notification delivery still needs confirmation from the mentioned account.
+  - **ADO:** △ ADO v1.2.0 ships multi-word search, keyboard/mouse selection, native submission, readable inline rendering, Threads snippets, edits, and cross-file navigation. Notification delivery still needs confirmation from the mentioned account.
   - Use active user identities from IdentityPicker results, insert native GUID tokens for submission, and render readable display names in the extension instead of exposing tokens.
   - Reuse one accessible dropdown interaction across new comments, replies, and edits; cache successful lookups without exposing organization identities outside the active signed-in session.
 
@@ -197,7 +198,7 @@ Priority applies to the shared user outcome:
 - [x] **P1 — Keep the Outline focused on a cross-file heading destination**
   - **Outcome:** clicking a heading under another file opens that file and centers the selected heading in the Outline, providing context above and below instead of resetting the list to its top.
   - **GitHub:** ✅ All rendered files share one live document and Outline position follows the selected heading.
-  - **ADO:** 🧪 Live validated: Outline rebuilds restore and center the selected destination after Preview reaches the requested file and heading. Queued for the next ADO release.
+  - **ADO:** ✅ ADO v1.2.0. Outline rebuilds restore and center the selected destination after Preview reaches the requested file and heading.
   - Preserve stable file order and resume normal scroll-follow behavior after the explicit navigation completes.
 
 - [ ] **P2 — Make bulk section-folding scope explicit and predictable**
@@ -243,7 +244,7 @@ Priority applies to the shared user outcome:
 
 - [x] **P2 — Persistent rendered-diff highlighting in ADO Preview**
   - **GitHub:** ↔ Native rich diff already shows additions and removals.
-  - **ADO:** 🧪 Live validated: added and modified Preview highlights follow progressive analysis, file remounts, and ADO themes. Queued for the next ADO release.
+  - **ADO:** ✅ ADO v1.2.0. Added and modified Preview highlights follow progressive analysis, file remounts, and ADO themes.
   - Show a subtle green file-level marker for a newly added Markdown file rather than tinting its entire document; for edited files, highlight only blocks mapped to added or mixed hunks.
   - Keep text readable in light, dark, and forced-colors themes, preserve comment/selection affordances, and reapply highlights after Preview remounts or progressive Changes analysis.
   - Removed content remains out of scope until ADO has a safe rendered representation for it; do not mark an unrelated surviving block as removed.

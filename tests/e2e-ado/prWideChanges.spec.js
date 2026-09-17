@@ -19,6 +19,42 @@ function requestsEndingWith(server, suffix) {
 }
 
 test.describe('ADO PR-wide Changes', () => {
+  test('shows a loading message instead of an empty Threads state during startup', async ({ page }) => {
+    await setupAdoExtensionPage(page, {
+      waitForReady: false,
+      sidebarState: { tab: 'threads' },
+      threadsDelay: 1200,
+    });
+
+    const empty = page.locator('.adrc-sidebar-thread-list .adrc-sidebar-empty');
+    await expect(empty).toHaveText('Loading review threads…');
+    await expect(empty).toHaveAttribute('role', 'status');
+    await expect(page.locator('.adrc-sidebar-thread-card')).toHaveCount(3, { timeout: 4000 });
+    await expect(empty).toHaveCount(0);
+  });
+
+  test('shows Loading in a collapsed sidebar until initial review data is ready', async ({ page }) => {
+    await setupAdoExtensionPage(page, {
+      waitForReady: false,
+      sidebarState: { collapsed: true },
+      sourceDelays: {
+        [`${SOURCE_COMMIT}:${fixtures.OTHER_PATH}`]: 1800,
+        [`${COMMON_COMMIT}:${fixtures.OTHER_PATH}`]: 1800,
+      },
+    });
+
+    const sidebar = page.locator('.adrc-sidebar');
+    const hint = sidebar.locator('.adrc-sidebar-loading-hint');
+    await expect(sidebar).toHaveClass(/adrc-sidebar-collapsed/);
+    await expect(hint).toBeVisible();
+    await expect(hint).toHaveText('Loading…');
+    await expect.poll(
+      () => page.evaluate(() => window.ADORC_probe.startup().changesStatus),
+      { timeout: 8000 }
+    ).toBe('ready');
+    await expect(hint).toBeHidden();
+  });
+
   test('publishes completed file changes while a slow Markdown file is still loading', async ({ page }) => {
     await setupAdoExtensionPage(page, {
       waitForReady: false,

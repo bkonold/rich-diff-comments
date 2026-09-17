@@ -439,6 +439,18 @@ body.adrc-dragging {
 .adrc-sidebar-header-spacer {
   flex: 1;
   min-width: 2px;
+  text-align: center;
+}
+
+.adrc-sidebar-loading-hint {
+  display: none;
+  color: var(--adrc-text-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.adrc-sidebar-collapsed .adrc-sidebar-loading-hint-visible {
+  display: inline;
 }
 
 .adrc-sidebar-nav-cluster {

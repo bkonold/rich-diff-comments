@@ -14,7 +14,7 @@
   'use strict';
 
   const LOG = '[ADRC]';
-  const RUNTIME_REVISION = '2026-09-17-persistent-thread-mentions-r25';
+  const RUNTIME_REVISION = '2026-09-17-thread-loading-message-r27';
   const adapter = (typeof window !== 'undefined' && window.ADORC) || null;
   const startupTiming = {
     scriptLoadedAt: performance.now(),
@@ -1782,6 +1782,7 @@
   let sidebarThreadsLoadPromise = null;
   let sidebarThreadsLoadGeneration = 0;
   let sidebarThreadsReady = false;
+  let sidebarThreadsStatus = 'idle'; // idle | loading | ready | error
   let sidebarActiveThreadId = null;
   // Stable, DOM-free PR-wide cards. Live target elements are resolved from
   // `currentLineToBlock` only when a card belongs to the active Preview.
@@ -2111,6 +2112,7 @@
     }
     setSidebarTab(sidebarState.tab, false);
     updateSidebarFilterUI();
+    updateSidebarNavigation();
 
     if (sidebarState.visible !== false) attachOutlineScrollListener();
     else detachOutlineScrollListener();
@@ -2304,7 +2306,7 @@
       '    <button type="button" class="adrc-sidebar-nav-button adrc-sidebar-prev-thread" aria-label="Previous thread" title="Previous thread (k) \u2014 first thread (h)">\u2039</button>',
       '    <button type="button" class="adrc-sidebar-nav-button adrc-sidebar-next-thread" aria-label="Next thread" title="Next thread (j) \u2014 last thread (l)">\u203a</button>',
       '  </span>',
-      '  <span class="adrc-sidebar-header-spacer"></span>',
+      '  <span class="adrc-sidebar-header-spacer"><span class="adrc-sidebar-loading-hint" role="status" aria-live="polite">Loading&hellip;</span></span>',
       '  <button type="button" class="adrc-sidebar-icon adrc-sidebar-filter" aria-pressed="false" title="Show unresolved threads only">',
       '    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12l-4.5 5v4l-3 1V8L2 3z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>',
       '  </button>',
@@ -2516,6 +2518,16 @@
   function updateSidebarNavigation() {
     if (!sidebarPanel) return;
 
+    const loadingHint = sidebarPanel.querySelector('.adrc-sidebar-loading-hint');
+    if (loadingHint) {
+      const isLoading = sidebarChangesStatus === 'idle' || sidebarChangesStatus === 'loading' ||
+        sidebarThreadsStatus === 'idle' || sidebarThreadsStatus === 'loading';
+      loadingHint.classList.toggle(
+        'adrc-sidebar-loading-hint-visible',
+        sidebarState?.collapsed === true && isLoading
+      );
+    }
+
     const activePath = currentFilePath() || currentFilePathCached;
     const GRDC = window.GRDC || {};
     const buildCounter = typeof GRDC.buildScopedCounterState === 'function'
@@ -2709,8 +2721,12 @@
     if (options?.force === true) {
       sidebarThreadsLoadPromise = null;
       sidebarThreadsReady = false;
+      sidebarThreadsStatus = 'idle';
     }
     if (sidebarThreadsLoadPromise) return sidebarThreadsLoadPromise;
+    sidebarThreadsStatus = 'loading';
+    renderThreadsSidebar();
+    updateSidebarNavigation();
     const generation = ++sidebarThreadsLoadGeneration;
     const request = resolveIdsOnce()
       .then(() => withTimeout(
@@ -2723,6 +2739,7 @@
         await hydrateMentionIdentities(threads);
         if (generation === sidebarThreadsLoadGeneration) {
           sidebarThreadsReady = true;
+          sidebarThreadsStatus = 'ready';
           setSidebarThreads(threads);
         }
         return threads;
@@ -2731,6 +2748,9 @@
         if (generation === sidebarThreadsLoadGeneration) {
           sidebarThreadsLoadPromise = null;
           sidebarThreadsReady = false;
+          sidebarThreadsStatus = 'error';
+          renderThreadsSidebar();
+          updateSidebarNavigation();
         }
         console.warn(`${LOG} sidebar thread inventory unavailable:`, err);
         throw err;
@@ -2774,9 +2794,17 @@
     if (visible.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'adrc-sidebar-empty';
-      empty.textContent = sidebarState?.unresolvedOnly
-        ? 'No unresolved threads.'
-        : 'No review threads yet.';
+      if (sidebarThreadsStatus === 'idle' || sidebarThreadsStatus === 'loading') {
+        empty.setAttribute('role', 'status');
+        empty.setAttribute('aria-live', 'polite');
+        empty.textContent = 'Loading review threads\u2026';
+      } else if (sidebarThreadsStatus === 'error') {
+        empty.textContent = 'Could not load review threads.';
+      } else {
+        empty.textContent = sidebarState?.unresolvedOnly
+          ? 'No unresolved threads.'
+          : 'No review threads yet.';
+      }
       list.appendChild(empty);
       return;
     }
@@ -4445,8 +4473,10 @@
       // sidebar so an exact-route document fallback cannot regress readable
       // snippets back to raw tokens.
       sidebarThreadsReady = false;
+      sidebarThreadsStatus = 'loading';
       sidebarThreadsLoadPromise = hydrateMentionIdentities(snapshot.threads).then(() => {
         sidebarThreadsReady = true;
+        sidebarThreadsStatus = 'ready';
         setSidebarThreads(snapshot.threads);
         return snapshot.threads;
       });
