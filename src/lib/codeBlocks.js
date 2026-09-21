@@ -100,8 +100,25 @@
     });
   }
 
+  // Place a source-line marker proportionally within a rendered code block.
+  // ADO syntax highlighting does not expose one reliable DOM element per
+  // source line: wrapping can add visual rows and compression can remove them.
+  // Using the complete fenced source range keeps the first/last marker inside
+  // the rendered content while distributing intermediate lines monotonically.
+  function codeLineMarkerLayout(line, rangeStart, rangeEnd, contentHeight, paddingTop) {
+    if (![line, rangeStart, rangeEnd, contentHeight].every(Number.isFinite)) return null;
+    if (rangeEnd < rangeStart || line < rangeStart || line > rangeEnd || contentHeight <= 0) return null;
+    const sourceRows = rangeEnd - rangeStart + 1;
+    const spacing = contentHeight / sourceRows;
+    return {
+      top: (Number.isFinite(paddingTop) ? paddingTop : 0) + ((line - rangeStart) + 0.5) * spacing,
+      size: Math.max(12, Math.min(18, Math.floor(spacing) - 2)),
+    };
+  }
+
   return {
     findFenceRangeAroundLine,
     sortThreadHeads,
+    codeLineMarkerLayout,
   };
 });

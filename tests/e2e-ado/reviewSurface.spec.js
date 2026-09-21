@@ -279,6 +279,64 @@ test.describe('ADO rendered review surface', () => {
     await expect(editor.locator('.adrc-line-input')).toHaveAttribute('max', '18');
   });
 
+  test('marks affected code lines and cycles through multiple line threads', async ({ page }) => {
+    const makeCodeThread = (id, startLine, endLine, content, status = 'active') => ({
+      id,
+      status,
+      threadContext: {
+        filePath: fixtures.DESIGN_PATH,
+        rightFileStart: { line: startLine, offset: 1 },
+        rightFileEnd: { line: endLine, offset: 1 },
+      },
+      comments: [{
+        id: 1,
+        parentCommentId: 0,
+        commentType: 1,
+        content,
+        author: fixtures.OTHER_USER,
+        publishedDate: `2026-08-20T13:${id - 300}0:00.000Z`,
+        lastContentUpdatedDate: `2026-08-20T13:${id - 300}0:00.000Z`,
+        isDeleted: false,
+      }],
+    });
+    const threads = [
+      makeCodeThread(301, 17, 17, 'First retries-line thread.'),
+      makeCodeThread(302, 17, 17, 'Second retries-line thread.', 'fixed'),
+      makeCodeThread(303, 18, 18, 'Enqueue-line thread.'),
+      makeCodeThread(304, 17, 18, 'Two-line range thread.'),
+    ];
+    await setupAdoExtensionPage(page, { threads });
+
+    const pre = page.locator('.markdown-preview-container pre');
+    const line17Marker = pre.locator('.adrc-code-line-thread-marker[data-line="17"]');
+    const line18Marker = pre.locator('.adrc-code-line-thread-marker[data-line="18"]');
+    await expect(line17Marker).toHaveCount(1);
+    await expect(line18Marker).toHaveCount(1);
+    await expect(line17Marker).toHaveAttribute('data-count', '3');
+    await expect(line18Marker).toHaveAttribute('data-count', '2');
+    await expect(line17Marker).toHaveAttribute('data-thread-ids', '301,302,304');
+    await expect(line18Marker).toHaveAttribute('data-thread-ids', '304,303');
+    await expect(pre).toContainText('const retries = 3;');
+
+    const centers = await pre.evaluate((element) => {
+      const rows = Array.from(element.querySelectorAll('code > span'));
+      const markers = Array.from(element.querySelectorAll('.adrc-code-line-thread-marker'));
+      return rows.map((row, index) => {
+        const rowRect = row.getBoundingClientRect();
+        const markerRect = markers[index].getBoundingClientRect();
+        return Math.abs((rowRect.top + rowRect.height / 2) - (markerRect.top + markerRect.height / 2));
+      });
+    });
+    expect(centers).toHaveLength(2);
+    centers.forEach((difference) => expect(difference).toBeLessThanOrEqual(1));
+
+    await line17Marker.click();
+    await expect(page.locator('.adrc-thread-badge[data-thread-id="301"]')).toBeFocused();
+    await line17Marker.press('Enter');
+    await expect(page.locator('.adrc-thread-badge[data-thread-id="302"]')).toBeFocused();
+    await expect(page.locator('.adrc-thread-panel[data-thread-id="302"]')).toBeVisible();
+  });
+
   test('drags between rendered blocks and posts a normalized multi-line ADO range', async ({ page }) => {
     const { server } = await setupAdoExtensionPage(page);
     const startHost = page.locator('.markdown-preview-container p', { hasText: 'The worker uses a durable queue.' });

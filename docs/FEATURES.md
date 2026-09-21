@@ -128,8 +128,8 @@ Priority applies to the shared user outcome:
 - [ ] **P0 — Inline markers for code lines that already have comments**
   - **Outcome:** a reviewer can see which exact code line has a conversation even though the thread body remains below the complete code block.
   - **GitHub:** 📋 Planned.
-  - **ADO:** 📋 Prototype after table-row markers are live validated; wrapping and syntax-highlighter row compression can make visual line positioning approximate.
-  - **Constraint:** use a non-destructive overlay and never split or rewrite syntax-highlighted code DOM.
+  - **ADO:** ✅ ADO Unreleased. A keyboard-accessible marker identifies each affected source line, shows the thread count, and cycles through conversations on that line.
+  - **Constraint:** use a non-destructive overlay and never split or rewrite syntax-highlighted code DOM. Position markers proportionally when wrapping or syntax-highlighter row compression prevents exact visual alignment.
 
 - [ ] **P1 — Improve rendered-block text-match accuracy**
   - **Outcome:** fewer comments rely on approximate fallback lines, especially in nested lists, blockquotes, fenced prose, and HTML-backed Markdown.
