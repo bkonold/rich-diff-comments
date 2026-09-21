@@ -4,6 +4,10 @@ All notable user-visible changes to the Azure DevOps browser extension are recor
 
 ## [Unreleased]
 
+### Added
+
+- **Table comments now identify their exact row.** A persistent marker appears on each table row with review threads; when several conversations share a row, the marker shows their count and cycles through them by mouse or keyboard.
+
 ### Fixed
 
 - **Threads disappear after their final comment is deleted.** Empty conversations no longer remain in Preview, sidebar totals, or keyboard navigation as distracting **0 comments** entries; threads with an undeleted reply remain available.
