@@ -62,7 +62,7 @@ Priority applies to the shared user outcome:
 | Show resolved state and collapse resolved threads by default | ✅ | ✅ |
 | Write with a Markdown toolbar, Write/Preview tabs, auto-grow, and Cmd/Ctrl+Enter | ✅ | ✅ |
 | Render deleted-comment placeholders safely | ✅ | ✅ |
-| Hide a thread after its last visible comment is deleted | N/A — deleted comments are omitted by the host response | ✅ ADO Unreleased |
+| Hide a thread after its last visible comment is deleted | N/A — deleted comments are omitted by the host response | ✅ ADO v1.3.0 |
 | Preserve reading position while thread actions update the page | ✅ | ✅ |
 
 ### Changes, Threads, and Outline
@@ -122,13 +122,13 @@ Priority applies to the shared user outcome:
 - [ ] **P0 — Inline markers for table rows that already have comments**
   - **Outcome:** a reviewer can see which exact table row has a conversation even though the thread body remains below the complete table.
   - **GitHub:** 📋 Planned.
-  - **ADO:** ✅ ADO Unreleased. One persistent, keyboard-accessible marker in the row's first cell displays the thread count and cycles through that row's conversations when activated.
+  - **ADO:** ✅ ADO v1.3.0. One persistent, keyboard-accessible marker in the row's first cell displays the thread count and cycles through that row's conversations when activated.
   - **Constraint:** keep valid table structure, preserve the existing `+` control, and omit threads with no visible comments.
 
 - [ ] **P0 — Inline markers for code lines that already have comments**
   - **Outcome:** a reviewer can see which exact code line has a conversation even though the thread body remains below the complete code block.
   - **GitHub:** 📋 Planned.
-  - **ADO:** ✅ ADO Unreleased. A keyboard-accessible marker identifies each affected source line, shows the thread count, and cycles through conversations on that line.
+  - **ADO:** ✅ ADO v1.3.0. A keyboard-accessible marker identifies each affected source line, shows the thread count, and cycles through conversations on that line.
   - **Constraint:** use a non-destructive overlay and never split or rewrite syntax-highlighted code DOM. Position markers proportionally when wrapping or syntax-highlighter row compression prevents exact visual alignment.
 
 - [ ] **P1 — Improve rendered-block text-match accuracy**
