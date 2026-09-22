@@ -50,6 +50,7 @@ Priority applies to the shared user outcome:
 | Add a review comment from rendered paragraphs, headings, list items, table rows, and code blocks | ✅ GitHub v1.0.0 | ✅ ADO v1.2.0 |
 | Create single-line and multi-line comments with editable source-line targets | ✅ GitHub v1.0.0 | ✅ ADO v1.0.0 |
 | Track a specific line inside a fenced code block from the pointer position | ✅ | ✅ |
+| Keep the comment button aligned with the selected rendered line | ✅ | ✅ ADO v1.2.0 |
 | Show new comments inline immediately without a manual refresh | ✅ | ✅ |
 | Use the signed-in browser session without requiring a PAT | ✅ | ✅ |
 
@@ -61,6 +62,7 @@ Priority applies to the shared user outcome:
 | Reply, resolve/reopen, edit, and delete comments inline | ✅ | ✅ |
 | Show resolved state and collapse resolved threads by default | ✅ | ✅ |
 | Write with a Markdown toolbar, Write/Preview tabs, auto-grow, and Cmd/Ctrl+Enter | ✅ | ✅ |
+| Complete `@mention` names with keyboard and mouse selection and preserve host notifications | ✅ | ✅ ADO v1.2.0 |
 | Render deleted-comment placeholders safely | ✅ | ✅ |
 | Hide a thread after its last visible comment is deleted | N/A — deleted comments are omitted by the host response | ✅ ADO v1.3.0 |
 | Preserve reading position while thread actions update the page | ✅ | ✅ |
@@ -75,6 +77,7 @@ Priority applies to the shared user outcome:
 | Show one summary card for a newly added, deleted, or renamed Markdown file where applicable | ✅ | ✅ |
 | Navigate threads globally and filter to unresolved conversations | ✅ | ✅ |
 | Browse headings across changed Markdown files with per-section thread counts | ✅ | ✅ |
+| Keep the Outline focused when navigating to a heading in another file | ✅ | ✅ ADO v1.2.0 |
 | Fold individual sections or bulk-fold by H1/H2/H3 level and expand all | ✅ Bulk actions affect all rendered files | ✅ Bulk actions affect the current file |
 | Show file-scoped position with a PR-wide total and jump header icons to the current file first | ✅ | ✅ |
 | Follow native file navigation and keep sidebar selection synchronized | ✅ | ✅ |
@@ -97,39 +100,46 @@ Priority applies to the shared user outcome:
 | Capability | GitHub | Azure DevOps |
 |---|---|---|
 | Map rendered blocks to source lines with the shared forward-scan matcher | ✅ | ✅ |
+| Keep comments on ordered and unordered list items anchored to the selected bullet | ✅ | ✅ ADO v1.2.0 |
 | Prevent diagrams, deleted content, and unmatched blocks from corrupting later line mappings | ✅ | ✅ where the content exists in Preview |
 | Map table rows and fenced-code ranges without altering host markup | ✅ | ✅ |
 | Handle YAML frontmatter without shifting the document's later line mappings | ✅ | △ Needs target-specific fixture validation |
 | Build changed-block navigation from the host's available source information | ✅ Native rich-diff markers | ✅ Head/base source comparison |
+| Highlight added and modified rendered blocks persistently | ↔ Native rich diff already supplies this context | ✅ ADO v1.2.0 |
 | Keep diagnostic logging and local inspection hooks available without telemetry | ✅ | ✅ |
 
 ---
 
-## 🚧 Planned / nice-to-have
+## 🎯 GitHub v1.10.0 candidate
+
+This release candidate closes the two remaining P0 visibility gaps for conversations attached inside compound rendered blocks and adds a complete way to dismiss and restore the sidebar. Marker implementation starts only after the current GitHub rich-diff table and code-block DOM has been captured and recorded in the GitHub developer notes.
 
 ### Correctness
 
-- [x] **P0 — Keep ADO list-item comments anchored to the selected bullet**
-  - **Outcome:** clicking `+` on an ordered or unordered list item creates the comment on that item's source line, never on the preceding section heading or another bullet.
-  - **GitHub:** ✅ List items, including nested items, have dedicated mapping coverage.
-  - **ADO:** ✅ ADO v1.2.0. List matching is restricted to Markdown list-marker lines so the selected bullet supplies the create-thread anchor.
-
-- [x] **P2 — Center the comment button on single-line highlighted blocks**
-  - **Outcome:** the `+` affordance is vertically centered on the text line and its hover/change highlight instead of appearing below it.
-  - **GitHub:** ✅ No equivalent alignment issue observed.
-  - **ADO:** ✅ ADO v1.2.0. List-item buttons center on the first rendered line, including items with nested content.
-
 - [ ] **P0 — Inline markers for table rows that already have comments**
   - **Outcome:** a reviewer can see which exact table row has a conversation even though the thread body remains below the complete table.
-  - **GitHub:** 📋 Planned.
+  - **GitHub:** 📋 Planned for GitHub v1.10.0. Blocked on capturing the current rich-diff table DOM before implementation.
   - **ADO:** ✅ ADO v1.3.0. One persistent, keyboard-accessible marker in the row's first cell displays the thread count and cycles through that row's conversations when activated.
   - **Constraint:** keep valid table structure, preserve the existing `+` control, and omit threads with no visible comments.
 
 - [ ] **P0 — Inline markers for code lines that already have comments**
   - **Outcome:** a reviewer can see which exact code line has a conversation even though the thread body remains below the complete code block.
-  - **GitHub:** 📋 Planned.
+  - **GitHub:** 📋 Planned for GitHub v1.10.0. Blocked on capturing the current rich-diff code-block DOM and computed layout before implementation.
   - **ADO:** ✅ ADO v1.3.0. A keyboard-accessible marker identifies each affected source line, shows the thread count, and cycles through conversations on that line.
   - **Constraint:** use a non-destructive overlay and never split or rewrite syntax-highlighted code DOM. Position markers proportionally when wrapping or syntax-highlighter row compression prevents exact visual alignment.
+
+### Navigation and focus
+
+- [ ] **P2 — Dismiss and restore the sidebar without losing its layout**
+  - **Outcome:** reviewers can remove the sidebar completely when they need the full page width, then restore it from a small launcher without losing its saved position and size.
+  - **GitHub:** 📋 Planned for GitHub v1.10.0; collapse and keyboard toggle are available, but there is no full-dismiss control or launcher.
+  - **ADO:** ✅ The header × hides the sidebar and a launcher restores it.
+
+---
+
+## 🚧 Backlog
+
+### Correctness
 
 - [ ] **P1 — Improve rendered-block text-match accuracy**
   - **Outcome:** fewer comments rely on approximate fallback lines, especially in nested lists, blockquotes, fenced prose, and HTML-backed Markdown.
@@ -156,13 +166,6 @@ Priority applies to the shared user outcome:
   - Retain this as a monitoring decision so marker/thread maps are not mistaken for the set of valid review lines again.
 
 ### Review and collaboration
-
-- [x] **P2 — ADO `@mention` autocomplete parity**
-  - **Outcome:** typing `@` in a new comment, reply, or edit shows relevant people, supports keyboard selection, inserts the native ADO mention form, and preserves real linking and notifications after submission.
-  - **GitHub:** ✅ Available with pre-warmed collaborator suggestions.
-  - **ADO:** ✅ ADO v1.2.0. Multi-word search, keyboard/mouse selection, native submission, readable inline rendering, Threads snippets, edits, cross-file navigation, and email notification delivery are live validated.
-  - Use active user identities from IdentityPicker results, insert native GUID tokens for submission, and render readable display names in the extension instead of exposing tokens.
-  - Reuse one accessible dropdown interaction across new comments, replies, and edits; cache successful lookups without exposing organization identities outside the active signed-in session.
 
 - [ ] **P2 — Reactions on comments**
   - **GitHub:** 📋 Planned; mutation endpoint needs validation.
@@ -201,22 +204,11 @@ Priority applies to the shared user outcome:
   - **ADO:** 📋 Deferred pending real timing evidence and UX evaluation.
   - Compare current parallel loading with active-file-first scheduling using `ADORC_probe.startup()` on small and large pull requests. Do not change scheduling unless the improvement in comment readiness clearly outweighs delayed PR-wide sidebar readiness.
 
-- [x] **P1 — Keep the Outline focused on a cross-file heading destination**
-  - **Outcome:** clicking a heading under another file opens that file and centers the selected heading in the Outline, providing context above and below instead of resetting the list to its top.
-  - **GitHub:** ✅ All rendered files share one live document and Outline position follows the selected heading.
-  - **ADO:** ✅ ADO v1.2.0. Outline rebuilds restore and center the selected destination after Preview reaches the requested file and heading.
-  - Preserve stable file order and resume normal scroll-follow behavior after the explicit navigation completes.
-
 - [ ] **P2 — Make bulk section-folding scope explicit and predictable**
   - **Outcome:** reviewers can tell whether Fold H1/H2/H3 and Expand all affect the current file or every Markdown file before applying the action.
   - **GitHub:** △ Shipped with PR-wide scope across all rendered Markdown files.
   - **ADO:** △ Shipped with current-file scope because Preview renders one file at a time.
   - Do not force identical mechanics without user evidence. First clarify the labels or expose an explicit scope choice; current-file scope is safer for focused review, while all-files scope is useful for PR-wide triage.
-
-- [ ] **P2 — Dismiss and restore the sidebar without losing its layout**
-  - **Outcome:** reviewers can remove the sidebar completely when they need the full page width, then restore it from a small launcher without losing its saved position and size.
-  - **GitHub:** 📋 Planned; collapse and keyboard toggle are available, but there is no full-dismiss control or launcher.
-  - **ADO:** ✅ The header × hides the sidebar and a launcher restores it.
 
 - [ ] **P1 — Current-file focus for Changes and Threads**
   - **Outcome:** reduce sidebar clutter while reviewing one file without corrupting global navigation state.
@@ -245,15 +237,6 @@ Priority applies to the shared user outcome:
   - **GitHub:** △ Documentation currently explains the required refresh.
   - **ADO:** △ The same Chromium content-script limitation applies.
   - Do not add broad tab/scripting permissions without evidence that the documentation is insufficient. A hidden toolbar badge is not an adequate prompt.
-
-### Target-specific opportunities
-
-- [x] **P2 — Persistent rendered-diff highlighting in ADO Preview**
-  - **GitHub:** ↔ Native rich diff already shows additions and removals.
-  - **ADO:** ✅ ADO v1.2.0. Added and modified Preview highlights follow progressive analysis, file remounts, and ADO themes.
-  - Show a subtle green file-level marker for a newly added Markdown file rather than tinting its entire document; for edited files, highlight every rendered block covered by an added or mixed hunk, including multi-block sections.
-  - Keep text readable in light, dark, and forced-colors themes, preserve comment/selection affordances, and reapply highlights after Preview remounts or progressive Changes analysis.
-  - Removed content remains out of scope until ADO has a safe rendered representation for it; do not mark an unrelated surviving block as removed.
 
 ### Engineering quality backlog
 
