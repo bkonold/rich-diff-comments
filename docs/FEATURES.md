@@ -62,7 +62,7 @@ Priority applies to the shared user outcome:
 | Show resolved state and collapse resolved threads by default | ✅ | ✅ |
 | Write with a Markdown toolbar, Write/Preview tabs, auto-grow, and Cmd/Ctrl+Enter | ✅ | ✅ |
 | Render deleted-comment placeholders safely | ✅ | ✅ |
-| Hide a thread after its last visible comment is deleted | N/A — deleted comments are omitted by the host response | ✅ ADO Unreleased |
+| Hide a thread after its last visible comment is deleted | N/A — deleted comments are omitted by the host response | ✅ ADO v1.3.0 |
 | Preserve reading position while thread actions update the page | ✅ | ✅ |
 
 ### Changes, Threads, and Outline
@@ -122,14 +122,14 @@ Priority applies to the shared user outcome:
 - [ ] **P0 — Inline markers for table rows that already have comments**
   - **Outcome:** a reviewer can see which exact table row has a conversation even though the thread body remains below the complete table.
   - **GitHub:** 📋 Planned.
-  - **ADO:** ✅ ADO Unreleased. One persistent, keyboard-accessible marker in the row's first cell displays the thread count and cycles through that row's conversations when activated.
+  - **ADO:** ✅ ADO v1.3.0. One persistent, keyboard-accessible marker in the row's first cell displays the thread count and cycles through that row's conversations when activated.
   - **Constraint:** keep valid table structure, preserve the existing `+` control, and omit threads with no visible comments.
 
 - [ ] **P0 — Inline markers for code lines that already have comments**
   - **Outcome:** a reviewer can see which exact code line has a conversation even though the thread body remains below the complete code block.
   - **GitHub:** 📋 Planned.
-  - **ADO:** 📋 Prototype after table-row markers are live validated; wrapping and syntax-highlighter row compression can make visual line positioning approximate.
-  - **Constraint:** use a non-destructive overlay and never split or rewrite syntax-highlighted code DOM.
+  - **ADO:** ✅ ADO v1.3.0. A keyboard-accessible marker identifies each affected source line, shows the thread count, and cycles through conversations on that line.
+  - **Constraint:** use a non-destructive overlay and never split or rewrite syntax-highlighted code DOM. Position markers proportionally when wrapping or syntax-highlighter row compression prevents exact visual alignment.
 
 - [ ] **P1 — Improve rendered-block text-match accuracy**
   - **Outcome:** fewer comments rely on approximate fallback lines, especially in nested lists, blockquotes, fenced prose, and HTML-backed Markdown.
@@ -157,10 +157,10 @@ Priority applies to the shared user outcome:
 
 ### Review and collaboration
 
-- [ ] **P2 — ADO `@mention` autocomplete parity**
+- [x] **P2 — ADO `@mention` autocomplete parity**
   - **Outcome:** typing `@` in a new comment, reply, or edit shows relevant people, supports keyboard selection, inserts the native ADO mention form, and preserves real linking and notifications after submission.
   - **GitHub:** ✅ Available with pre-warmed collaborator suggestions.
-  - **ADO:** △ ADO v1.2.0 ships multi-word search, keyboard/mouse selection, native submission, readable inline rendering, Threads snippets, edits, and cross-file navigation. Notification delivery still needs confirmation from the mentioned account.
+  - **ADO:** ✅ ADO v1.2.0. Multi-word search, keyboard/mouse selection, native submission, readable inline rendering, Threads snippets, edits, cross-file navigation, and email notification delivery are live validated.
   - Use active user identities from IdentityPicker results, insert native GUID tokens for submission, and render readable display names in the extension instead of exposing tokens.
   - Reuse one accessible dropdown interaction across new comments, replies, and edits; cache successful lookups without exposing organization identities outside the active signed-in session.
 
@@ -251,7 +251,7 @@ Priority applies to the shared user outcome:
 - [x] **P2 — Persistent rendered-diff highlighting in ADO Preview**
   - **GitHub:** ↔ Native rich diff already shows additions and removals.
   - **ADO:** ✅ ADO v1.2.0. Added and modified Preview highlights follow progressive analysis, file remounts, and ADO themes.
-  - Show a subtle green file-level marker for a newly added Markdown file rather than tinting its entire document; for edited files, highlight only blocks mapped to added or mixed hunks.
+  - Show a subtle green file-level marker for a newly added Markdown file rather than tinting its entire document; for edited files, highlight every rendered block covered by an added or mixed hunk, including multi-block sections.
   - Keep text readable in light, dark, and forced-colors themes, preserve comment/selection affordances, and reapply highlights after Preview remounts or progressive Changes analysis.
   - Removed content remains out of scope until ADO has a safe rendered representation for it; do not mark an unrelated surviving block as removed.
 

@@ -313,9 +313,16 @@
   function diffLineHunks(baseSource, headSource, options) {
     const baseLines = splitSourceLines(baseSource);
     const headLines = splitSourceLines(headSource);
+    // Markdown trailing spaces are often introduced or removed by editors and
+    // are not visible in Preview. Treat them as equal for hunk boundaries so
+    // an unchanged heading/TODO line with a trailing-space-only edit cannot
+    // absorb a following pure-added section and turn its highlight modified.
+    // Leading whitespace remains significant for Markdown structure.
+    const comparableBaseLines = baseLines.map((line) => line.replace(/[ \t]+$/g, ''));
+    const comparableHeadLines = headLines.map((line) => line.replace(/[ \t]+$/g, ''));
     const operations = diffLineOperations(
-      baseLines,
-      headLines,
+      comparableBaseLines,
+      comparableHeadLines,
       options && options.maxEditDistance
     );
     const hunks = [];
@@ -353,7 +360,41 @@
       }
     });
     flush();
-    return hunks;
+
+    // Myers can split one visual replacement when a blank separator is equal
+    // on both sides. For example, replacing a paragraph plus its list may be
+    // emitted as one mixed hunk followed by an added list. Join only those
+    // mixed/add-or-remove continuations across blank-only context so Preview
+    // presents the whole replacement as modified, without combining two
+    // independent paragraph edits.
+    const merged = [];
+    hunks.forEach((hunk) => {
+      const previous = merged[merged.length - 1];
+      if (previous) {
+        const baseGap = hunk.baseStart - previous.baseEnd - 1;
+        const headGap = hunk.headStart - previous.headEnd - 1;
+        const pairKinds = new Set([previous.kind, hunk.kind]);
+        const isReplacementContinuation =
+          (pairKinds.has('mixed') && (pairKinds.has('added') || pairKinds.has('removed'))) ||
+          (pairKinds.has('added') && pairKinds.has('removed'));
+        const blankOnlyGap = baseGap > 0 && baseGap === headGap &&
+          baseLines.slice(previous.baseEnd, hunk.baseStart - 1).every((line) => !String(line).trim()) &&
+          headLines.slice(previous.headEnd, hunk.headStart - 1).every((line) => !String(line).trim());
+        if (isReplacementContinuation && blankOnlyGap) {
+          const baseContext = baseLines.slice(previous.baseEnd, hunk.baseStart - 1);
+          const headContext = headLines.slice(previous.headEnd, hunk.headStart - 1);
+          previous.baseLines.push(...baseContext, ...hunk.baseLines);
+          previous.headLines.push(...headContext, ...hunk.headLines);
+          previous.baseEnd = hunk.baseEnd;
+          previous.headEnd = hunk.headEnd;
+          previous.kind = previous.baseLines.length && previous.headLines.length ? 'mixed'
+            : previous.headLines.length ? 'added' : 'removed';
+          return;
+        }
+      }
+      merged.push(hunk);
+    });
+    return merged;
   }
 
   function mergeChangeKind(a, b) {
@@ -399,6 +440,12 @@
       entry.endLine = Number.isFinite(entry.explicitEnd) && entry.explicitEnd >= entry.line
         ? entry.explicitEnd
         : Math.max(entry.line, nextLine == null ? maxHead : nextLine - 1);
+      // ATX headings occupy one source line. Never let an unmatched rendered
+      // block beneath a heading make that unchanged heading inherit the
+      // following paragraph's inferred source range.
+      if (/^H[1-6]$/.test(String(entry.block.tagName || ''))) {
+        entry.endLine = entry.line;
+      }
     });
 
     const byBlock = new Map();
@@ -410,7 +457,7 @@
         : Math.max(1, Math.min(maxHead, Number(hunk.headStart) || 1));
       const end = hasHead ? hunk.headEnd : start;
       let matching = entries.filter((entry) => entry.line <= end && entry.endLine >= start);
-      if (matching.length === 0) {
+      if (matching.length === 0 && !hasHead) {
         const after = entries.find((entry) => entry.line >= start);
         matching = [after || entries[entries.length - 1]].filter(Boolean);
       }
@@ -447,6 +494,53 @@
         delete stop._order;
         return stop;
       });
+  }
+
+  /**
+   * Expand DOM-free source-hunk stops into the rendered blocks that should
+   * receive persistent Preview highlighting. Sidebar navigation deliberately
+   * keeps one card per source hunk, but one hunk can cover several rendered
+   * blocks (for example a newly added heading, paragraphs, and list items).
+   * Mixed replacement context wins if overlapping hunks reach the same block.
+   */
+  function mapChangeStopsToHighlightBlocks(stops, mappedBlocks, headLineCount) {
+    if (!Array.isArray(stops) || !Array.isArray(mappedBlocks)) return [];
+    const byBlock = new Map();
+    stops.forEach((stop) => {
+      if (!stop || stop.stopType !== 'hunk' ||
+          (stop.kind !== 'added' && stop.kind !== 'mixed') || !stop.hunk) return;
+      const headLines = Array.isArray(stop.hunk.headLines) ? stop.hunk.headLines : [];
+      const expectedHeadLineCount = Math.max(0, stop.hunk.headEnd - stop.hunk.headStart + 1);
+      // Legacy restored snapshots compressed all head lines to one sentinel,
+      // losing blank-boundary information. Do not risk tinting neighboring
+      // unchanged blocks; a fresh catalog will replace this transient state.
+      if (headLines.length !== expectedHeadLineCount) {
+        return;
+      }
+      let firstContent = 0;
+      let lastContent = headLines.length - 1;
+      while (firstContent < headLines.length && !String(headLines[firstContent]).trim()) firstContent++;
+      while (lastContent >= firstContent && !String(headLines[lastContent]).trim()) lastContent--;
+      // Blank lines belong to Markdown structure rather than a visible block.
+      // Trim them before overlap mapping so an insertion beginning between two
+      // blocks does not tint the preceding unchanged block whose inferred range
+      // includes that blank separator.
+      if (firstContent >= headLines.length) return;
+      const highlightHunk = {
+        ...stop.hunk,
+        headStart: stop.hunk.headStart + firstContent,
+        headEnd: stop.hunk.headStart + lastContent,
+        headLines: headLines.slice(firstContent, lastContent + 1),
+      };
+      const mapped = mapDiffHunksToBlocks([highlightHunk], mappedBlocks, headLineCount);
+      mapped.forEach((entry) => {
+        if (!entry || !entry.block) return;
+        const kind = entry.kind === 'mixed' ? 'mixed' : stop.kind;
+        const prior = byBlock.get(entry.block);
+        if (kind === 'mixed' || !prior) byBlock.set(entry.block, kind);
+      });
+    });
+    return Array.from(byBlock, ([block, kind]) => ({ block, kind }));
   }
 
   // Build a compact source snippet for a DOM-free PR-wide card. Prefer the
@@ -580,6 +674,7 @@
     splitSourceLines,
     diffLineHunks,
     mapDiffHunksToBlocks,
+    mapChangeStopsToHighlightBlocks,
     buildSourceChangeSnippet,
     buildPrChangeStops,
   };

@@ -207,6 +207,54 @@ th.adrc-table-thread-marker-host {
   line-height: 1;
 }
 
+/* ADO code highlighting does not provide stable source-line wrappers. Keep
+   syntax DOM untouched and place compact thread controls proportionally in a
+   reserved right-edge overlay instead. */
+pre.adrc-code-thread-marker-host {
+  position: relative;
+  padding-right: 34px !important;
+}
+
+.adrc-code-line-thread-marker {
+  position: absolute;
+  right: 5px;
+  transform: translateY(-50%);
+  padding: 0 2px;
+  border: 1px solid var(--adrc-accent);
+  border-radius: 9px;
+  background: var(--adrc-bg);
+  color: var(--adrc-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 91;
+}
+
+.adrc-code-line-thread-marker:hover {
+  background: var(--adrc-accent-tint);
+}
+
+.adrc-code-line-thread-marker:focus-visible {
+  outline: 2px solid var(--adrc-focus);
+  outline-offset: 1px;
+}
+
+.adrc-code-line-thread-marker svg {
+  width: 10px;
+  height: 10px;
+  flex: none;
+}
+
+.adrc-code-line-thread-marker[data-count]::after {
+  content: attr(data-count);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+}
+
 /* Wide code blocks — keep the button reachable at the left edge.
    Reset the negative-margin trick so the block doesn't shift. */
 pre.adrc-hoverable {
@@ -1857,6 +1905,7 @@ body.adrc-dragging {
   .adrc-toast,
   .adrc-comment-btn,
   .adrc-table-thread-marker,
+  .adrc-code-line-thread-marker,
   .adrc-collapse-toggle {
     forced-color-adjust: none;
   }

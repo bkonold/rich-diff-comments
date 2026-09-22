@@ -10,7 +10,7 @@ const {
 } = require('./_helpers');
 const fixtures = require('./fixtures/sources');
 
-const EXPECTED_STOP_COUNT = 9;
+const EXPECTED_STOP_COUNT = 10;
 
 function requestsEndingWith(server, suffix) {
   return server.requests.filter((request) =>
@@ -113,7 +113,7 @@ test.describe('ADO PR-wide Changes', () => {
     await expect(page.locator('.adrc-sidebar-change-card[data-path="/src/ignored.js"]')).toHaveCount(0);
     await expect(page.locator('.adrc-sidebar-change-card[data-path="/docs/now-text.txt"]')).toHaveCount(0);
     await expect(page.locator('[data-count="changes"]')).toHaveText(String(EXPECTED_STOP_COUNT));
-    await expect(page.locator('.adrc-sidebar-changes-count span')).toHaveText(`1/3 (${EXPECTED_STOP_COUNT})`);
+    await expect(page.locator('.adrc-sidebar-changes-count span')).toHaveText(`1/4 (${EXPECTED_STOP_COUNT})`);
 
     const iterationRequests = requestsEndingWith(server, '/iterations');
     const changeRequests = requestsEndingWith(server, '/iterations/2/changes');
@@ -155,6 +155,13 @@ test.describe('ADO PR-wide Changes', () => {
     await expect(preview.locator('li', { hasText: 'Emit delivery metrics' }))
       .toHaveClass(/adrc-preview-change-modified/);
     await expect(preview.locator('pre')).toHaveClass(/adrc-preview-change-modified/);
+    await expect(preview.locator('.adrc-preview-change-added')).toHaveCount(3);
+    await expect(preview.locator('p', { hasText: 'Roll out the worker gradually' }))
+      .toHaveClass(/adrc-preview-change-added/);
+    await expect(preview.locator('li', { hasText: 'Validate staging behavior' }))
+      .toHaveClass(/adrc-preview-change-added/);
+    await expect(preview.locator('li', { hasText: 'Monitor delivery errors' }))
+      .toHaveClass(/adrc-preview-change-added/);
     await expect(preview.locator('p', { hasText: 'This document explains' }))
       .not.toHaveClass(/adrc-preview-change-(?:added|modified)/);
 
@@ -169,7 +176,7 @@ test.describe('ADO PR-wide Changes', () => {
     await page.evaluate((path) => window.__ADO_FIXTURE__.openPath(path), fixtures.DESIGN_PATH);
     await waitForAdoReady(page, fixtures.DESIGN_PATH, userThreadCount(server.threads));
     await expect(preview).not.toHaveClass(/adrc-preview-new-file/);
-    await expect(preview.locator('.adrc-preview-change-added')).toHaveCount(0);
+    await expect(preview.locator('.adrc-preview-change-added')).toHaveCount(3);
     await expect(preview.locator('.adrc-preview-change-modified')).toHaveCount(3);
   });
 
@@ -282,7 +289,7 @@ test.describe('ADO PR-wide Changes', () => {
     await page.keyboard.press(']');
     await waitForAdoReady(page, fixtures.DESIGN_PATH, userThreadCount(server.threads));
     await expect.poll(() => page.evaluate(() => window.ADORC_probe.sidebar().activeChangeIndex)).toBe(0);
-    await expect(page.locator('.adrc-sidebar-changes-count span')).toHaveText(`1/3 (${EXPECTED_STOP_COUNT})`);
+    await expect(page.locator('.adrc-sidebar-changes-count span')).toHaveText(`1/4 (${EXPECTED_STOP_COUNT})`);
     await expect(page.locator('.adrc-sidebar-tab[data-tab="outline"]')).toHaveClass(/adrc-sidebar-tab-active/);
   });
 

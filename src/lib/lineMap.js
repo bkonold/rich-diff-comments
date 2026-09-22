@@ -196,6 +196,24 @@
     let matchCount = 0;
     const tableHeaderLine = new Map();
 
+    function blockTextWithoutInjectedUi(block) {
+      const clone = block.cloneNode(true);
+      clone.querySelectorAll(
+        '.grdc-comment-box, .grdc-thread, .grdc-sidebar, .grdc-comment-edit, .grdc-reply-box, ' +
+        '.adrc-editor, .adrc-thread-badge, .adrc-thread-panel, .adrc-sidebar, ' +
+        '.adrc-comment-btn, .adrc-collapse-toggle'
+      ).forEach((element) => element.remove());
+      if (clone.tagName === 'LI') {
+        const nested = clone.querySelector('ul, ol');
+        if (nested) nested.remove();
+      }
+      if (clone.tagName === 'TR') {
+        const cells = clone.querySelectorAll('td, th');
+        if (cells.length) return Array.from(cells).map((cell) => cell.textContent).join(' ');
+      }
+      return clone.textContent;
+    }
+
     blocks.forEach((block) => {
       if (isDiagramBlock(block)) return;
       if (isInDeletedBlock(block)) return;
@@ -212,19 +230,7 @@
       // Skip <p> inside <li> — parent <li> already gets a button.
       if (block.tagName === 'P' && block.closest('li')) return;
 
-      let rawText = block.textContent;
-      if (block.tagName === 'LI') {
-        const nested = block.querySelector('ul, ol');
-        if (nested) {
-          rawText = rawText.replace(nested.textContent, '');
-        }
-      }
-      if (block.tagName === 'TR') {
-        const cells = block.querySelectorAll('td, th');
-        if (cells.length) {
-          rawText = Array.from(cells).map(c => c.textContent).join(' ');
-        }
-      }
+      const rawText = blockTextWithoutInjectedUi(block);
 
       let line;
       // Special handling for table rows: only text-match the header row,

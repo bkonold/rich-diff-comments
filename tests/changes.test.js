@@ -11,6 +11,7 @@ const {
   splitSourceLines,
   diffLineHunks,
   mapDiffHunksToBlocks,
+  mapChangeStopsToHighlightBlocks,
   buildSourceChangeSnippet,
   buildPrChangeStops,
 } = require('../src/lib/changes.js');
@@ -541,6 +542,53 @@ test('diffLineHunks — exhaustive small sequences reconstruct the exact head', 
   }
 });
 
+test('diffLineHunks — blank-separated replacement continuation stays modified', () => {
+  const hunks = diffLineHunks(
+    ['## Setup', 'Old introduction', '1. Old step', '2. Old dependency', '', '## Next'].join('\n'),
+    ['## Setup', 'New introduction', '', '1. New step', '2. New dependency', '', '## Next'].join('\n')
+  );
+
+  assert.equal(hunks.length, 1);
+  assert.equal(hunks[0].kind, 'mixed');
+  assert.deepEqual([hunks[0].headStart, hunks[0].headEnd], [2, 6]);
+});
+
+test('diffLineHunks — delete and add around a blank line form one modified replacement', () => {
+  const hunks = diffLineHunks(
+    ['# Introduction', 'Old introduction.', '', '# Next'].join('\n'),
+    ['# Introduction', '', 'New introduction.', '# Next'].join('\n')
+  );
+
+  assert.equal(hunks.length, 1);
+  assert.equal(hunks[0].kind, 'mixed');
+  assert.deepEqual([hunks[0].headStart, hunks[0].headEnd], [2, 3]);
+});
+
+test('diffLineHunks — trailing-space-only boundaries do not contaminate a following addition', () => {
+  const hunks = diffLineHunks(
+    [
+      '# Build and Test ',
+      'TODO: Build the project. ',
+      '',
+      '# Contribute ',
+    ].join('\n'),
+    [
+      '# Build and Test',
+      'TODO: Build the project.',
+      '',
+      '# Deployment',
+      '',
+      'Deploy safely.',
+      '',
+      '# Contribute',
+    ].join('\n')
+  );
+
+  assert.equal(hunks.length, 1);
+  assert.equal(hunks[0].kind, 'added');
+  assert.deepEqual([hunks[0].headStart, hunks[0].headEnd], [4, 7]);
+});
+
 test('mapDiffHunksToBlocks — maps changed interior lines to inferred block ranges', () => {
   const p1 = { id: 'p1' };
   const p2 = { id: 'p2' };
@@ -575,6 +623,20 @@ test('mapDiffHunksToBlocks — one wide hunk creates one stop per affected readi
   ], 8);
   assert.deepEqual(stops.map((s) => s.block), [h, p, li]);
   assert.deepEqual(stops.map((s) => [s.line, s.endLine]), [[2, 2], [3, 5], [6, 6]]);
+});
+
+test('mapDiffHunksToBlocks — an unchanged heading does not absorb a following changed line', () => {
+  const heading = { id: 'heading', tagName: 'H1' };
+  const nextHeading = { id: 'next-heading', tagName: 'H1' };
+  const stops = mapDiffHunksToBlocks([{
+    baseStart: 2, baseEnd: 2, headStart: 2, headEnd: 2,
+    baseLines: ['old'], headLines: ['new'], kind: 'mixed',
+  }], [
+    { block: heading, line: 1 },
+    { block: nextHeading, line: 4 },
+  ], 4);
+
+  assert.equal(stops.length, 0);
 });
 
 test('mapDiffHunksToBlocks — deletion anchors next block or previous block at EOF', () => {
@@ -622,6 +684,137 @@ test('mapDiffHunksToBlocks — merges multiple hunks landing on one block', () =
   assert.equal(stops.length, 1);
   assert.equal(stops[0].kind, 'mixed');
   assert.deepEqual([stops[0].line, stops[0].endLine], [2, 4]);
+});
+
+test('mapChangeStopsToHighlightBlocks — highlights every block in a pure-added section', () => {
+  const heading = { id: 'heading' };
+  const intro = { id: 'intro' };
+  const lead = { id: 'lead' };
+  const item1 = { id: 'item1' };
+  const item2 = { id: 'item2' };
+  const nextHeading = { id: 'next-heading' };
+  const hunk = {
+    baseStart: 14,
+    baseEnd: 13,
+    headStart: 17,
+    headEnd: 27,
+    baseLines: [],
+    headLines: Array(11).fill('new'),
+    kind: 'added',
+  };
+  const highlighted = mapChangeStopsToHighlightBlocks([{
+    stopType: 'hunk',
+    kind: 'added',
+    hunk,
+  }], [
+    { block: heading, line: 17 },
+    { block: intro, line: 19 },
+    { block: lead, line: 21 },
+    { block: item1, line: 23 },
+    { block: item2, line: 26 },
+    { block: nextHeading, line: 28 },
+  ], 34);
+
+  assert.deepEqual(highlighted, [
+    { block: heading, kind: 'added' },
+    { block: intro, kind: 'added' },
+    { block: lead, kind: 'added' },
+    { block: item1, kind: 'added' },
+    { block: item2, kind: 'added' },
+  ]);
+});
+
+test('mapChangeStopsToHighlightBlocks — mixed context wins on an overlapping block', () => {
+  const block = { id: 'shared' };
+  const highlighted = mapChangeStopsToHighlightBlocks([
+    {
+      stopType: 'hunk',
+      kind: 'added',
+      hunk: { headStart: 2, headEnd: 2, headLines: ['new'], baseLines: [], kind: 'added' },
+    },
+    {
+      stopType: 'hunk',
+      kind: 'mixed',
+      hunk: { headStart: 3, headEnd: 3, headLines: ['newer'], baseLines: ['old'], kind: 'mixed' },
+    },
+  ], [{ block, line: 1, endLine: 4 }], 4);
+
+  assert.deepEqual(highlighted, [{ block, kind: 'mixed' }]);
+});
+
+test('mapChangeStopsToHighlightBlocks — blank separators do not tint adjacent unchanged blocks', () => {
+  const prior = { id: 'prior' };
+  const paragraph = { id: 'paragraph' };
+  const item = { id: 'item' };
+  const highlighted = mapChangeStopsToHighlightBlocks([{
+    stopType: 'hunk',
+    kind: 'added',
+    hunk: {
+      headStart: 27,
+      headEnd: 30,
+      headLines: ['', 'New paragraph.', '', '- New item'],
+      baseLines: [],
+      kind: 'added',
+    },
+  }], [
+    { block: prior, line: 26 },
+    { block: paragraph, line: 28 },
+    { block: item, line: 30 },
+  ], 30);
+
+  assert.deepEqual(highlighted, [
+    { block: paragraph, kind: 'added' },
+    { block: item, kind: 'added' },
+  ]);
+});
+
+test('mapChangeStopsToHighlightBlocks — legacy compact hunks do not tint uncertain blocks', () => {
+  const heading = { id: 'heading' };
+  const paragraph = { id: 'paragraph' };
+  const item = { id: 'item' };
+  const highlighted = mapChangeStopsToHighlightBlocks([{
+    stopType: 'hunk',
+    kind: 'added',
+    hunk: {
+      headStart: 17,
+      headEnd: 27,
+      headLines: [''],
+      baseLines: [],
+      kind: 'added',
+    },
+  }], [
+    { block: heading, line: 17 },
+    { block: paragraph, line: 19 },
+    { block: item, line: 23 },
+  ], 27);
+
+  assert.deepEqual(highlighted, []);
+});
+
+test('mapChangeStopsToHighlightBlocks — shaped compact hunks preserve range and blank boundaries', () => {
+  const prior = { id: 'prior' };
+  const paragraph = { id: 'paragraph' };
+  const item = { id: 'item' };
+  const highlighted = mapChangeStopsToHighlightBlocks([{
+    stopType: 'hunk',
+    kind: 'added',
+    hunk: {
+      headStart: 17,
+      headEnd: 21,
+      headLines: ['', 'x', '', 'x', ''],
+      baseLines: [],
+      kind: 'added',
+    },
+  }], [
+    { block: prior, line: 16 },
+    { block: paragraph, line: 18 },
+    { block: item, line: 20 },
+  ], 21);
+
+  assert.deepEqual(highlighted, [
+    { block: paragraph, kind: 'added' },
+    { block: item, kind: 'added' },
+  ]);
 });
 
 test('mapDiffHunksToBlocks — defensive invalid inputs return empty arrays', () => {

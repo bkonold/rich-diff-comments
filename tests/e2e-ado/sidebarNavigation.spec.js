@@ -127,7 +127,7 @@ test.describe('ADO sidebar and keyboard navigation', () => {
     await expect.poll(() => page.evaluate(() => window.ADORC_probe.sidebar().activeChangeIndex)).toBe(2);
     await sidebar.locator('.adrc-sidebar-diff-icon').click();
     await expect.poll(() => page.evaluate(() => window.ADORC_probe.sidebar().activeChangeIndex)).toBe(0);
-    await expect(sidebar.locator('.adrc-sidebar-changes-count span')).toHaveText('1/3 (9)');
+    await expect(sidebar.locator('.adrc-sidebar-changes-count span')).toHaveText('1/4 (10)');
 
     await page.keyboard.press('h');
     await page.keyboard.press('j');
@@ -143,11 +143,11 @@ test.describe('ADO sidebar and keyboard navigation', () => {
     expect(changeCount).toBeGreaterThanOrEqual(2);
 
     const designCards = page.locator('.adrc-sidebar-change-card[data-path="/docs/design.md"]');
-    await expect(designCards).toHaveCount(3);
+    await expect(designCards).toHaveCount(4);
     await designCards.nth(2).click();
     await expect.poll(() => page.evaluate(() => window.ADORC_probe.sidebar().activeChangeIndex))
       .toBe(2);
-    await expect(page.locator('.adrc-sidebar-changes-count span')).toHaveText(`3/3 (${changeCount})`);
+    await expect(page.locator('.adrc-sidebar-changes-count span')).toHaveText(`3/4 (${changeCount})`);
     await expect.poll(() => page.locator('#preview-scroll').evaluate((element) => element.scrollTop))
       .toBeGreaterThan(0);
     await expect(page.locator('.markdown-preview-container .adrc-change-target-pulse')).toHaveCount(1);

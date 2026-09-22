@@ -14,7 +14,7 @@
   'use strict';
 
   const LOG = '[ADRC]';
-  const RUNTIME_REVISION = '2026-09-21-table-thread-markers-r29';
+  const RUNTIME_REVISION = '2026-09-21-trailing-space-hunks-r36';
   const adapter = (typeof window !== 'undefined' && window.ADORC) || null;
   const startupTiming = {
     scriptLoadedAt: performance.now(),
@@ -1538,6 +1538,91 @@
   }
 
   /**
+   * Add one right-edge marker for each fenced source line touched by a visible
+   * review thread. ADO's highlighter does not expose dependable per-line DOM,
+   * so markers are proportionally positioned across the measured block while
+   * the syntax-highlighted children remain untouched.
+   */
+  function renderCodeLineThreadMarkers(anchoredThreads) {
+    const blocks = new Map();
+    (Array.isArray(anchoredThreads) ? anchoredThreads : []).forEach(({ thread }) => {
+      if (!thread) return;
+      const visibleComments = (thread.comments || []).filter((comment) => comment && !comment.isDeleted);
+      if (visibleComments.length === 0) return;
+      const tc = thread.threadContext || {};
+      const startLine = tc.rightFileStart && tc.rightFileStart.line;
+      const endLine = tc.rightFileEnd && Number.isFinite(tc.rightFileEnd.line)
+        ? tc.rightFileEnd.line
+        : startLine;
+      if (!Number.isFinite(startLine) || !Number.isFinite(endLine)) return;
+
+      for (let line = Math.min(startLine, endLine); line <= Math.max(startLine, endLine); line++) {
+        const pre = currentLineToBlock.get(line);
+        if (!pre || pre.tagName !== 'PRE') continue;
+        if (!blocks.has(pre)) blocks.set(pre, new Map());
+        const lines = blocks.get(pre);
+        if (!lines.has(line)) lines.set(line, []);
+        if (!lines.get(line).some((item) => String(item.id) === String(thread.id))) {
+          lines.get(line).push(thread);
+        }
+      }
+    });
+
+    const GRDC = window.GRDC || {};
+    if (typeof GRDC.codeLineMarkerLayout !== 'function') return;
+    blocks.forEach((lines, pre) => {
+      const rangeStart = parseInt(pre.dataset.adrcRangeStart, 10);
+      const rangeEnd = parseInt(pre.dataset.adrcRangeEnd, 10);
+      if (!Number.isFinite(rangeStart) || !Number.isFinite(rangeEnd)) return;
+
+      pre.classList.add('adrc-code-thread-marker-host');
+      const cs = getComputedStyle(pre);
+      const paddingTop = parseFloat(cs.paddingTop) || 0;
+      const paddingBottom = parseFloat(cs.paddingBottom) || 0;
+      const contentHeight = Math.max(1, pre.getBoundingClientRect().height - paddingTop - paddingBottom);
+
+      Array.from(lines.entries()).sort((a, b) => a[0] - b[0]).forEach(([line, threads]) => {
+        const layout = GRDC.codeLineMarkerLayout(line, rangeStart, rangeEnd, contentHeight, paddingTop);
+        if (!layout) return;
+        const marker = document.createElement('button');
+        marker.type = 'button';
+        marker.className = 'adrc-code-line-thread-marker';
+        marker.dataset.line = String(line);
+        marker.dataset.threadIds = threads.map((thread) => String(thread.id)).join(',');
+        marker.dataset.activeIndex = '0';
+        marker.style.top = `${layout.top}px`;
+        marker.style.height = `${layout.size}px`;
+        marker.style.minWidth = `${layout.size}px`;
+        if (threads.length > 1) marker.dataset.count = String(threads.length);
+        marker.setAttribute('aria-label', threads.length === 1
+          ? `Open the review thread on code line ${line}`
+          : `Open review threads on code line ${line}; ${threads.length} threads`);
+        marker.title = threads.length === 1
+          ? `1 review thread on code line ${line}`
+          : `${threads.length} review threads on code line ${line} · click to cycle`;
+        marker.innerHTML =
+          '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h11v8h-6l-3.5 3v-3H2.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+
+        marker.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const index = Math.max(0, Math.min(threads.length - 1, Number(marker.dataset.activeIndex) || 0));
+          const thread = threads[index];
+          marker.dataset.activeIndex = String((index + 1) % threads.length);
+          const badge = document.querySelector(`.adrc-thread-badge[data-thread-id="${thread.id}"]`);
+          if (!badge) return;
+          const panel = document.querySelector(`.adrc-thread-panel[data-thread-id="${thread.id}"]`);
+          if (!panel) badge.click();
+          badge.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          badge.focus({ preventScroll: true });
+        });
+
+        pre.appendChild(marker);
+      });
+    });
+  }
+
+  /**
    * Mark every commentable block whose source line falls inside a
    * multi-line thread's range with `.adrc-range-permanent` so reviewers
    * can see the extent of the thread at a glance. Uses `currentLineToBlock`
@@ -1603,6 +1688,9 @@
       .forEach((el) => el.classList.remove('adrc-table-thread-marker-host'));
     renderContainer.querySelectorAll('.adrc-table-thread-marked')
       .forEach((el) => el.classList.remove('adrc-table-thread-marked'));
+    renderContainer.querySelectorAll('.adrc-code-line-thread-marker').forEach((el) => el.remove());
+    renderContainer.querySelectorAll('.adrc-code-thread-marker-host')
+      .forEach((el) => el.classList.remove('adrc-code-thread-marker-host'));
     renderContainer.querySelectorAll('.adrc-range-permanent')
       .forEach((el) => el.classList.remove('adrc-range-permanent'));
 
@@ -1653,6 +1741,7 @@
       }
     });
     renderTableRowThreadMarkers(sorted);
+    renderCodeLineThreadMarkers(sorted);
     console.log(`${LOG} rendered ${rendered} thread badge${rendered !== 1 ? 's' : ''} for ${renderPath}`);
     updateActiveSidebarThread();
 
@@ -1690,6 +1779,7 @@
            cl.contains('adrc-editor') ||
            cl.contains('adrc-comment-btn') ||
           cl.contains('adrc-table-thread-marker') ||
+           cl.contains('adrc-code-line-thread-marker') ||
           cl.contains('adrc-collapse-toggle') ||
           cl.contains('adrc-sidebar') ||
           cl.contains('adrc-sidebar-launcher') ||
@@ -1845,7 +1935,7 @@
   const SIDEBAR_PENDING_CHANGE_KEY = 'adrc-pending-change-jump-v1';
   const SIDEBAR_PENDING_OUTLINE_KEY = 'adrc-pending-outline-jump-v1';
   const EXACT_ROUTE_FALLBACK_KEY = 'adrc-exact-route-fallback-v1';
-  const PR_SESSION_CATALOG_CACHE_KEY = 'adrc-pr-session-catalog-v1';
+  const PR_SESSION_CATALOG_CACHE_KEY = 'adrc-pr-session-catalog-v4';
   const PENDING_NAVIGATION_TTL_MS = 90000;
   const PR_SESSION_CATALOG_CACHE_MAX_CHARS = 1500000;
   const SIDEBAR_MIN_WIDTH = 520;
@@ -4391,9 +4481,15 @@
         headEnd: stop.hunk.headEnd,
         kind: stop.hunk.kind,
         // Mapping only needs to know whether each side contains lines. Do not
-        // persist the changed source text that generated the sidebar snippet.
-        baseLines: stop.hunk.baseLines?.length ? [''] : [],
-        headLines: stop.hunk.headLines?.length ? [''] : []
+        // persist changed source text. Retain line count and blank boundaries
+        // so restored Preview highlighting can trim Markdown separators just
+        // as accurately as a freshly built catalog.
+        baseLines: Array.isArray(stop.hunk.baseLines)
+          ? stop.hunk.baseLines.map((line) => String(line).trim() ? 'x' : '')
+          : [],
+        headLines: Array.isArray(stop.hunk.headLines)
+          ? stop.hunk.headLines.map((line) => String(line).trim() ? 'x' : '')
+          : []
       };
     }
     return compact;
@@ -4950,18 +5046,18 @@
       return;
     }
 
-    const blockKinds = new Map();
-    activeStops.forEach((stop) => {
-      if (stop.stopType !== 'hunk' || (stop.kind !== 'added' && stop.kind !== 'mixed')) return;
-      const block = resolveCurrentChangeBlock(stop);
-      if (!block) return;
-      // A rendered block can cover multiple source hunks (especially fenced
-      // code). Mixed takes precedence so replacement content is never shown
-      // as a pure addition merely because another hunk shares the block.
-      const prior = blockKinds.get(block);
-      if (stop.kind === 'mixed' || !prior) blockKinds.set(block, stop.kind);
-    });
-    blockKinds.forEach((kind, block) => {
+    const GRDC = window.GRDC || {};
+    const headLineCount = typeof GRDC.splitSourceLines === 'function'
+      ? GRDC.splitSourceLines(currentSource).length
+      : String(currentSource || '').split(/\r?\n/).length;
+    const highlighted = typeof GRDC.mapChangeStopsToHighlightBlocks === 'function'
+      ? GRDC.mapChangeStopsToHighlightBlocks(
+          activeStops,
+          getMappedBlocksForChanges(),
+          headLineCount
+        )
+      : [];
+    highlighted.forEach(({ block, kind }) => {
       block.classList.add(kind === 'added'
         ? 'adrc-preview-change-added'
         : 'adrc-preview-change-modified');
@@ -5500,7 +5596,7 @@
     outlineScrollContainer = null;
 
     document.querySelectorAll(
-      '.adrc-comment-btn, .adrc-editor, .adrc-thread-badge, .adrc-thread-panel, .adrc-collapse-toggle'
+      '.adrc-comment-btn, .adrc-editor, .adrc-thread-badge, .adrc-thread-panel, .adrc-table-thread-marker, .adrc-code-line-thread-marker, .adrc-collapse-toggle'
     ).forEach((el) => el.remove());
 
     document.querySelectorAll('[data-adrc-has-button]').forEach((el) => {
@@ -5510,10 +5606,13 @@
       delete el.dataset.adrcOutlineKey;
     });
     document.querySelectorAll(
-      '.adrc-hoverable, .adrc-collapsible, .adrc-section-collapsed, .adrc-collapsed-hidden, .adrc-range-permanent, .adrc-range-hover, .adrc-preview-change-added, .adrc-preview-change-modified, .adrc-preview-new-file'
+      '.adrc-hoverable, .adrc-table-thread-marker-host, .adrc-table-thread-marked, .adrc-code-thread-marker-host, .adrc-collapsible, .adrc-section-collapsed, .adrc-collapsed-hidden, .adrc-range-permanent, .adrc-range-hover, .adrc-preview-change-added, .adrc-preview-change-modified, .adrc-preview-new-file'
     ).forEach((el) => {
       el.classList.remove(
         'adrc-hoverable',
+        'adrc-table-thread-marker-host',
+        'adrc-table-thread-marked',
+        'adrc-code-thread-marker-host',
         'adrc-collapsible',
         'adrc-section-collapsed',
         'adrc-collapsed-hidden',

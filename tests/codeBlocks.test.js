@@ -3,7 +3,11 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { findFenceRangeAroundLine, sortThreadHeads } = require('../src/lib/codeBlocks.js');
+const {
+  findFenceRangeAroundLine,
+  sortThreadHeads,
+  codeLineMarkerLayout,
+} = require('../src/lib/codeBlocks.js');
 
 // ───────────────────────────────────────────────────────────────────────────
 // findFenceRangeAroundLine
@@ -158,4 +162,30 @@ test('sortThreadHeads — missing createdAt treated as epoch 0', () => {
   const sorted = sortThreadHeads(heads);
   // no-date sorts first (epoch 0 < 2026).
   assert.deepEqual(sorted.map(h => h.label), ['no-date', 'has-date']);
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// codeLineMarkerLayout
+// ───────────────────────────────────────────────────────────────────────────
+
+test('codeLineMarkerLayout — centers markers on one-to-one rendered rows', () => {
+  assert.deepEqual(codeLineMarkerLayout(17, 17, 18, 40, 12), { top: 22, size: 18 });
+  assert.deepEqual(codeLineMarkerLayout(18, 17, 18, 40, 12), { top: 42, size: 18 });
+});
+
+test('codeLineMarkerLayout — distributes compressed source lines proportionally', () => {
+  assert.deepEqual(codeLineMarkerLayout(3, 1, 5, 40, 10), { top: 30, size: 12 });
+});
+
+test('codeLineMarkerLayout — clamps marker size for sparse and dense blocks', () => {
+  assert.equal(codeLineMarkerLayout(1, 1, 1, 100, 0).size, 18);
+  assert.equal(codeLineMarkerLayout(1, 1, 20, 40, 0).size, 12);
+});
+
+test('codeLineMarkerLayout — rejects invalid geometry and out-of-range lines', () => {
+  assert.equal(codeLineMarkerLayout(0, 1, 2, 40, 0), null);
+  assert.equal(codeLineMarkerLayout(3, 1, 2, 40, 0), null);
+  assert.equal(codeLineMarkerLayout(1, 2, 1, 40, 0), null);
+  assert.equal(codeLineMarkerLayout(1, 1, 2, 0, 0), null);
+  assert.equal(codeLineMarkerLayout(NaN, 1, 2, 40, 0), null);
 });
