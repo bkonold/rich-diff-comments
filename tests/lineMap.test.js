@@ -74,6 +74,30 @@ test('plain markdown body: each block anchors to its real source line', () => {
   assert.equal(lineOf(map, rd, 'p', 1), 7);
 });
 
+test('repeated mapping ignores injected collapse toggles and comment controls', () => {
+  const source = [
+    '# Introduction',
+    '',
+    'Updated introduction.',
+    '',
+    '# Getting Started',
+    '',
+    'Setup details.',
+  ];
+  const rd = richDiff(`
+    <h1><button class="adrc-collapse-toggle">▾</button>Introduction</h1>
+    <p>Updated introduction.<button class="adrc-comment-btn">+</button></p>
+    <h1><button class="adrc-collapse-toggle">▾</button>Getting Started</h1>
+    <p>Setup details.<span class="adrc-thread-badge">2</span></p>
+  `);
+
+  const map = mapBlocksToSourceLines(rd, source, 'doc.md', deps);
+  assert.equal(lineOf(map, rd, 'h1', 0), 1);
+  assert.equal(lineOf(map, rd, 'p', 0), 3);
+  assert.equal(lineOf(map, rd, 'h1', 1), 5);
+  assert.equal(lineOf(map, rd, 'p', 1), 7);
+});
+
 test('list item anchors to its Markdown marker line when the same text appears in an unmatched heading', () => {
   const source = [
     '# Review',                 // 1

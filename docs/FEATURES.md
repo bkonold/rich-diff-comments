@@ -157,10 +157,10 @@ Priority applies to the shared user outcome:
 
 ### Review and collaboration
 
-- [ ] **P2 — ADO `@mention` autocomplete parity**
+- [x] **P2 — ADO `@mention` autocomplete parity**
   - **Outcome:** typing `@` in a new comment, reply, or edit shows relevant people, supports keyboard selection, inserts the native ADO mention form, and preserves real linking and notifications after submission.
   - **GitHub:** ✅ Available with pre-warmed collaborator suggestions.
-  - **ADO:** △ ADO v1.2.0 ships multi-word search, keyboard/mouse selection, native submission, readable inline rendering, Threads snippets, edits, and cross-file navigation. Notification delivery still needs confirmation from the mentioned account.
+  - **ADO:** ✅ ADO v1.2.0. Multi-word search, keyboard/mouse selection, native submission, readable inline rendering, Threads snippets, edits, cross-file navigation, and email notification delivery are live validated.
   - Use active user identities from IdentityPicker results, insert native GUID tokens for submission, and render readable display names in the extension instead of exposing tokens.
   - Reuse one accessible dropdown interaction across new comments, replies, and edits; cache successful lookups without exposing organization identities outside the active signed-in session.
 
@@ -251,7 +251,7 @@ Priority applies to the shared user outcome:
 - [x] **P2 — Persistent rendered-diff highlighting in ADO Preview**
   - **GitHub:** ↔ Native rich diff already shows additions and removals.
   - **ADO:** ✅ ADO v1.2.0. Added and modified Preview highlights follow progressive analysis, file remounts, and ADO themes.
-  - Show a subtle green file-level marker for a newly added Markdown file rather than tinting its entire document; for edited files, highlight only blocks mapped to added or mixed hunks.
+  - Show a subtle green file-level marker for a newly added Markdown file rather than tinting its entire document; for edited files, highlight every rendered block covered by an added or mixed hunk, including multi-block sections.
   - Keep text readable in light, dark, and forced-colors themes, preserve comment/selection affordances, and reapply highlights after Preview remounts or progressive Changes analysis.
   - Removed content remains out of scope until ADO has a safe rendered representation for it; do not mark an unrelated surviving block as removed.
 

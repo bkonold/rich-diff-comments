@@ -14,7 +14,7 @@
   'use strict';
 
   const LOG = '[ADRC]';
-  const RUNTIME_REVISION = '2026-09-21-code-thread-markers-r30';
+  const RUNTIME_REVISION = '2026-09-21-trailing-space-hunks-r36';
   const adapter = (typeof window !== 'undefined' && window.ADORC) || null;
   const startupTiming = {
     scriptLoadedAt: performance.now(),
@@ -1935,7 +1935,7 @@
   const SIDEBAR_PENDING_CHANGE_KEY = 'adrc-pending-change-jump-v1';
   const SIDEBAR_PENDING_OUTLINE_KEY = 'adrc-pending-outline-jump-v1';
   const EXACT_ROUTE_FALLBACK_KEY = 'adrc-exact-route-fallback-v1';
-  const PR_SESSION_CATALOG_CACHE_KEY = 'adrc-pr-session-catalog-v1';
+  const PR_SESSION_CATALOG_CACHE_KEY = 'adrc-pr-session-catalog-v4';
   const PENDING_NAVIGATION_TTL_MS = 90000;
   const PR_SESSION_CATALOG_CACHE_MAX_CHARS = 1500000;
   const SIDEBAR_MIN_WIDTH = 520;
@@ -4481,9 +4481,15 @@
         headEnd: stop.hunk.headEnd,
         kind: stop.hunk.kind,
         // Mapping only needs to know whether each side contains lines. Do not
-        // persist the changed source text that generated the sidebar snippet.
-        baseLines: stop.hunk.baseLines?.length ? [''] : [],
-        headLines: stop.hunk.headLines?.length ? [''] : []
+        // persist changed source text. Retain line count and blank boundaries
+        // so restored Preview highlighting can trim Markdown separators just
+        // as accurately as a freshly built catalog.
+        baseLines: Array.isArray(stop.hunk.baseLines)
+          ? stop.hunk.baseLines.map((line) => String(line).trim() ? 'x' : '')
+          : [],
+        headLines: Array.isArray(stop.hunk.headLines)
+          ? stop.hunk.headLines.map((line) => String(line).trim() ? 'x' : '')
+          : []
       };
     }
     return compact;
@@ -5040,18 +5046,18 @@
       return;
     }
 
-    const blockKinds = new Map();
-    activeStops.forEach((stop) => {
-      if (stop.stopType !== 'hunk' || (stop.kind !== 'added' && stop.kind !== 'mixed')) return;
-      const block = resolveCurrentChangeBlock(stop);
-      if (!block) return;
-      // A rendered block can cover multiple source hunks (especially fenced
-      // code). Mixed takes precedence so replacement content is never shown
-      // as a pure addition merely because another hunk shares the block.
-      const prior = blockKinds.get(block);
-      if (stop.kind === 'mixed' || !prior) blockKinds.set(block, stop.kind);
-    });
-    blockKinds.forEach((kind, block) => {
+    const GRDC = window.GRDC || {};
+    const headLineCount = typeof GRDC.splitSourceLines === 'function'
+      ? GRDC.splitSourceLines(currentSource).length
+      : String(currentSource || '').split(/\r?\n/).length;
+    const highlighted = typeof GRDC.mapChangeStopsToHighlightBlocks === 'function'
+      ? GRDC.mapChangeStopsToHighlightBlocks(
+          activeStops,
+          getMappedBlocksForChanges(),
+          headLineCount
+        )
+      : [];
+    highlighted.forEach(({ block, kind }) => {
       block.classList.add(kind === 'added'
         ? 'adrc-preview-change-added'
         : 'adrc-preview-change-modified');

@@ -62,7 +62,7 @@ test.describe('ADO SPA lifecycle and cross-file navigation', () => {
       sessionStorage.setItem('adrc-exact-route-fallback-v1', JSON.stringify({
         path: '/docs/design.md', identity, startedAt: Date.now(),
       }));
-      sessionStorage.setItem('adrc-pr-session-catalog-v1', JSON.stringify({
+      sessionStorage.setItem('adrc-pr-session-catalog-v4', JSON.stringify({
         version: 1, identity, expiresAt,
       }));
       const url = new URL(location.href);
@@ -77,7 +77,7 @@ test.describe('ADO SPA lifecycle and cross-file navigation', () => {
       'adrc-pending-change-jump-v1',
       'adrc-pending-outline-jump-v1',
       'adrc-exact-route-fallback-v1',
-      'adrc-pr-session-catalog-v1',
+      'adrc-pr-session-catalog-v4',
     ].every((key) => sessionStorage.getItem(key) == null));
     expect(cleared).toBe(true);
 

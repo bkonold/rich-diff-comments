@@ -6,7 +6,7 @@
 
 ## Submission notes
 
-Version 1.3.0 adds persistent markers that identify table rows and fenced-code lines with review conversations, and removes a thread after its final visible comment is deleted. It remains packaged separately from the GitHub extension, requests no new permissions or hosts, loads no remote code, has no backend, and contains no analytics or telemetry.
+Version 1.3.0 adds persistent markers that identify table rows and fenced-code lines with review conversations, removes a thread after its final visible comment is deleted, and keeps added and modified Preview highlights accurate across complete sections. It remains packaged separately from the GitHub extension, requests no new permissions or hosts, loads no remote code, has no backend, and contains no analytics or telemetry.
 
 ## Package
 
@@ -35,6 +35,7 @@ Comment on rendered Markdown in Azure DevOps PRs with inline threads, Changes, O
 
 • See persistent markers on table rows and fenced-code lines that already have review conversations; activate a marker to open or cycle through its threads.
 • Empty threads disappear after their final visible comment is deleted instead of remaining as “0 comments” entries.
+• Added and modified sections keep the correct Preview highlight across every paragraph, heading, and list item, while adjacent unchanged content remains clear.
 
 v1.2.0 (2026-09-17)
 
@@ -188,6 +189,7 @@ https://github.com/chienyuanchang/rich-diff-comments/blob/main/PRIVACY_ADO.md
 #### Fixed
 
 - Threads disappear after their final visible comment is deleted instead of remaining in Preview, sidebar totals, or keyboard navigation as **0 comments** entries.
+- Added and modified sections keep the correct Preview highlight across every paragraph, heading, and list item, while adjacent unchanged content remains clear.
 
 ### v1.2.0 — 2026-09-17
 

@@ -35,6 +35,11 @@ const DESIGN_SOURCE = [
   '| --- | --- |',                              // 24
   '| API | Platform |',                         // 25
   '| UI | Experience |',                        // 26
+  '',                                           // 27
+  'Roll out the worker gradually.',             // 28
+  '',                                           // 29
+  '- Validate staging behavior',                // 30
+  '- Monitor delivery errors',                  // 31
 ].join('\n');
 
 const DESIGN_BASE_SOURCE = [
@@ -63,7 +68,7 @@ const DESIGN_BASE_SOURCE = [
   '| Area | Owner |',
   '| --- | --- |',
   '| API | Platform |',
-  '| UI | Experience |',
+  '| UI | Experience | ',
 ].join('\n');
 
 const OTHER_SOURCE = [

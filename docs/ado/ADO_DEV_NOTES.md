@@ -123,7 +123,7 @@ Threads are returned by `GET /threads`:
 
 **Comment deletion** is soft. DELETE returns 200 with an empty body; the comment stays in the thread with `isDeleted: true`. Deleted-comment placeholders remain inside threads that have another visible comment so replies retain their context. Once every comment is deleted, the retained empty thread record is excluded from inline rendering, sidebar totals, Outline attribution, and navigation.
 
-## Native `@mention` discovery — endpoint verified, payload pending
+## Native `@mention` discovery — endpoint, payload, and notification verified
 
 A live native ADO PR comment capture on 2026-09-17 showed that typing a mention
 uses `POST /_apis/IdentityPicker/Identities`, not the previously assumed
@@ -157,7 +157,8 @@ preview resource. Keep this version separate from the adapter's stable API
 version. Identity display metadata is resolved again when a short-lived PR
 catalog snapshot is restored after cross-file route fallback; only raw thread
 data is persisted, so snippets must not be built before UID hydration completes.
-Notification delivery still needs explicit live confirmation.
+On 2026-09-21, a live check from the mentioned account confirmed that a mention
+submitted by the extension delivers ADO's email notification.
 
 ## DOM quirks — table rows
 

@@ -36,7 +36,7 @@ test('ADO manifest loads shared sidebar and Changes helpers before content.js', 
 });
 
 test('ADO exposes a runtime revision for live loaded-script verification', () => {
-  assert.match(content, /const RUNTIME_REVISION = '2026-09-21-code-thread-markers-r30'/);
+  assert.match(content, /const RUNTIME_REVISION = '2026-09-21-trailing-space-hunks-r36'/);
   assert.match(content, /revision: RUNTIME_REVISION/);
 });
 
@@ -70,7 +70,7 @@ test('ADO exact TreeEx activation reaches the list selection model', () => {
 });
 
 test('ADO preserves compact PR catalogs across an exact-route document fallback', () => {
-  assert.match(content, /const PR_SESSION_CATALOG_CACHE_KEY = 'adrc-pr-session-catalog-v1'/);
+  assert.match(content, /const PR_SESSION_CATALOG_CACHE_KEY = 'adrc-pr-session-catalog-v4'/);
   assert.match(content, /function persistPrSessionCatalogSnapshot\(\)/);
   assert.match(content, /function restorePrSessionCatalogSnapshot\(\)/);
   assert.match(content, /persistPrSessionCatalogSnapshot\(\)/);
@@ -81,8 +81,8 @@ test('ADO preserves compact PR catalogs across an exact-route document fallback'
   assert.match(content, /sidebarThreadsLoadPromise = hydrateMentionIdentities\(snapshot\.threads\)\.then/);
   assert.match(content, /hydrateMentionIdentities\(snapshot\.threads\)[\s\S]*?setSidebarThreads\(snapshot\.threads\)/);
   assert.match(content, /snapshot\.threads = null;[\s\S]*?snapshot\.outline = null;[\s\S]*?snapshot\.changes = null;/);
-  assert.match(content, /baseLines: stop\.hunk\.baseLines\?\.length \? \[''\] : \[\]/);
-  assert.match(content, /headLines: stop\.hunk\.headLines\?\.length \? \[''\] : \[\]/);
+  assert.match(content, /baseLines: Array\.isArray\(stop\.hunk\.baseLines\)[\s\S]*?\.map\(\(line\) => String\(line\)\.trim\(\) \? 'x' : ''\)/);
+  assert.match(content, /headLines: Array\.isArray\(stop\.hunk\.headLines\)[\s\S]*?\.map\(\(line\) => String\(line\)\.trim\(\) \? 'x' : ''\)/);
 });
 
 test('ADO sidebar renders Changes, Threads, Outline tabs in GitHub parity order', () => {
