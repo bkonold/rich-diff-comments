@@ -6,7 +6,7 @@
 
 ## Submission notes (edit before submitting)
 
-v1.10.0 is a security and reliability release. Authentication is now browser-session only, owned-comment actions are simpler, repeated Table of Contents navigation works consistently, sidebar lists stay stable while resizing, and GitHub's virtualized large-PR view now gives accurate one-file-at-a-time guidance. No new permissions or host permissions were added.
+v1.10.0 is a security and reliability release. Authentication is now browser-session only, owned-comment actions are simpler, repeated Table of Contents navigation works consistently, sidebar lists stay stable while resizing, navigation from the Pull requests list activates the review sidebar, and GitHub's virtualized large-PR view now gives accurate one-file-at-a-time guidance. No new permissions or host permissions were added.
 
 <!--
 Use this space for submission-specific context the reviewer should know
@@ -52,9 +52,9 @@ Comment, reply, resolve, and collapse sections directly in GitHub PR rich-diff (
 ```
 🆕 What's new in recent releases
 
-v1.10.0 (2026-09-22)
+v1.10.0 (2026-09-23)
 • Authentication is now browser-session only; the dormant Personal Access Token fallback and any legacy saved token are removed without reading or transmitting the token.
-• Comment actions, Table of Contents navigation, sidebar resizing, and large-PR guidance are now more direct and reliable.
+• Comment actions, Table of Contents navigation, sidebar resizing, Pull requests list navigation, and large-PR guidance are now more direct and reliable.
 
 v1.9.0 (2026-07-02)
 • GitHub's own left-side file tree now highlights the file you're currently reading — a subtle blue rail and background tint on the matching row, updated in step with the middle review area and the sidebar.
@@ -222,7 +222,7 @@ https://github.com/chienyuanchang/rich-diff-comments/blob/main/PRIVACY.md
 
 Includes all changes from v1.10.0, v1.9.0, and v1.8.0.
 
-### v1.10.0 — 2026-09-22
+### v1.10.0 — 2026-09-23
 
 #### Changed
 
@@ -234,6 +234,7 @@ Includes all changes from v1.10.0, v1.9.0, and v1.8.0.
 - **Table of Contents links now work on first and repeated clicks**, while links to other sections and browser Back/Forward navigation continue to work normally.
 - **Sidebar lists stay at the same position while resizing**, so the visible place in Changes, Threads, and Outline no longer slides toward the bottom.
 - **Large pull requests no longer offer a bulk-render action that GitHub cannot retain.** The sidebar now explains how to review Markdown files one at a time on GitHub's optimized large-PR view.
+- **The sidebar now returns when you open a pull request from the repository's Pull requests list.** Changes, Threads, and Outline rebuild for the selected pull request without requiring a page reload.
 
 ### v1.9.0 — 2026-07-02
 

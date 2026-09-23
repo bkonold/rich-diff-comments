@@ -146,6 +146,12 @@ This release removes dormant credential storage, simplifies comment actions, and
 
 ### Navigation and focus
 
+- [x] **P0 — Restore the review sidebar after returning from GitHub's pull-request list**
+  - **Outcome:** after visiting a repository's Pull requests list, opening the Files changed view for the same or another pull request activates the sidebar without requiring a page reload.
+  - **GitHub:** ✅ GitHub v1.10.0. The runtime is present but visually inactive on the Pull requests list, then initializes on entry to Files changed. Switching pull requests clears PR-specific route data, comments, source mappings, and mention data before rebuilding Changes, Threads, and Outline.
+  - **ADO:** ✅ Native-equivalent. The extension runtime is already present across the ADO pull-request routes used for Preview navigation.
+  - **Constraint:** the extension must remain visually inactive on the Pull requests list and other non-review pages, and broadening activation must not add permissions or host access.
+
 - [x] **P1 — Keep sidebar content stable while resizing**
   - **Outcome:** resizing the sidebar changes only its viewport dimensions; the active tab and scroll position in Changes, Threads, and Outline do not move during the drag.
   - **GitHub:** ✅ GitHub v1.10.0. Each pane's scroll position is locked for the duration of a bottom-right resize gesture so browser scroll anchoring cannot move its scrollbar thumb.

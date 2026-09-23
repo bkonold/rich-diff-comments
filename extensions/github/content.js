@@ -812,6 +812,7 @@
 
   // Cached route data from /changes endpoint
   let routeData = null;
+  let routeLifecycleGeneration = 0;
   // Map from pathDigest → file path (from diffSummaries)
   let pathDigestMap = new Map();
   // Map from path → GitHub's `changeType` ("ADDED" | "MODIFIED" |
@@ -828,6 +829,23 @@
   function invalidateRouteData() {
     routeData = null;
     markSourceDiffDirty();
+  }
+
+  // A GitHub document can survive client-side navigation between pull
+  // requests. Never let one PR's route payload, source files, comments, or
+  // mention IDs leak into the next PR's review surface.
+  function resetPrScopedState() {
+    routeLifecycleGeneration++;
+    routeData = null;
+    pathDigestMap.clear();
+    pathChangeTypeMap.clear();
+    rawSourceCache.clear();
+    fileLineMap.clear();
+    existingComments = [];
+    mentionSuggestionCache = null;
+    mentionIdsResolved = null;
+    getPRAuthorLogin._cached = undefined;
+    sourceDiffDirty = false;
   }
 
   // ── Source-diff sync (1.0.2) ───────────────────────────────────────────────
@@ -1123,10 +1141,12 @@
   async function fetchRouteData() {
     if (routeData) return routeData;
     if (!prInfo) return null;
+    const fetchGeneration = routeLifecycleGeneration;
+    const requestPr = { ...prInfo };
 
     try {
       const res = await fetch(
-        `https://github.com/${prInfo.owner}/${prInfo.repo}/pull/${prInfo.pullNumber}/changes`,
+        `https://github.com/${requestPr.owner}/${requestPr.repo}/pull/${requestPr.pullNumber}/changes`,
         {
           credentials: 'include',
           headers: {
@@ -1138,6 +1158,7 @@
       );
       if (res.ok) {
         const data = await res.json();
+        if (fetchGeneration !== routeLifecycleGeneration) return null;
         routeData = data?.payload?.pullRequestsChangesRoute || null;
 
         // Build pathDigest → path mapping and path → changeType mapping.
@@ -1218,6 +1239,7 @@
 
   async function fetchRawSource(container, path) {
     if (rawSourceCache.has(path)) return rawSourceCache.get(path);
+    const fetchGeneration = routeLifecycleGeneration;
 
     // Discover head commit SHA from route data or blob links
     let headOid = routeData?.comparison?.fullDiff?.headOid;
@@ -1229,15 +1251,17 @@
       }
     }
     if (!headOid || !prInfo || !looksLikePath(path)) return null;
+    const requestPr = { ...prInfo };
 
     try {
-      const blobUrl = `https://github.com/${prInfo.owner}/${prInfo.repo}/blob/${headOid}/${encodeURI(path)}`;
+      const blobUrl = `https://github.com/${requestPr.owner}/${requestPr.repo}/blob/${headOid}/${encodeURI(path)}`;
       const res = await fetch(blobUrl, { credentials: 'include' });
       if (!res.ok) {
         console.log(`[GRDC] Blob page fetch failed for ${path}: HTTP ${res.status}`);
         return null;
       }
       const html = await res.text();
+      if (fetchGeneration !== routeLifecycleGeneration) return null;
 
       // Strategy A: read-only textarea (older blob views)
       let m = html.match(/<textarea[^>]*id=["']read-only-cursor-text-area["'][^>]*>([\s\S]*?)<\/textarea>/);
@@ -5052,6 +5076,7 @@
   async function init() {
     prInfo = parsePRUrl();
     if (!prInfo) return;
+    const initGeneration = routeLifecycleGeneration;
 
     // Don't blow away an active inline editor (Edit-comment textarea). When
     // the user is mid-edit, a re-init from any source — GitHub's React
@@ -5071,6 +5096,7 @@
 
     // Fetch route data first (builds pathDigest map + caches for comments)
     await fetchRouteData();
+    if (initGeneration !== routeLifecycleGeneration) return;
 
     // Kick off `fetchExistingComments()` in parallel with `buildLineMap()`.
     // Both only need `routeData` (already cached above): `fetchExistingComments`
@@ -5082,10 +5108,12 @@
     const commentsPromise = fetchExistingComments();
 
     await buildLineMap();
+    if (initGeneration !== routeLifecycleGeneration) return;
     attachCommentButtons();
     attachCollapseToggles();
 
     existingComments = await commentsPromise;
+    if (initGeneration !== routeLifecycleGeneration) return;
     console.log(`[GRDC] Fetched ${existingComments.length} existing comments`);
     renderExistingComments();
     buildThreadsSidebar();
@@ -5288,10 +5316,20 @@
   // latency when clicking a tab. Also listen for `popstate` (fires across
   // worlds for back/forward navigation) so we react instantly to those.
   let lastInitPath = null;
+  let activePrKey = null;
   function maybeInit() {
     const path = window.location.pathname;
     if (path === lastInitPath) return;
     lastInitPath = path;
+    const nextPr = parsePRUrl();
+    const nextPrKey = nextPr
+      ? `${nextPr.owner}/${nextPr.repo}#${nextPr.pullNumber}`
+      : null;
+
+    if (nextPrKey !== activePrKey) {
+      resetPrScopedState();
+      activePrKey = nextPrKey;
+    }
     // If the user navigated away from Files-changed (e.g. clicked
     // Conversation / Commits / Checks, or left the PR entirely), the
     // sidebar has nothing to do: existing threads are rendered inline
@@ -5304,7 +5342,7 @@
     // We also drop any injected `+` buttons / thread badges via
     // `clearInjectedDom` for the same reason — they're anchored to
     // rich-diff blocks that no longer exist.
-    if (!parsePRUrl()) {
+    if (!nextPr) {
       const stale = document.querySelector('.grdc-sidebar');
       if (stale) {
         console.log(`[GRDC] URL changed → ${path}, removing sidebar (not on Files-changed)`);
