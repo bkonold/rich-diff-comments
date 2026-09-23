@@ -118,7 +118,7 @@ This release removes dormant credential storage, simplifies comment actions, and
 
 - [x] **P0 — Remove dormant Personal Access Token mode and stored credentials**
   - **Outcome:** authentication always uses the browser-managed signed-in session, and the extension never asks for or persistently stores a GitHub credential.
-  - **GitHub:** △ Implemented and validated for GitHub v1.10.0; release pending. The hidden PAT/REST fallback and token prompt are removed, and upgrades delete legacy PAT values without reading them.
+  - **GitHub:** ✅ GitHub v1.10.0. The hidden PAT/REST fallback and token prompt are removed, and upgrades delete legacy PAT values without reading them.
   - **ADO:** ✅ Already session-only and never stores a PAT.
   - **Constraint:** normal session-cookie comment submission remains covered by the GitHub browser suite.
 
@@ -126,13 +126,13 @@ This release removes dormant credential storage, simplifies comment actions, and
 
 - [x] **P1 — Make bulk rich-diff rendering reliable on GitHub's large-PR surface**
   - **Outcome:** “Render all Markdown files as rich-diff” either switches to a GitHub mode that can retain all rendered files and completes there, or clearly explains why PR-wide rendering is unavailable instead of showing temporary progress that disappears.
-  - **GitHub:** △ Implemented and browser-validated for GitHub v1.10.0; release pending. On `mode=virtualization`—with GitHub's “Switch to single file mode” link as a fallback signal—the extension hides PR-wide render controls, guards the bulk action, and shows one-file-at-a-time guidance instead.
+  - **GitHub:** ✅ GitHub v1.10.0. On `mode=virtualization`—with GitHub's “Switch to single file mode” link as a fallback signal—the extension hides PR-wide render controls, guards the bulk action, and shows one-file-at-a-time guidance instead.
   - **ADO:** — Preview uses one selected file and has no equivalent bulk-render action.
   - **Constraint:** do not navigate modes automatically and do not run the two-pass bulk sweep on the virtualized surface. Preserve the user's original scroll position when bulk rendering is supported.
 
 - [x] **P1 — Allow repeated navigation to the same Table of Contents destination**
   - **Outcome:** clicking the same rendered Table of Contents link repeatedly always scrolls to its section, even when that anchor is already the current URL fragment.
-  - **GitHub:** △ Implemented and browser-validated for GitHub v1.10.0; release pending. Repeated clicks scroll directly, while changed destinations and browser Back/Forward retain hash history.
+  - **GitHub:** ✅ GitHub v1.10.0. Repeated clicks scroll directly, while changed destinations and browser Back/Forward retain hash history.
   - **ADO:** ✅ No equivalent repeated-anchor issue observed in Preview.
   - **Constraint:** preserve normal heading-anchor behavior, browser history, and links to a different section.
 
@@ -140,7 +140,7 @@ This release removes dormant credential storage, simplifies comment actions, and
 
 - [x] **P2 — Simplify actions on the reviewer's own comments**
   - **Outcome:** Edit and Delete are visible as direct comment-header actions, while the redundant `GitHub ↗` link and one-item overflow menu are removed.
-  - **GitHub:** △ Implemented and validated for GitHub v1.10.0; release pending. Delete now sits beside Edit with destructive styling and confirmation, and both actions remain limited to the reviewer's own comments.
+  - **GitHub:** ✅ GitHub v1.10.0. Delete now sits beside Edit with destructive styling and confirmation, and both actions remain limited to the reviewer's own comments.
   - **ADO:** ↔ Uses its own direct inline comment actions and has no GitHub link.
   - **Constraint:** show destructive styling for Delete, preserve ownership checks, and keep accidental deletion protected by confirmation.
 
@@ -148,7 +148,7 @@ This release removes dormant credential storage, simplifies comment actions, and
 
 - [x] **P1 — Keep sidebar content stable while resizing**
   - **Outcome:** resizing the sidebar changes only its viewport dimensions; the active tab and scroll position in Changes, Threads, and Outline do not move during the drag.
-  - **GitHub:** △ Implemented and browser-validated for GitHub v1.10.0; release pending. Each pane's scroll position is locked for the duration of a bottom-right resize gesture so browser scroll anchoring cannot move its scrollbar thumb.
+  - **GitHub:** ✅ GitHub v1.10.0. Each pane's scroll position is locked for the duration of a bottom-right resize gesture so browser scroll anchoring cannot move its scrollbar thumb.
   - **ADO:** ✅ No equivalent resize movement observed.
   - **Constraint:** preserve persisted width and height without changing navigation state during intermediate resize events.
 

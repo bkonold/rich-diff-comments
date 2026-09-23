@@ -46,7 +46,7 @@ test('ADO sync and audit use the ADO-specific privacy policy and changelog', () 
   assert.match(syncScript, /if \(\$Target -eq 'ado'\) \{ 'PRIVACY_ADO\.md' \} else \{ 'PRIVACY\.md' \}/);
   assert.match(preflightScript, /if \(\$Target -eq 'ado'\) \{ 'CHANGELOG_ADO\.md' \} else \{ 'CHANGELOG\.md' \}/);
   assert.match(releaseScript, /if \(\$Target -eq 'ado'\) \{ 'CHANGELOG_ADO\.md' \} else \{ 'CHANGELOG\.md' \}/);
-  assert.match(preflightScript, /src\\adapters\\\*\.js/);
+  assert.match(preflightScript, /Get-ChildItem "\$extPrefix\\src\\adapters" -Filter \*\.js -File -ErrorAction SilentlyContinue/);
   assert.match(preflightScript, /packaged manifest identity differs from extensions\/\$Target\/manifest\.json/);
   assert.match(preflightScript, /packaged host permissions match the \$Target target/);
   assert.match(preflightScript, /all declared icons are in the zip/);

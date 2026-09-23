@@ -168,6 +168,10 @@ try {
   # ── Permissions audit (the rule that rejected 1.0.2) ──────────────────
   Section "Permissions audit"
 
+  $codePaths = @("$extPrefix\content.js")
+  $codePaths += @(Get-ChildItem "$extPrefix\src\lib" -Filter *.js -File -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+  $codePaths += @(Get-ChildItem "$extPrefix\src\adapters" -Filter *.js -File -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+
   $perms = @($manifest.permissions | Where-Object { $_ -and $_.ToString().Trim() })
   if ($perms.Count -eq 0) {
     Pass "no permissions declared (good — minimum necessary)"
@@ -191,7 +195,7 @@ try {
         default          { "chrome\.${p}\." }
       }
 
-      $hit = Select-String -Path "$extPrefix\content.js","$extPrefix\src\lib\*.js","$extPrefix\src\adapters\*.js" -Pattern $patterns 2>$null `
+      $hit = Select-String -Path $codePaths -Pattern $patterns 2>$null `
         | Where-Object { $_.Line -notmatch '^\s*//' -and $_.Line -notmatch '^\s*\*' }
 
       if ($hit) {
@@ -216,7 +220,7 @@ try {
       # example fetchImpl(threadsUrl(ctx), ...)). Because the content script
       # runs only on the manifest's matched service origins, those calls are
       # same-origin uses of each declared current/legacy ADO host pattern.
-      $hit = Select-String -Path "$extPrefix\content.js","$extPrefix\src\lib\*.js","$extPrefix\src\adapters\*.js" -Pattern "fetch(?:Impl)?\([^)]*${hpHost}|fetch(?:Impl)?\([^)]*(?:['""]/|\b(?:url|[A-Za-z]+Url\())" 2>$null `
+      $hit = Select-String -Path $codePaths -Pattern "fetch(?:Impl)?\([^)]*${hpHost}|fetch(?:Impl)?\([^)]*(?:['""]/|\b(?:url|[A-Za-z]+Url\())" 2>$null `
         | Where-Object { $_.Line -notmatch '^\s*//' -and $_.Line -notmatch '^\s*\*' }
       if ($hit) {
         Pass "host_permission '$hp' is used by fetch() ($($hit.Count) call$(if ($hit.Count -ne 1) { 's' }))"

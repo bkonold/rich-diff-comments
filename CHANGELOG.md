@@ -4,6 +4,8 @@ All notable changes to Markdown PR Comments for GitHub (formerly *Rich Diff Comm
 
 ## [Unreleased]
 
+## [1.10.0] — 2026-09-22
+
 ### Changed
 
 - **Authentication is now browser-session only.** The extension no longer offers its dormant Personal Access Token fallback, and upgrading to v1.10.0 removes any GitHub token previously saved by that older mode without reading or transmitting it. Normal commenting on public and private repositories continues to use the GitHub session already open in the browser.
