@@ -593,7 +593,7 @@ To discover a new endpoint: open DevTools → Network → filter `page_data`, pe
 
 **Submit-review is intentionally not implemented** — GitHub's native "Review changes" button on the Files-changed tab already covers it. See [FEATURES.md → Won't do](../FEATURES.md#-wont-do-deliberate-trade-offs).
 
-If cookie endpoints stop working, fallback is GraphQL (`api.github.com/graphql`) with a PAT — mutations are `addPullRequestReviewComment` (with `inReplyTo`), `resolveReviewThread`, `unresolveReviewThread`. Would reuse existing PAT plumbing (`grdc_use_pat`).
+GitHub v1.10.0 removes the dormant PAT plumbing. If these cookie-authenticated endpoints stop working, block the affected action with a clear error while investigating another browser-session-authenticated path; do not collect a credential as a fallback.
 
 ## Thread state (resolved / outdated)
 

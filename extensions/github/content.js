@@ -9,6 +9,16 @@
 (function () {
   "use strict";
 
+  // v1.10.0 removed the dormant PAT fallback. Delete legacy values without
+  // reading them so upgrades cannot retain a credential under github.com.
+  try {
+    localStorage.removeItem('grdc_github_token');
+    localStorage.removeItem('grdc_use_pat');
+  } catch (_) {
+    // Storage can be unavailable in restricted browser contexts. The runtime
+    // remains session-only either way because no code reads these keys.
+  }
+
   // Pure helpers are defined in src/lib/*.js (loaded before this script via manifest.json).
   // They're shared with the Node test suite. See docs/github/APPROACH.md for the strategy.
   const {
@@ -76,14 +86,6 @@
   }
 
   // ── GitHub API ─────────────────────────────────────────────────────────────
-
-  function getGitHubToken() {
-    return localStorage.getItem("grdc_github_token");
-  }
-
-  function setGitHubToken(token) {
-    localStorage.setItem("grdc_github_token", token);
-  }
 
   // Try to discover the head/base commit SHAs from the page DOM.
   function discoverCommitOids() {
@@ -260,52 +262,7 @@
     }
   }
 
-  // PAT-based fallback (kept for compatibility / opt-in)
-  async function postReviewCommentApi(path, line, body, opts) {
-    const token = getGitHubToken();
-    if (!token) {
-      promptForToken();
-      return { ok: false, error: "No token configured" };
-    }
-    opts = opts || {};
-    const startLine = (opts.startLine != null && opts.startLine < line) ? opts.startLine : null;
-
-    if (!prInfo.commitId) {
-      const res0 = await fetch(
-        `https://api.github.com/repos/${prInfo.owner}/${prInfo.repo}/pulls/${prInfo.pullNumber}`,
-        { headers: { Authorization: `token ${token}`, Accept: "application/vnd.github.v3+json" } }
-      );
-      if (res0.ok) prInfo.commitId = (await res0.json()).head.sha;
-    }
-
-    const res = await fetch(
-      `https://api.github.com/repos/${prInfo.owner}/${prInfo.repo}/pulls/${prInfo.pullNumber}/comments`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `token ${token}`,
-          Accept: "application/vnd.github.v3+json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          body, commit_id: prInfo.commitId, path, line, side: "RIGHT",
-          ...(startLine != null ? { start_line: startLine, start_side: "RIGHT" } : {}),
-        }),
-      }
-    );
-
-    if (!res.ok) {
-      const err = await res.json();
-      return { ok: false, error: err.message || `HTTP ${res.status}` };
-    }
-    return { ok: true };
-  }
-
-  // Default: use internal endpoint (session cookies). Set localStorage 'grdc_use_pat' = '1' to use PAT.
   async function postReviewComment(path, line, body, opts) {
-    if (localStorage.getItem("grdc_use_pat") === "1") {
-      return postReviewCommentApi(path, line, body, opts);
-    }
     return postReviewCommentInternal(path, line, body, opts);
   }
 
@@ -849,22 +806,6 @@
       // Delay so a mousedown on the dropdown can still fire.
       setTimeout(() => close(), 150);
     });
-  }
-
-  // ── Token Prompt ───────────────────────────────────────────────────────────
-
-
-  function promptForToken() {
-    const existing = getGitHubToken();
-    const token = prompt(
-      "Markdown PR — Markdown PR Comments for GitHub needs a Personal Access Token (PAT) with 'repo' scope.\n\n" +
-        "Create one at: https://github.com/settings/tokens\n\n" +
-        "Enter your token:",
-      existing || ""
-    );
-    if (token && token.trim()) {
-      setGitHubToken(token.trim());
-    }
   }
 
   // ── Line Number Mapping ────────────────────────────────────────────────────

@@ -90,6 +90,7 @@ test('GitHub and ADO manifests remain separately scoped', () => {
     'https://dev.azure.com/*',
     'https://*.visualstudio.com/*'
   ]);
+  assert.equal(githubManifest.version, '1.10.0');
   assert.equal(adoManifest.version, '1.3.0');
   assert.match(adoManifest.name, /Azure DevOps/);
   assert.doesNotMatch(githubManifest.name, /Azure DevOps/);

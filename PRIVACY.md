@@ -34,16 +34,11 @@ The extension does not request any other permissions and does not have access to
 
 ## Local storage
 
-The extension stores the following in your browser's local storage (`localStorage`), all under the `github.com` origin:
-
-- `grdc_use_pat` (optional, off by default): a flag indicating whether to use a Personal Access Token instead of session cookies.
-- `grdc_github_token` (optional, only if you choose PAT mode): the PAT you provide. This value never leaves your browser except in `Authorization: token ...` headers sent to `github.com` / `api.github.com`.
-
-Both keys can be cleared at any time from your browser's DevTools (`Application → Storage → Local Storage`).
+The extension stores sidebar layout and display preferences in your browser's local storage under the `github.com` origin. It does not store credentials, comment drafts, raw Markdown files, or review-thread contents. Version 1.10.0 also deletes the two legacy PAT-related keys used by an older dormant fallback without reading their values.
 
 ## Authentication
 
-The extension does not handle, store, or transmit your GitHub password. Authentication is performed by your browser's existing GitHub session cookies (or, in the optional PAT mode, by a token you provide). Requests succeed only if your normal GitHub account would be allowed to perform the same action.
+The extension does not handle, store, or transmit your GitHub password or a Personal Access Token. Authentication is performed by the GitHub session already established in your browser. Requests succeed only if your signed-in GitHub account is allowed to perform the same action.
 
 ## Children
 

@@ -146,7 +146,7 @@ All JavaScript is bundled in the package (`content.js` + `src/lib/*.js`). No `ev
 
 **What user data do you plan to collect from users now or in the future?** — check ONLY these two:
 
-- ☑ **Authentication information** — the extension reads the user's existing `github.com` session cookies (and an optional opt-in PAT from `localStorage` under the github.com origin) so it can make same-origin requests to GitHub's PR endpoints on the user's behalf. Authentication data is never transmitted anywhere except back to `github.com`.
+- ☑ **Authentication information** — the extension relies on the browser-managed `github.com` session so it can make same-origin requests to GitHub's PR endpoints on the user's behalf. It does not read or store passwords, raw session cookies, Personal Access Tokens, or OAuth tokens.
 - ☑ **Website content** — the extension reads the rendered diff DOM of GitHub PR pages and the raw markdown source of changed files, in order to render the inline comment UI. Processed locally in the browser.
 
 Leave all other categories unchecked: Personally identifiable info, Health, Financial, Personal communications, Location, Web history, User activity.

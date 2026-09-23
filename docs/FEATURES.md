@@ -112,15 +112,15 @@ Priority applies to the shared user outcome:
 
 ## 🎯 GitHub v1.10.0 candidate
 
-This release candidate closes the two remaining P0 visibility gaps for conversations attached inside compound rendered blocks and adds a complete way to dismiss and restore the sidebar. Marker implementation starts only after the current GitHub rich-diff table and code-block DOM has been captured and recorded in the GitHub developer notes.
+This release candidate closes the two remaining P0 visibility gaps for conversations attached inside compound rendered blocks, simplifies comment actions, and fixes navigation and sidebar-layout friction. Marker implementation starts only after the current GitHub rich-diff table and code-block DOM has been captured and recorded in the GitHub developer notes.
 
 ### Security and authentication
 
-- [ ] **P0 — Remove dormant Personal Access Token mode and stored credentials**
+- [x] **P0 — Remove dormant Personal Access Token mode and stored credentials**
   - **Outcome:** authentication always uses the browser-managed signed-in session, and the extension never asks for or persistently stores a GitHub credential.
-  - **GitHub:** 📋 Planned for GitHub v1.10.0. Remove the hidden PAT/REST fallback, token prompt, and PAT-related privacy documentation; delete any legacy `grdc_github_token` and `grdc_use_pat` values left in GitHub local storage by earlier versions.
+  - **GitHub:** △ Implemented and validated for GitHub v1.10.0; release pending. The hidden PAT/REST fallback and token prompt are removed, and upgrades delete legacy PAT values without reading them.
   - **ADO:** ✅ Already session-only and never stores a PAT.
-  - **Constraint:** preserve normal session-cookie comment submission and verify that upgrading users do not retain a previously stored token.
+  - **Constraint:** normal session-cookie comment submission remains covered by the GitHub browser suite.
 
 ### Correctness
 
@@ -136,12 +136,32 @@ This release candidate closes the two remaining P0 visibility gaps for conversat
   - **ADO:** ✅ ADO v1.3.0. A keyboard-accessible marker identifies each affected source line, shows the thread count, and cycles through conversations on that line.
   - **Constraint:** use a non-destructive overlay and never split or rewrite syntax-highlighted code DOM. Position markers proportionally when wrapping or syntax-highlighter row compression prevents exact visual alignment.
 
+- [ ] **P1 — Allow repeated navigation to the same Table of Contents destination**
+  - **Outcome:** clicking the same rendered Table of Contents link repeatedly always scrolls to its section, even when that anchor is already the current URL fragment.
+  - **GitHub:** 📋 Planned for GitHub v1.10.0. The first click works today, but a second click on the same link does nothing until another destination is selected.
+  - **ADO:** ✅ No equivalent repeated-anchor issue observed in Preview.
+  - **Constraint:** preserve normal heading-anchor behavior, browser history, and links to a different section.
+
+### Review and collaboration
+
+- [ ] **P2 — Simplify actions on the reviewer's own comments**
+  - **Outcome:** Edit and Delete are visible as direct comment-header actions, while the redundant `GitHub ↗` link and one-item overflow menu are removed.
+  - **GitHub:** 📋 Planned for GitHub v1.10.0. Move Delete out of the `⋯` menu beside Edit and retain the deletion confirmation.
+  - **ADO:** ↔ Uses its own direct inline comment actions and has no GitHub link.
+  - **Constraint:** show destructive styling for Delete, preserve ownership checks, and keep accidental deletion protected by confirmation.
+
 ### Navigation and focus
 
 - [ ] **P2 — Dismiss and restore the sidebar without losing its layout**
   - **Outcome:** reviewers can remove the sidebar completely when they need the full page width, then restore it from a small launcher without losing its saved position and size.
   - **GitHub:** 📋 Planned for GitHub v1.10.0; collapse and keyboard toggle are available, but there is no full-dismiss control or launcher.
   - **ADO:** ✅ The header × hides the sidebar and a launcher restores it.
+
+- [ ] **P1 — Keep sidebar content stable while resizing**
+  - **Outcome:** resizing the sidebar changes only its viewport dimensions; the active tab, selected item, and list position do not unexpectedly move or reset during the drag.
+  - **GitHub:** 📋 Planned for GitHub v1.10.0. Changes, Threads, and Outline content currently shifts while the sidebar size is adjusted.
+  - **ADO:** ✅ No equivalent resize movement observed.
+  - **Constraint:** preserve persisted width and height without rebuilding tab content or changing navigation state on intermediate resize events.
 
 ---
 
