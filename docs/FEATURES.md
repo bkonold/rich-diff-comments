@@ -162,7 +162,7 @@ This release removes dormant credential storage, simplifies comment actions, and
 
 ## 🎯 GitHub v1.11.0 candidate
 
-This release targets the two remaining P0 visibility gaps for conversations attached inside compound rendered blocks. Implementation starts only after the current GitHub rich-diff table and code-block DOM has been captured and recorded in the GitHub developer notes.
+This release prioritizes the two remaining P0 visibility gaps for conversations attached inside compound rendered blocks, plus targeted sidebar clarity. Compound-marker implementation starts only after the current GitHub rich-diff table and code-block DOM has been captured and recorded in the GitHub developer notes.
 
 ### Correctness
 
@@ -177,6 +177,14 @@ This release targets the two remaining P0 visibility gaps for conversations atta
   - **GitHub:** 📋 Planned for GitHub v1.11.0. Blocked on capturing the current rich-diff code-block DOM and computed layout before implementation.
   - **ADO:** ✅ ADO v1.3.0. A keyboard-accessible marker identifies each affected source line, shows the thread count, and cycles through conversations on that line.
   - **Constraint:** use a non-destructive overlay and never split or rewrite syntax-highlighted code DOM. Position markers proportionally when wrapping or syntax-highlighter row compression prevents exact visual alignment.
+
+### Navigation and focus
+
+- [ ] **P1 — Show bulk rendering only when Markdown files still need it**
+  - **Outcome:** the Threads and Changes empty states distinguish “no comments or changes here” from “Markdown has not been rendered,” and offer bulk rich-diff rendering only while eligible Markdown files remain in source view.
+  - **GitHub:** 📋 Planned for GitHub v1.11.0. The Threads empty state currently shows the bulk-render action whenever no threads are visible, even when rich-diff content is already on screen.
+  - **ADO:** — Preview has no equivalent bulk-render action.
+  - **Constraint:** keep the action available when other Markdown files still need rendering, including when the current file is already rich-diff; preserve the separate one-file guidance for virtualized large PRs.
 
 ---
 
