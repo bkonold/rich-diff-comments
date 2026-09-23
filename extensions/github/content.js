@@ -4893,25 +4893,23 @@
     tree.scrollTop = Math.max(0, Math.min(target, maxScroll));
   }
 
-  function tryScrollToHashAnchor() {
-    const hash = (window.location.hash || '').replace(/^#/, '');
+  function findRichDiffHeadingForHash(hash, preferredScope) {
     if (!hash) return;
-    // If the browser already found a target with this id/name, native
-    // anchoring handles it — bail.
-    if (document.getElementById(hash) || document.getElementsByName(hash).length) return;
 
     // Scope to the file matching `?file=<path>` when present; otherwise
     // search across all rich-diff prose bodies on the page.
-    let scope;
-    try {
-      const fileParam = new URL(window.location.href).searchParams.get('file');
-      if (fileParam) {
-        const containers = document.querySelectorAll('div[id^="diff-"]');
-        for (const c of containers) {
-          if (getFilePath(c) === fileParam) { scope = c; break; }
+    let scope = preferredScope;
+    if (!scope) {
+      try {
+        const fileParam = new URL(window.location.href).searchParams.get('file');
+        if (fileParam) {
+          const containers = document.querySelectorAll('div[id^="diff-"]');
+          for (const c of containers) {
+            if (getFilePath(c) === fileParam) { scope = c; break; }
+          }
         }
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
     const roots = scope
       ? [scope.querySelector('.prose-diff .markdown-body, .prose-diff, .rich-diff-level-one .markdown-body')].filter(Boolean)
       : document.querySelectorAll('.prose-diff .markdown-body, .prose-diff, .rich-diff-level-one .markdown-body');
@@ -4920,14 +4918,59 @@
       const headings = root.querySelectorAll('h1, h2, h3, h4, h5, h6');
       for (const h of headings) {
         if (slugifyHeading(h.textContent) === hash) {
-          scrollToWithStickyOffset(h);
-          return;
+          return h;
         }
       }
     }
   }
 
-  window.addEventListener('hashchange', tryScrollToHashAnchor);
+  function tryScrollToHashAnchor(preferredScope) {
+    let hash;
+    try { hash = decodeURIComponent((window.location.hash || '').replace(/^#/, '')); } catch (_) { return; }
+    if (!hash) return;
+    // If the browser already found a target with this id/name, native
+    // anchoring handles it — bail.
+    if (document.getElementById(hash) || document.getElementsByName(hash).length) return;
+
+    const heading = findRichDiffHeadingForHash(hash, preferredScope);
+    if (heading) scrollToWithStickyOffset(heading);
+  }
+
+  // `hashchange` does not fire when a reviewer clicks the same TOC link twice.
+  // Resolve every rendered TOC click directly. For a new hash, push a history
+  // entry without asking the browser to perform native anchor scrolling first;
+  // GitHub strips these heading ids, so that native attempt can jump to the top
+  // and race our manual scroll. Back/forward still emits `hashchange`.
+  // Prefer the clicked file so duplicate headings in another rendered Markdown
+  // file cannot steal the destination.
+  document.addEventListener('click', (e) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const origin = e.target instanceof Element ? e.target : e.target?.parentElement;
+    const link = origin?.closest?.('a[href^="#"]');
+    if (!link || !link.closest('.prose-diff, .rich-diff-level-one')) return;
+
+    const href = link.getAttribute('href') || '';
+    let hash;
+    try { hash = decodeURIComponent(href.replace(/^#/, '')); } catch (_) { return; }
+    if (!hash || document.getElementById(hash) || document.getElementsByName(hash).length) return;
+
+    const fileScope = link.closest('div[id^="diff-"]');
+    const heading = findRichDiffHeadingForHash(hash, fileScope);
+    if (!heading) return;
+
+    e.preventDefault();
+    let currentHash = '';
+    try { currentHash = decodeURIComponent((window.location.hash || '').replace(/^#/, '')); } catch (_) {}
+    if (currentHash === hash) {
+      scrollToWithStickyOffset(heading);
+      return;
+    }
+
+    window.history.pushState(window.history.state, '', href);
+    scrollToWithStickyOffset(heading);
+  }, true);
+
+  window.addEventListener('hashchange', () => tryScrollToHashAnchor());
 
   // Whenever any section toggles (sidebar chevron, fold/unfold button, or
   // the heading's own collapse chevron in the doc), rebuild the outline

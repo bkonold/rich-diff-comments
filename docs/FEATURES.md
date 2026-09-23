@@ -136,9 +136,9 @@ This release candidate closes the two remaining P0 visibility gaps for conversat
   - **ADO:** ✅ ADO v1.3.0. A keyboard-accessible marker identifies each affected source line, shows the thread count, and cycles through conversations on that line.
   - **Constraint:** use a non-destructive overlay and never split or rewrite syntax-highlighted code DOM. Position markers proportionally when wrapping or syntax-highlighter row compression prevents exact visual alignment.
 
-- [ ] **P1 — Allow repeated navigation to the same Table of Contents destination**
+- [x] **P1 — Allow repeated navigation to the same Table of Contents destination**
   - **Outcome:** clicking the same rendered Table of Contents link repeatedly always scrolls to its section, even when that anchor is already the current URL fragment.
-  - **GitHub:** 📋 Planned for GitHub v1.10.0. The first click works today, but a second click on the same link does nothing until another destination is selected.
+  - **GitHub:** △ Implemented and browser-validated for GitHub v1.10.0; release pending. Repeated clicks scroll directly, while changed destinations and browser Back/Forward retain hash history.
   - **ADO:** ✅ No equivalent repeated-anchor issue observed in Preview.
   - **Constraint:** preserve normal heading-anchor behavior, browser history, and links to a different section.
 

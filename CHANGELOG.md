@@ -8,6 +8,10 @@ All notable changes to Markdown PR Comments for GitHub (formerly *Rich Diff Comm
 
 - **Authentication is now browser-session only.** The extension no longer offers its dormant Personal Access Token fallback, and upgrading to v1.10.0 removes any GitHub token previously saved by that older mode without reading or transmitting it. Normal commenting on public and private repositories continues to use the GitHub session already open in the browser.
 
+### Fixed
+
+- **Table of Contents links work every time, including repeated clicks on the same section.** You can return to a section after scrolling away without first clicking a different heading, while links to other sections and browser Back/Forward navigation continue to work normally.
+
 ## [1.9.0] — 2026-07-02
 
 ### Added
