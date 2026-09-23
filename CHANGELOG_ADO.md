@@ -4,6 +4,10 @@ All notable user-visible changes to the Azure DevOps browser extension are recor
 
 ## [Unreleased]
 
+### Added
+
+- **Copy a direct link from any rendered comment.** The comment-header action copies the same comment-specific destination used by Azure DevOps and confirms whether the link reached the clipboard.
+
 ## [1.3.0] — 2026-09-21
 
 ### Added

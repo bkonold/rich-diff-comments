@@ -14,7 +14,7 @@
   'use strict';
 
   const LOG = '[ADRC]';
-  const RUNTIME_REVISION = '2026-09-21-trailing-space-hunks-r36';
+  const RUNTIME_REVISION = '2026-09-23-copy-thread-link-r37';
   const adapter = (typeof window !== 'undefined' && window.ADORC) || null;
   const startupTiming = {
     scriptLoadedAt: performance.now(),
@@ -813,7 +813,7 @@
     }));
   }
 
-  function renderCommentHtml(c) {
+  function renderCommentHtml(c, commentLink) {
     const author = escapeHtml((c.author && c.author.displayName) || 'Unknown');
     const time = escapeHtml(formatTime(c.publishedDate));
     const edited = c.lastContentUpdatedDate && c.lastContentUpdatedDate !== c.publishedDate
@@ -827,14 +827,20 @@
       ? `<img class="adrc-thread-comment-avatar" src="${escapeAttr(imageUrl)}" alt="" />`
       : '';
 
-    // Edit / Delete affordances live in the meta row's right side (like
-    // GitHub's comment header) so they're near the author identity and
-    // don't push the body around. Only shown on the current user's own
-    // undeleted comments.
-    const ownActions = isOwnComment(c) && !c.isDeleted
+    // Copy link is available on every visible comment, while Edit / Delete
+    // remain ownership-limited. ADO selects the containing conversation with
+    // discussionId and the individual comment with its timestamp fragment.
+    const ownActions = isOwnComment(c)
+      ? `<button type="button" class="adrc-comment-inline-btn adrc-edit-comment" data-comment-id="${c.id}">Edit</button>` +
+        `<button type="button" class="adrc-comment-inline-btn adrc-delete-comment" data-comment-id="${c.id}">Delete</button>`
+      : '';
+    const copyAction = commentLink
+      ? `<button type="button" class="adrc-comment-inline-btn adrc-copy-comment-link" title="Copy link to this comment">Copy link</button>`
+      : '';
+    const inlineActions = !c.isDeleted && (copyAction || ownActions)
       ? `<span class="adrc-comment-inline-actions">` +
-          `<button type="button" class="adrc-comment-inline-btn adrc-edit-comment" data-comment-id="${c.id}">Edit</button>` +
-          `<button type="button" class="adrc-comment-inline-btn adrc-delete-comment" data-comment-id="${c.id}">Delete</button>` +
+          copyAction +
+          ownActions +
         `</span>`
       : '';
 
@@ -845,7 +851,7 @@
           `<span class="adrc-thread-comment-author">${author}</span>` +
           ` · ${time}${edited}` +
         `</span>` +
-        ownActions +
+        inlineActions +
       `</div>`;
 
     if (c.isDeleted) {
@@ -857,6 +863,43 @@
     const bodyHtml = renderMarkdownWithMentions(c.content || '');
 
     return `<div class="adrc-thread-comment" data-comment-id="${c.id}">${meta}<div class="adrc-thread-comment-body">${bodyHtml}</div></div>`;
+  }
+
+  async function copyTextToClipboard(text) {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copied = document.execCommand('copy');
+    textarea.remove();
+    if (!copied) throw new Error('Clipboard write was rejected');
+  }
+
+  async function copyCommentLink(button, link) {
+    button.disabled = true;
+    try {
+      await copyTextToClipboard(link);
+      button.textContent = 'Copied!';
+      button.title = 'Comment link copied';
+    } catch (error) {
+      console.warn(`${LOG} failed to copy comment link:`, error && error.message ? error.message : error);
+      button.textContent = 'Copy failed';
+      button.title = 'Could not copy comment link';
+    }
+    setTimeout(() => {
+      if (!button.isConnected) return;
+      button.textContent = 'Copy link';
+      button.title = 'Copy link to this comment';
+      button.disabled = false;
+    }, 1600);
   }
 
   // ── Shared editor (Write / Preview tabs, toolbar, auto-grow) ─────────
@@ -1212,7 +1255,9 @@
       ? ' <span class="adrc-thread-status">· ✓ resolved</span>'
       : '';
     const header = `<div class="adrc-thread-panel-header">Thread ${thread.id}${statusSuffix}</div>`;
-    const comments = (thread.comments || []).map(renderCommentHtml).join('');
+    const comments = (thread.comments || []).map((comment) => (
+      renderCommentHtml(comment, window.GRDC.getAdoCommentLink(thread, comment, ctx))
+    )).join('');
     const resolveLabel = thread.status === 'fixed' ? 'Unresolve' : 'Resolve';
     const actions = [
       '<div class="adrc-thread-actions">',
@@ -1229,6 +1274,14 @@
 
     replyBtn.addEventListener('click', () => openReplyBox(panel, thread));
     statusBtn.addEventListener('click', () => toggleThreadStatus(thread, statusBtn));
+
+    panel.querySelectorAll('.adrc-copy-comment-link').forEach(btn => {
+      const commentEl = btn.closest('.adrc-thread-comment');
+      const commentId = commentEl && parseInt(commentEl.dataset.commentId, 10);
+      const comment = (thread.comments || []).find((candidate) => candidate.id === commentId);
+      const commentLink = window.GRDC.getAdoCommentLink(thread, comment, ctx);
+      btn.addEventListener('click', () => copyCommentLink(btn, commentLink));
+    });
 
     // Wire per-comment Edit / Delete affordances on any of the current
     // user's own comments.

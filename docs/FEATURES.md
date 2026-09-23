@@ -183,7 +183,7 @@ This release prioritizes the two remaining P0 visibility gaps for conversations 
 - [ ] **P0 — Complete the core Edit, Delete, and Copy link comment actions**
   - **Outcome:** reviewers can edit or delete their own rendered comments and copy a stable link to any visible conversation without leaving the rendered review surface.
   - **GitHub:** ✅ GitHub v1.11.0. Edit and Delete remain ownership-limited, while Copy link works for every visible comment and uses the canonical URL or a reconstructed stable discussion fragment.
-  - **ADO:** △ Edit and Delete shipped in ADO v1.0.0; Copy link is planned. Azure DevOps exposes a thread-level destination rather than a distinct URL for each reply.
+  - **ADO:** △ Implemented, browser-tested, and live-validated for ADO v1.4.0; release pending. Edit and Delete remain ownership-limited, while Copy link works for every visible comment using its native conversation ID and publication-time fragment.
   - **Constraint:** retain ownership checks and deletion confirmation. Copy the most specific stable destination each host supports, provide clear copied feedback, and fall back safely when link metadata is absent.
 
 - [ ] **P1 — Turn a conversation into tracked work**

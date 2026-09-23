@@ -6,6 +6,7 @@ const {
   findBlobInJson,
   threadResponseToComments,
   getGitHubCommentLink,
+  getAdoCommentLink,
   escapeHtml,
   formatTimeAgo,
   parseMarkersMap,
@@ -38,6 +39,36 @@ test('getGitHubCommentLink returns empty when neither canonical nor fallback met
   assert.equal(getGitHubCommentLink({ dbId: 123 }, { owner: 'acme', pullNumber: 42 }), '');
   assert.equal(getGitHubCommentLink({ dbId: 123 }, { owner: 'acme', repo: 'widgets', pullNumber: 0 }), '');
   assert.equal(getGitHubCommentLink(null, null), '');
+});
+
+test('getAdoCommentLink matches the native discussion URL and selected comment fragment', () => {
+  assert.equal(
+    getAdoCommentLink(
+      { id: 25 },
+      { id: 2, publishedDate: '2026-09-22T00:52:54.000Z' },
+      { org: 'acme', projectName: 'design docs', repoName: 'widgets', prId: 42 }
+    ),
+    'https://dev.azure.com/acme/design%20docs/_git/widgets/pullRequest/42?discussionId=25#1790038374'
+  );
+});
+
+test('getAdoCommentLink falls back to the thread destination when publication time is absent', () => {
+  assert.equal(
+    getAdoCommentLink(
+      { id: '25' },
+      { id: 2 },
+      { org: 'acme', projectName: 'project', repoName: 'widgets', prId: '42' }
+    ),
+    'https://dev.azure.com/acme/project/_git/widgets/pullRequest/42?discussionId=25'
+  );
+});
+
+test('getAdoCommentLink returns empty when required thread or PR metadata is incomplete', () => {
+  const context = { org: 'acme', projectName: 'project', repoName: 'widgets', prId: 42 };
+  assert.equal(getAdoCommentLink({}, {}, context), '');
+  assert.equal(getAdoCommentLink({ id: 25 }, {}, { org: 'acme', repoName: 'widgets', prId: 42 }), '');
+  assert.equal(getAdoCommentLink({ id: 25 }, {}, { ...context, prId: 0 }), '');
+  assert.equal(getAdoCommentLink(null, null, null), '');
 });
 
 test('looksLikePath accepts normal paths', () => {

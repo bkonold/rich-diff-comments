@@ -33,6 +33,7 @@
         "src/lib/changes.js",
         "src/lib/mentions.js",
         "src/lib/lineMap.js",
+        "src/lib/responses.js",
         "src/adapters/ado.js",
         "content.js"
       ],

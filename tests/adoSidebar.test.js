@@ -19,24 +19,27 @@ function ruleBody(selector) {
   return match ? match[1] : '';
 }
 
-test('ADO manifest loads shared sidebar and Changes helpers before content.js', () => {
+test('ADO manifest loads required shared helpers before content.js', () => {
   const scripts = manifest.content_scripts[0].js;
   const sidebarIndex = scripts.indexOf('src/lib/sidebar.js');
   const outlineIndex = scripts.indexOf('src/lib/outline.js');
   const changesIndex = scripts.indexOf('src/lib/changes.js');
+  const responsesIndex = scripts.indexOf('src/lib/responses.js');
   const contentIndex = scripts.indexOf('content.js');
   assert.ok(sidebarIndex >= 0, 'Expected src/lib/sidebar.js in ADO manifest');
   assert.ok(outlineIndex >= 0, 'Expected src/lib/outline.js in ADO manifest');
   assert.ok(changesIndex >= 0, 'Expected src/lib/changes.js in ADO manifest');
+  assert.ok(responsesIndex >= 0, 'Expected src/lib/responses.js in ADO manifest');
   assert.ok(contentIndex >= 0, 'Expected content.js in ADO manifest');
   assert.ok(sidebarIndex < contentIndex, 'Sidebar helpers must load before content.js');
   assert.ok(outlineIndex < contentIndex, 'Outline helpers must load before content.js');
   assert.ok(changesIndex < contentIndex, 'Changes helpers must load before content.js');
+  assert.ok(responsesIndex < contentIndex, 'Response helpers must load before content.js');
   assert.equal(manifest.content_scripts[0].run_at, 'document_end', 'ADO sidebar should mount as soon as the DOM is ready');
 });
 
 test('ADO exposes a runtime revision for live loaded-script verification', () => {
-  assert.match(content, /const RUNTIME_REVISION = '2026-09-21-trailing-space-hunks-r36'/);
+  assert.match(content, /const RUNTIME_REVISION = '2026-09-23-copy-thread-link-r37'/);
   assert.match(content, /revision: RUNTIME_REVISION/);
 });
 
