@@ -124,6 +124,12 @@ This release candidate closes the two remaining P0 visibility gaps for conversat
 
 ### Correctness
 
+- [x] **P1 — Make bulk rich-diff rendering reliable on GitHub's large-PR surface**
+  - **Outcome:** “Render all Markdown files as rich-diff” either switches to a GitHub mode that can retain all rendered files and completes there, or clearly explains why PR-wide rendering is unavailable instead of showing temporary progress that disappears.
+  - **GitHub:** △ Implemented and browser-validated for GitHub v1.10.0; release pending. On `mode=virtualization`—with GitHub's “Switch to single file mode” link as a fallback signal—the extension hides PR-wide render controls, guards the bulk action, and shows one-file-at-a-time guidance instead.
+  - **ADO:** — Preview uses one selected file and has no equivalent bulk-render action.
+  - **Constraint:** do not navigate modes automatically and do not run the two-pass bulk sweep on the virtualized surface. Preserve the user's original scroll position when bulk rendering is supported.
+
 - [ ] **P0 — Inline markers for table rows that already have comments**
   - **Outcome:** a reviewer can see which exact table row has a conversation even though the thread body remains below the complete table.
   - **GitHub:** 📋 Planned for GitHub v1.10.0. Blocked on capturing the current rich-diff table DOM before implementation.
@@ -151,11 +157,6 @@ This release candidate closes the two remaining P0 visibility gaps for conversat
   - **Constraint:** show destructive styling for Delete, preserve ownership checks, and keep accidental deletion protected by confirmation.
 
 ### Navigation and focus
-
-- [ ] **P2 — Dismiss and restore the sidebar without losing its layout**
-  - **Outcome:** reviewers can remove the sidebar completely when they need the full page width, then restore it from a small launcher without losing its saved position and size.
-  - **GitHub:** 📋 Planned for GitHub v1.10.0; collapse and keyboard toggle are available, but there is no full-dismiss control or launcher.
-  - **ADO:** ✅ The header × hides the sidebar and a launcher restores it.
 
 - [x] **P1 — Keep sidebar content stable while resizing**
   - **Outcome:** resizing the sidebar changes only its viewport dimensions; the active tab and scroll position in Changes, Threads, and Outline do not move during the drag.
@@ -225,6 +226,12 @@ This release candidate closes the two remaining P0 visibility gaps for conversat
   - Evaluate the reduced click cost against the permanent vertical space added to every expanded thread.
 
 ### Navigation and focus
+
+- [ ] **P2 — Reconsider full sidebar dismissal and restoration**
+  - **Outcome:** reviewers can reclaim page space without creating a hidden state that first-time users cannot easily discover or recover from.
+  - **GitHub:** ⏸ Deferred. Keep the existing collapse control and `t` shortcut; do not add a full-dismiss button or launcher until the restore affordance is proven discoverable.
+  - **ADO:** △ Shipped with a header × and restore launcher, but retained under UX review rather than treated as the parity target. Evaluate whether to remove full dismissal and keep collapse only.
+  - **Constraint:** do not remove the ADO behavior until its discoverability and usage have been manually reviewed; if full dismissal remains, position, size, active tab, filter, and collapsed state must survive restoration.
 
 - [ ] **P3 — Evaluate active-file prioritization during startup**
   - **Outcome:** reviewers can begin commenting sooner without making Changes, Threads, or Outline feel noticeably slower or incomplete.

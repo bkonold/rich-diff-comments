@@ -948,6 +948,9 @@ li.grdc-hoverable .grdc-comment-btn {
   align-items: center;
   justify-content: center;
 }
+.grdc-sidebar-header button[hidden] {
+  display: none;
+}
 .grdc-sidebar-header button:hover {
   /* Hover state per v2 spec: subtle white wash. */
   background: rgba(255, 255, 255, 0.1);

@@ -3179,6 +3179,24 @@
     return false;
   }
 
+  // GitHub virtualizes files on its "optimized for large pull requests"
+  // surface. Its URL uses `?mode=virtualization`; the native escape hatch is a
+  // link to `?mode=single`. While either signal is present, rich-diff state
+  // belongs only to currently mounted file nodes and cannot survive a PR-wide
+  // scroll sweep.
+  function isVirtualizedLargePrMode() {
+    try {
+      if (new URL(window.location.href).searchParams.get('mode') === 'virtualization') return true;
+    } catch (_) {}
+    return !!Array.from(document.querySelectorAll('a[href*="mode=single"]')).find((link) =>
+      /switch\s+to\s+single\s+file\s+mode/i.test(link.textContent || link.getAttribute('aria-label') || '')
+    );
+  }
+
+  function largePrRenderHint() {
+    return 'GitHub is optimizing this large pull request and unloads offscreen files. Review Markdown files one at a time and switch each file to rich diff as needed.';
+  }
+
   // Expand the sidebar (if collapsed) and render every `.md` file as
   // rich-diff, with tooltip + disabled feedback on the book button while
   // the work runs. Used by THREE call-sites:
@@ -3192,6 +3210,10 @@
   // signals "show me the outline".
   async function expandAndRenderAllMd(sidebar) {
     const btn = sidebar.querySelector('.grdc-sidebar-render-md');
+    if (isVirtualizedLargePrMode()) {
+      if (btn) btn.setAttribute('title', largePrRenderHint());
+      return 0;
+    }
     const orig = btn ? btn.getAttribute('title') : null;
     if (btn) {
       btn.setAttribute('title', 'Rendering Markdown files as rich-diff…');
@@ -3478,6 +3500,12 @@
 
     // Apply persisted state.
     sidebar.classList.toggle('grdc-sidebar-collapsed', collapsed);
+    const renderAllBtn = sidebar.querySelector('.grdc-sidebar-render-md');
+    const largePrMode = isVirtualizedLargePrMode();
+    if (renderAllBtn) {
+      renderAllBtn.hidden = largePrMode;
+      if (largePrMode) renderAllBtn.setAttribute('title', largePrRenderHint());
+    }
     const filterCb = sidebar.querySelector('.grdc-sidebar-filter-cb');
     if (filterCb.checked !== unresolvedOnly) filterCb.checked = unresolvedOnly;
     const headerFilter = sidebar.querySelector('.grdc-sidebar-header-filter');
@@ -3508,6 +3536,10 @@
     if (visible.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'grdc-sidebar-empty';
+      if (largePrMode) {
+        empty.innerHTML = `<p class="grdc-sidebar-empty-msg">${escapeHtml(largePrRenderHint())}</p>`;
+        list.appendChild(empty);
+      } else {
       const msg = threadEls.length === 0
         ? (unresolvedOnly
             ? 'No threads on this page yet.'
@@ -3530,6 +3562,7 @@
         expandAndRenderAllMd(sidebar);
       });
       list.appendChild(empty);
+      }
     }
     visible.forEach((threadEl, idx) => {
       const card = document.createElement('button');
@@ -4503,6 +4536,12 @@
         list.innerHTML = '';
         const empty = document.createElement('div');
         empty.className = 'grdc-sidebar-empty';
+        if (isVirtualizedLargePrMode()) {
+          empty.innerHTML = `<p class="grdc-sidebar-empty-msg">${escapeHtml(largePrRenderHint())}</p>`;
+          list.appendChild(empty);
+          updateChangesCount(sidebar);
+          return;
+        }
         empty.innerHTML = `
           <p class="grdc-sidebar-empty-msg">No changes visible yet. Render the Markdown files as rich-diff to see them.</p>
           <button type="button" class="grdc-sidebar-empty-cta">

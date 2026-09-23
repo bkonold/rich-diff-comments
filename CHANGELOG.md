@@ -13,6 +13,7 @@ All notable changes to Markdown PR Comments for GitHub (formerly *Rich Diff Comm
 
 - **Table of Contents links work every time, including repeated clicks on the same section.** You can return to a section after scrolling away without first clicking a different heading, while links to other sections and browser Back/Forward navigation continue to work normally.
 - **Sidebar lists now stay at the same scroll position while you resize the sidebar.** Dragging the bottom-right resize handle no longer makes the scrollbar thumb—and the visible place in Changes, Threads, or Outline—slide toward the bottom.
+- **Large pull requests no longer offer a bulk-render action that GitHub cannot retain.** When GitHub optimizes a PR by unloading offscreen files, the sidebar now asks you to review Markdown files one at a time and switch each file to rich diff as needed, instead of showing temporary progress that disappears at the end.
 
 ## [1.9.0] — 2026-07-02
 
