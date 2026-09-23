@@ -3036,6 +3036,64 @@
     });
   })();
 
+  // Native `resize: both` can trigger browser scroll anchoring as card text
+  // reflows. That changes scrollTop and visibly slides the scrollbar thumb
+  // while the user drags the sidebar's bottom-right handle. Lock each pane to
+  // its scrollTop at gesture start; resizing should change viewport dimensions,
+  // not navigate the Changes, Threads, or Outline lists.
+  function attachSidebarResizeScrollLock(sidebar) {
+    sidebar.addEventListener('mousedown', (e) => {
+      if (e.button !== 0 || sidebar.classList.contains('grdc-sidebar-collapsed')) return;
+      const rect = sidebar.getBoundingClientRect();
+      const handleSize = 20;
+      if (e.clientX < rect.right - handleSize || e.clientY < rect.bottom - handleSize) return;
+
+      const selectors = [
+        '.grdc-sidebar-changes-list',
+        '.grdc-sidebar-list',
+        '.grdc-sidebar-outline-tree',
+      ];
+      const locked = selectors.map((selector) => {
+        const scroller = sidebar.querySelector(selector);
+        return scroller ? { scroller, scrollTop: scroller.scrollTop } : null;
+      }).filter(Boolean);
+      sidebar._grdcResizeScrollLock = locked;
+
+      const restore = () => {
+        for (const item of locked) {
+          if (item.scroller.isConnected && item.scroller.scrollTop !== item.scrollTop) {
+            item.scroller.scrollTop = item.scrollTop;
+          }
+        }
+      };
+      // ResizeObserver only runs while dimensions are changing. Chromium can
+      // continue scrollbar track auto-repeat after the pointer leaves the
+      // bottom-right corner, so also cancel every scroll event for the full
+      // mouse gesture rather than waiting for another size callback.
+      for (const item of locked) {
+        item.onScroll = restore;
+        item.scroller.addEventListener('scroll', item.onScroll);
+      }
+      const onUp = () => {
+        document.removeEventListener('mouseup', onUp, true);
+        window.removeEventListener('mouseup', onUp, true);
+        window.removeEventListener('pointerup', onUp, true);
+        window.removeEventListener('blur', onUp);
+        for (const item of locked) {
+          item.scroller.removeEventListener('scroll', item.onScroll);
+        }
+        restore();
+        sidebar._grdcResizeScrollLock = null;
+      };
+      // Capture on both document and window so releasing over native browser
+      // chrome or outside a child scroller cannot leave the lock active.
+      document.addEventListener('mouseup', onUp, true);
+      window.addEventListener('mouseup', onUp, true);
+      window.addEventListener('pointerup', onUp, true);
+      window.addEventListener('blur', onUp);
+    });
+  }
+
   // Reset the sidebar to its default right-dock layout: clear persisted
   // position / size / collapsed state, drop inline styles, and rebuild so
   // the user can recover from an offscreen drag or unwanted collapse
@@ -3079,6 +3137,9 @@
     let writeTimer = null;
     const ro = new ResizeObserver(() => {
       if (sidebar.classList.contains('grdc-sidebar-collapsed')) return;
+      for (const item of sidebar._grdcResizeScrollLock || []) {
+        if (item.scroller.isConnected) item.scroller.scrollTop = item.scrollTop;
+      }
       clearTimeout(writeTimer);
       writeTimer = setTimeout(() => {
         try {
@@ -3323,6 +3384,7 @@
       const headerEl = sidebar.querySelector('.grdc-sidebar-header');
       attachSidebarDrag(sidebar, headerEl);
       applySidebarPersistedPos(sidebar);
+      attachSidebarResizeScrollLock(sidebar);
       observeSidebarResize(sidebar);
 
       sidebar.querySelector('.grdc-sidebar-collapse').addEventListener('click', () => {

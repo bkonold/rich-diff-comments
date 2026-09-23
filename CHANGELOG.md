@@ -12,6 +12,7 @@ All notable changes to Markdown PR Comments for GitHub (formerly *Rich Diff Comm
 ### Fixed
 
 - **Table of Contents links work every time, including repeated clicks on the same section.** You can return to a section after scrolling away without first clicking a different heading, while links to other sections and browser Back/Forward navigation continue to work normally.
+- **Sidebar lists now stay at the same scroll position while you resize the sidebar.** Dragging the bottom-right resize handle no longer makes the scrollbar thumb—and the visible place in Changes, Threads, or Outline—slide toward the bottom.
 
 ## [1.9.0] — 2026-07-02
 

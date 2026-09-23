@@ -157,11 +157,11 @@ This release candidate closes the two remaining P0 visibility gaps for conversat
   - **GitHub:** 📋 Planned for GitHub v1.10.0; collapse and keyboard toggle are available, but there is no full-dismiss control or launcher.
   - **ADO:** ✅ The header × hides the sidebar and a launcher restores it.
 
-- [ ] **P1 — Keep sidebar content stable while resizing**
-  - **Outcome:** resizing the sidebar changes only its viewport dimensions; the active tab, selected item, and list position do not unexpectedly move or reset during the drag.
-  - **GitHub:** 📋 Planned for GitHub v1.10.0. Changes, Threads, and Outline content currently shifts while the sidebar size is adjusted.
+- [x] **P1 — Keep sidebar content stable while resizing**
+  - **Outcome:** resizing the sidebar changes only its viewport dimensions; the active tab and scroll position in Changes, Threads, and Outline do not move during the drag.
+  - **GitHub:** △ Implemented and browser-validated for GitHub v1.10.0; release pending. Each pane's scroll position is locked for the duration of a bottom-right resize gesture so browser scroll anchoring cannot move its scrollbar thumb.
   - **ADO:** ✅ No equivalent resize movement observed.
-  - **Constraint:** preserve persisted width and height without rebuilding tab content or changing navigation state on intermediate resize events.
+  - **Constraint:** preserve persisted width and height without changing navigation state during intermediate resize events.
 
 ---
 

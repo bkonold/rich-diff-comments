@@ -108,11 +108,10 @@ test.describe('+ button visibility', () => {
 
     await h1.hover();
     // The `+` button transitions opacity 0 → 1 over 0.15s. Don't pin the
-    // exact final value (which would race the transition); just verify
-    // hover starts revealing it.
-    const opacityAfterHover = await h1.locator('.grdc-comment-btn').evaluate((el) => {
+    // exact final value. Poll until the transition has started because an
+    // immediate computed-style read can still land in its initial frame.
+    await expect.poll(() => h1.locator('.grdc-comment-btn').evaluate((el) => {
       return parseFloat(window.getComputedStyle(el).opacity);
-    });
-    expect(opacityAfterHover).toBeGreaterThan(0);
+    })).toBeGreaterThan(0);
   });
 });
