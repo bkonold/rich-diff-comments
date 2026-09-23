@@ -99,13 +99,23 @@ GitHub uses the original dark speech-bubble icon. ADO uses the separate Fluent-b
 
 The Web Store accepts up to 5 screenshots at **1280×800 or 640×400** (use the higher resolution). Never reuse screenshots across targets when the service chrome differs.
 
-Suggested ADO v1.3.0 set, in order:
+Current GitHub set, in order:
 
-1. Markdown Preview showing exact-row table thread markers and exact-line code-block thread markers.
-2. Added and modified section highlights beside the Changes tab.
-3. Pull-request-wide Outline with heading navigation and fold controls.
-4. An open comment editor showing `@mention` search results, plus a readable mention in an inline thread.
-5. The integrated sidebar and thread UI in Azure DevOps dark theme.
+1. Inline comment creation directly on rendered Markdown in rich diff.
+2. An expanded inline conversation synchronized with the Threads tab.
+3. Added, removed, and modified rendered sections synchronized with the Changes tab.
+4. Pull-request-wide Outline navigation and section-folding controls.
+
+The exact titles, subtitles, compositions, replacement rules, and deferred fifth-slide idea are in [the GitHub screenshot capture plan](../design/screenshots/GITHUB_CAPTURE_PLAN.md).
+
+Canonical ADO set, in order:
+
+1. Inline comment creation directly in Markdown Preview.
+2. An expanded inline conversation synchronized with the Threads tab.
+3. Added and modified rendered sections synchronized with the Changes tab.
+4. Pull-request-wide Outline navigation and section-folding controls.
+
+The exact titles, subtitles, compositions, and replacement rules are in [the ADO screenshot plan](../design/screenshots/ADO_CAPTURE_PLAN.md).
 
 Optional store assets:
 
