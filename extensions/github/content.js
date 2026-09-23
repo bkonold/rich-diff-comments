@@ -44,6 +44,7 @@
     clampDragPos,
     nextWrappingIndex,
     isMarkdownPath,
+    getMarkdownRenderState,
     slugifyHeading,
     buildOutlineTree,
     attributeThreadsToHeadings,
@@ -822,6 +823,7 @@
   // adds no value (and several attempts to detect those patterns via DOM
   // alone caused worse regressions — see the 2026-06-17 conversation).
   let pathChangeTypeMap = new Map();
+  const renderedMarkdownPaths = new Set();
 
   // Invalidate the route-data cache so the next `fetchRouteData()` re-fetches.
   // Call this after any mutation that adds a comment / reply / resolution so
@@ -839,6 +841,7 @@
     routeData = null;
     pathDigestMap.clear();
     pathChangeTypeMap.clear();
+    renderedMarkdownPaths.clear();
     rawSourceCache.clear();
     fileLineMap.clear();
     existingComments = [];
@@ -937,6 +940,29 @@
     try { return getFilePath(container) || ''; } catch (_) { return ''; }
   }
 
+  function markdownRenderState() {
+    // Refresh paths for every file container currently mounted by GitHub.
+    // Preserve observations for lazy-unmounted files, but update mounted files
+    // in both directions so switching one back to source view is reflected.
+    const mounted = new Map();
+    findFileContainers().forEach((container) => {
+      const path = getContainerPath(container);
+      if (!isMarkdownPath(path)) return;
+      const rendered = Array.from(container.querySelectorAll('.prose-diff'))
+        .some((root) => root.offsetParent || root === document.body);
+      mounted.set(path, (mounted.get(path) || false) || rendered);
+    });
+    mounted.forEach((rendered, path) => {
+      if (rendered) renderedMarkdownPaths.add(path);
+      else renderedMarkdownPaths.delete(path);
+    });
+
+    const expectedPaths = (routeData?.diffSummaries || [])
+      .map((summary) => summary?.path)
+      .filter(Boolean);
+    return getMarkdownRenderState(expectedPaths, Array.from(renderedMarkdownPaths));
+  }
+
   // Inside a file container, find the per-file toggle button that would
   // switch it to rich-diff. Returns null when the rich-diff segment is
   // already active or no toggle can be found. Reuses the same heuristics
@@ -1015,8 +1041,12 @@
                       btn.classList.contains('selected') ||
                       btn.classList.contains('SegmentedControl-item--selected');
       seen.add(path);
-      if (pressed) continue;
+      if (pressed) {
+        renderedMarkdownPaths.add(path);
+        continue;
+      }
       console.log(`[GRDC]   CLICK ${path}`);
+      renderedMarkdownPaths.add(path);
       btn.click();
       count++;
     }
@@ -3526,6 +3556,7 @@
     sidebar.classList.toggle('grdc-sidebar-collapsed', collapsed);
     const renderAllBtn = sidebar.querySelector('.grdc-sidebar-render-md');
     const largePrMode = isVirtualizedLargePrMode();
+    const renderState = markdownRenderState();
     if (renderAllBtn) {
       renderAllBtn.hidden = largePrMode;
       if (largePrMode) renderAllBtn.setAttribute('title', largePrRenderHint());
@@ -3564,20 +3595,23 @@
         empty.innerHTML = `<p class="grdc-sidebar-empty-msg">${escapeHtml(largePrRenderHint())}</p>`;
         list.appendChild(empty);
       } else {
+      const offerBulkRender = threadEls.length === 0 && !unresolvedOnly && renderState.hasUnrendered;
       const msg = threadEls.length === 0
         ? (unresolvedOnly
-            ? 'No threads on this page yet.'
-            : 'No review threads visible yet. Render the Markdown files as rich-diff to load any comments on them.')
+            ? 'No unresolved threads visible.'
+            : offerBulkRender
+              ? 'No review threads visible. Render remaining Markdown files as rich-diff to check them for comments.'
+              : 'No review threads visible.')
         : 'All threads on this page are resolved.';
       empty.innerHTML = `
         <p class="grdc-sidebar-empty-msg">${escapeHtml(msg)}</p>
-        <button type="button" class="grdc-sidebar-empty-cta">
+        ${offerBulkRender ? `<button type="button" class="grdc-sidebar-empty-cta">
           <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"/></svg>
           <span>Render all Markdown files as rich-diff</span>
-        </button>
+        </button>` : ''}
       `;
       const cta = empty.querySelector('.grdc-sidebar-empty-cta');
-      cta.addEventListener('click', () => {
+      cta?.addEventListener('click', () => {
         // Render-only — do NOT switch to the Outline tab. The user
         // clicked this CTA inside the Threads pane expecting threads to
         // appear after the render, not to be whisked away to Outline.
@@ -4563,6 +4597,14 @@
         if (isVirtualizedLargePrMode()) {
           empty.innerHTML = `<p class="grdc-sidebar-empty-msg">${escapeHtml(largePrRenderHint())}</p>`;
           list.appendChild(empty);
+          updateChangesCount(sidebar);
+          return;
+        }
+        if (!markdownRenderState().hasUnrendered) {
+          tab.hidden = true;
+          if (headerCluster) headerCluster.hidden = false;
+          sidebar._grdcChangeBlocks = [];
+          list.innerHTML = '';
           updateChangesCount(sidebar);
           return;
         }

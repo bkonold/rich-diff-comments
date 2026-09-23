@@ -4,6 +4,10 @@ All notable changes to Markdown PR Comments for GitHub (formerly *Rich Diff Comm
 
 ## [Unreleased]
 
+### Fixed
+
+- **The sidebar now offers “Render all Markdown files as rich-diff” only when another Markdown file still needs rendering.** When rendered files simply have no visible threads or changes, their empty states now say so without presenting a redundant action.
+
 ## [1.10.0] — 2026-09-23
 
 ### Changed

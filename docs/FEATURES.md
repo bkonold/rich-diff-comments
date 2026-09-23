@@ -180,9 +180,9 @@ This release prioritizes the two remaining P0 visibility gaps for conversations 
 
 ### Navigation and focus
 
-- [ ] **P1 — Show bulk rendering only when Markdown files still need it**
+- [x] **P1 — Show bulk rendering only when Markdown files still need it**
   - **Outcome:** the Threads and Changes empty states distinguish “no comments or changes here” from “Markdown has not been rendered,” and offer bulk rich-diff rendering only while eligible Markdown files remain in source view.
-  - **GitHub:** 📋 Planned for GitHub v1.11.0. The Threads empty state currently shows the bulk-render action whenever no threads are visible, even when rich-diff content is already on screen.
+  - **GitHub:** △ Implemented and browser-validated for GitHub v1.11.0; release pending. Rendered Markdown paths are tracked independently of thread presence, so the action remains available only while another eligible file still needs rich diff.
   - **ADO:** — Preview has no equivalent bulk-render action.
   - **Constraint:** keep the action available when other Markdown files still need rendering, including when the current file is already rich-diff; preserve the separate one-file guidance for virtualized large PRs.
 
