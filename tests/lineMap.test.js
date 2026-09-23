@@ -88,7 +88,7 @@ test('repeated mapping ignores injected collapse toggles and comment controls', 
     <h1><button class="adrc-collapse-toggle">▾</button>Introduction</h1>
     <p>Updated introduction.<button class="adrc-comment-btn">+</button></p>
     <h1><button class="adrc-collapse-toggle">▾</button>Getting Started</h1>
-    <p>Setup details.<span class="adrc-thread-badge">2</span></p>
+    <p>Setup details.<span class="adrc-thread-badge">2</span><button class="grdc-table-thread-marker">3</button></p>
   `);
 
   const map = mapBlocksToSourceLines(rd, source, 'doc.md', deps);

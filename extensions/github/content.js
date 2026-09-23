@@ -31,11 +31,13 @@
     looksLikePath,
     findBlobInJson,
     threadResponseToComments,
+    getGitHubCommentLink,
     parseMarkersMap,
     computeTableRowLine,
     renderMarkdownPreview,
     findFenceRangeAroundLine,
     sortThreadHeads,
+    codeLineMarkerLayout,
     escapeHtml,
     formatTimeAgo,
     buildAnchorKey,
@@ -44,6 +46,7 @@
     clampDragPos,
     nextWrappingIndex,
     isMarkdownPath,
+    getMarkdownRenderState,
     slugifyHeading,
     buildOutlineTree,
     attributeThreadsToHeadings,
@@ -822,6 +825,7 @@
   // adds no value (and several attempts to detect those patterns via DOM
   // alone caused worse regressions — see the 2026-06-17 conversation).
   let pathChangeTypeMap = new Map();
+  const renderedMarkdownPaths = new Set();
 
   // Invalidate the route-data cache so the next `fetchRouteData()` re-fetches.
   // Call this after any mutation that adds a comment / reply / resolution so
@@ -839,6 +843,7 @@
     routeData = null;
     pathDigestMap.clear();
     pathChangeTypeMap.clear();
+    renderedMarkdownPaths.clear();
     rawSourceCache.clear();
     fileLineMap.clear();
     existingComments = [];
@@ -937,6 +942,29 @@
     try { return getFilePath(container) || ''; } catch (_) { return ''; }
   }
 
+  function markdownRenderState() {
+    // Refresh paths for every file container currently mounted by GitHub.
+    // Preserve observations for lazy-unmounted files, but update mounted files
+    // in both directions so switching one back to source view is reflected.
+    const mounted = new Map();
+    findFileContainers().forEach((container) => {
+      const path = getContainerPath(container);
+      if (!isMarkdownPath(path)) return;
+      const rendered = Array.from(container.querySelectorAll('.prose-diff'))
+        .some((root) => root.offsetParent || root === document.body);
+      mounted.set(path, (mounted.get(path) || false) || rendered);
+    });
+    mounted.forEach((rendered, path) => {
+      if (rendered) renderedMarkdownPaths.add(path);
+      else renderedMarkdownPaths.delete(path);
+    });
+
+    const expectedPaths = (routeData?.diffSummaries || [])
+      .map((summary) => summary?.path)
+      .filter(Boolean);
+    return getMarkdownRenderState(expectedPaths, Array.from(renderedMarkdownPaths));
+  }
+
   // Inside a file container, find the per-file toggle button that would
   // switch it to rich-diff. Returns null when the rich-diff segment is
   // already active or no toggle can be found. Reuses the same heuristics
@@ -1015,8 +1043,12 @@
                       btn.classList.contains('selected') ||
                       btn.classList.contains('SegmentedControl-item--selected');
       seen.add(path);
-      if (pressed) continue;
+      if (pressed) {
+        renderedMarkdownPaths.add(path);
+        continue;
+      }
       console.log(`[GRDC]   CLICK ${path}`);
+      renderedMarkdownPaths.add(path);
       btn.click();
       count++;
     }
@@ -1385,7 +1417,23 @@
       const rawSource = rawSources[idx];
       const sourceLines = rawSource ? rawSource.split('\n') : null;
       const perFileMap = mapBlocksToSourceLines(richDiff, sourceLines, path, deps, console.log.bind(console));
-      perFileMap.forEach((info, el) => fileLineMap.set(el, info));
+      perFileMap.forEach((info, el) => {
+        fileLineMap.set(el, info);
+        if (el.tagName !== 'PRE') return;
+
+        // GitHub renders highlighted code directly inside <pre> (syntax spans
+        // and <ins>/<del> wrappers, no per-line elements). Preserve that DOM
+        // and cache the source fence's content range on the block so comment
+        // targeting and existing-thread markers share one line model.
+        const range = rawSource
+          ? findFenceRangeAroundLine(rawSource, info.line)
+          : null;
+        const renderedLines = (el.innerText || '').replace(/\n+$/, '').split('\n');
+        const start = range ? range.start : info.line;
+        const end = range ? range.end : start + Math.max(0, renderedLines.length - 1);
+        el.dataset.grdcRangeStart = String(start);
+        el.dataset.grdcRangeEnd = String(end);
+      });
     });
   }
 
@@ -2164,6 +2212,8 @@
           // whole tint band. `element` is the block the user clicked `+` on,
           // which for a drag-selected range is already the start block.
           renderThreadOnElement(element, newComments);
+          renderTableRowThreadMarkers();
+          renderCodeLineThreadMarkers();
           buildThreadsSidebar();
         }
         const success = document.createElement('div');
@@ -2303,6 +2353,8 @@
   function renderExistingComments() {
     // Remove previous renders
     document.querySelectorAll('.grdc-existing-thread').forEach(el => el.remove());
+    clearTableRowThreadMarkers();
+    clearCodeLineThreadMarkers();
     // Clear any range tints from a previous render so they don't accumulate.
     document.querySelectorAll('.grdc-thread-range').forEach(el => el.classList.remove('grdc-thread-range'));
 
@@ -2371,6 +2423,9 @@
       renderThreadOnElement(target, comments);
     });
 
+    renderTableRowThreadMarkers();
+    renderCodeLineThreadMarkers();
+
     const totalRendered = document.querySelectorAll('.grdc-existing-thread').length;
     console.log(`[GRDC] Rendered ${totalRendered} comment threads`);
   }
@@ -2386,6 +2441,190 @@
       if (info.path !== path) return;
       if (info.line < lo || info.line > hi) return;
       buttonAnchor(el).classList.add('grdc-thread-range');
+    });
+  }
+
+  function clearTableRowThreadMarkers() {
+    document.querySelectorAll('.grdc-table-thread-marker').forEach((el) => el.remove());
+    document.querySelectorAll('.grdc-table-thread-marker-host').forEach((el) => {
+      el.classList.remove('grdc-table-thread-marker-host');
+    });
+    document.querySelectorAll('.grdc-table-thread-marked').forEach((el) => {
+      el.classList.remove('grdc-table-thread-marked');
+    });
+  }
+
+  // Full thread bodies cannot be inserted between <tr> elements without
+  // producing invalid table markup, so they remain below the complete table.
+  // Add one compact, persistent button to each affected row's first cell to
+  // preserve the missing in-place signal. Activating it cycles through the
+  // row's conversations, expands a collapsed thread, and moves focus to its
+  // badge below the table.
+  function renderTableRowThreadMarkers() {
+    clearTableRowThreadMarkers();
+
+    const rowsByPath = new Map();
+    fileLineMap.forEach((info, element) => {
+      if (!info || !element || element.tagName !== 'TR' || !info.path || !Number.isFinite(info.line)) return;
+      if (!rowsByPath.has(info.path)) rowsByPath.set(info.path, new Map());
+      rowsByPath.get(info.path).set(info.line, element);
+    });
+
+    const rowThreads = new Map();
+    document.querySelectorAll('.grdc-existing-thread').forEach((thread) => {
+      const path = thread.dataset.grdcPath || '';
+      const endLine = Number(thread.dataset.grdcLine);
+      const rawStartLine = Number(thread.dataset.grdcStartLine);
+      const startLine = Number.isFinite(rawStartLine) && rawStartLine > 0 ? rawStartLine : endLine;
+      const pathRows = rowsByPath.get(path);
+      if (!pathRows || !Number.isFinite(startLine) || !Number.isFinite(endLine)) return;
+
+      const affectedRows = new Set();
+      for (let line = Math.min(startLine, endLine); line <= Math.max(startLine, endLine); line++) {
+        const row = pathRows.get(line);
+        if (row) affectedRows.add(row);
+      }
+      affectedRows.forEach((row) => {
+        if (!rowThreads.has(row)) rowThreads.set(row, []);
+        const rowItems = rowThreads.get(row);
+        const threadId = thread.dataset.grdcThreadId || '';
+        if (!rowItems.some((item) => item.dataset.grdcThreadId === threadId)) rowItems.push(thread);
+      });
+    });
+
+    rowThreads.forEach((threads, row) => {
+      const host = row.querySelector(':scope > th, :scope > td');
+      if (!host || threads.length === 0) return;
+
+      const marker = document.createElement('button');
+      marker.type = 'button';
+      marker.className = 'grdc-table-thread-marker';
+      marker.dataset.threadIds = threads.map((thread) => thread.dataset.grdcThreadId || '').join(',');
+      marker.dataset.activeIndex = '0';
+      if (threads.length > 1) marker.dataset.count = String(threads.length);
+      marker.setAttribute('aria-label', threads.length === 1
+        ? 'Open the review thread on this table row'
+        : `Open review threads on this table row; ${threads.length} threads`);
+      marker.title = threads.length === 1
+        ? '1 review thread on this row'
+        : `${threads.length} review threads on this row · activate to cycle`;
+      marker.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 2.5h11v8h-6l-3.5 3v-3H2.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+
+      marker.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const index = Math.max(0, Math.min(threads.length - 1, Number(marker.dataset.activeIndex) || 0));
+        const thread = threads[index];
+        marker.dataset.activeIndex = String((index + 1) % threads.length);
+        const badge = thread.querySelector('.grdc-thread-badge');
+        const body = thread.querySelector('.grdc-thread-body');
+        if (!badge || !body) return;
+        if (body.style.display === 'none') badge.click();
+        badge.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        badge.focus({ preventScroll: true });
+      });
+
+      host.classList.add('grdc-table-thread-marker-host');
+      row.classList.add('grdc-table-thread-marked');
+      host.appendChild(marker);
+    });
+  }
+
+  function clearCodeLineThreadMarkers() {
+    document.querySelectorAll('.grdc-code-line-thread-marker').forEach((el) => el.remove());
+    document.querySelectorAll('.grdc-code-thread-marker-host').forEach((el) => {
+      el.classList.remove('grdc-code-thread-marker-host');
+    });
+  }
+
+  // GitHub's current rich diff emits highlighted spans and <ins>/<del>
+  // wrappers directly under <pre>; it has no stable element per source line.
+  // Keep that syntax DOM untouched and position compact controls
+  // proportionally over the measured fenced-content height. The complete
+  // thread bodies remain below the block, where valid markup and the existing
+  // ordering logic already place them.
+  function renderCodeLineThreadMarkers() {
+    clearCodeLineThreadMarkers();
+    if (typeof codeLineMarkerLayout !== 'function') return;
+
+    const codeBlocksByPath = new Map();
+    fileLineMap.forEach((info, element) => {
+      if (!info || !element || element.tagName !== 'PRE' || !info.path) return;
+      const rangeStart = Number(element.dataset.grdcRangeStart);
+      const rangeEnd = Number(element.dataset.grdcRangeEnd);
+      if (!Number.isFinite(rangeStart) || !Number.isFinite(rangeEnd)) return;
+      if (!codeBlocksByPath.has(info.path)) codeBlocksByPath.set(info.path, []);
+      codeBlocksByPath.get(info.path).push({ element, rangeStart, rangeEnd });
+    });
+
+    const blockLines = new Map();
+    document.querySelectorAll('.grdc-existing-thread').forEach((thread) => {
+      const path = thread.dataset.grdcPath || '';
+      const endLine = Number(thread.dataset.grdcLine);
+      const rawStartLine = Number(thread.dataset.grdcStartLine);
+      const startLine = Number.isFinite(rawStartLine) && rawStartLine > 0 ? rawStartLine : endLine;
+      const blocks = codeBlocksByPath.get(path);
+      if (!blocks || !Number.isFinite(startLine) || !Number.isFinite(endLine)) return;
+
+      for (let line = Math.min(startLine, endLine); line <= Math.max(startLine, endLine); line++) {
+        const match = blocks.find(({ rangeStart, rangeEnd }) => line >= rangeStart && line <= rangeEnd);
+        if (!match) continue;
+        if (!blockLines.has(match.element)) blockLines.set(match.element, new Map());
+        const lines = blockLines.get(match.element);
+        if (!lines.has(line)) lines.set(line, []);
+        const lineThreads = lines.get(line);
+        const threadId = thread.dataset.grdcThreadId || '';
+        if (!lineThreads.some((item) => item.dataset.grdcThreadId === threadId)) lineThreads.push(thread);
+      }
+    });
+
+    blockLines.forEach((lines, pre) => {
+      const rangeStart = Number(pre.dataset.grdcRangeStart);
+      const rangeEnd = Number(pre.dataset.grdcRangeEnd);
+      const cs = getComputedStyle(pre);
+      const paddingTop = parseFloat(cs.paddingTop) || 0;
+      const paddingBottom = parseFloat(cs.paddingBottom) || 0;
+      const contentHeight = Math.max(1, pre.getBoundingClientRect().height - paddingTop - paddingBottom);
+      pre.classList.add('grdc-code-thread-marker-host');
+
+      Array.from(lines.entries()).sort((a, b) => a[0] - b[0]).forEach(([line, threads]) => {
+        const layout = codeLineMarkerLayout(line, rangeStart, rangeEnd, contentHeight, paddingTop);
+        if (!layout || threads.length === 0) return;
+
+        const marker = document.createElement('button');
+        marker.type = 'button';
+        marker.className = 'grdc-code-line-thread-marker';
+        marker.dataset.line = String(line);
+        marker.dataset.threadIds = threads.map((thread) => thread.dataset.grdcThreadId || '').join(',');
+        marker.dataset.activeIndex = '0';
+        marker.style.top = `${layout.top}px`;
+        marker.style.height = `${layout.size}px`;
+        marker.style.minWidth = `${layout.size}px`;
+        if (threads.length > 1) marker.dataset.count = String(threads.length);
+        marker.setAttribute('aria-label', threads.length === 1
+          ? `Open the review thread on code line ${line}`
+          : `Open review threads on code line ${line}; ${threads.length} threads`);
+        marker.title = threads.length === 1
+          ? `1 review thread on code line ${line}`
+          : `${threads.length} review threads on code line ${line} · activate to cycle`;
+        marker.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 2.5h11v8h-6l-3.5 3v-3H2.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+
+        marker.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const index = Math.max(0, Math.min(threads.length - 1, Number(marker.dataset.activeIndex) || 0));
+          const thread = threads[index];
+          marker.dataset.activeIndex = String((index + 1) % threads.length);
+          const badge = thread.querySelector('.grdc-thread-badge');
+          const body = thread.querySelector('.grdc-thread-body');
+          if (!badge || !body) return;
+          if (body.style.display === 'none') badge.click();
+          badge.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          badge.focus({ preventScroll: true });
+        });
+
+        pre.appendChild(marker);
+      });
     });
   }
 
@@ -2405,6 +2644,11 @@
 
     const badge = document.createElement('div');
     badge.className = 'grdc-thread-badge';
+    badge.dataset.grdcThreadId = String(threadId);
+    // Compound-block markers move focus here after navigation. Keep it out of
+    // the ordinary tab order because the marker itself is the accessible
+    // row/line-level control.
+    badge.tabIndex = -1;
     const stateBits = [];
     if (isResolved) stateBits.push('✓ resolved');
     if (isOutdated) stateBits.push('outdated');
@@ -2440,6 +2684,27 @@
     commentList.className = 'grdc-thread-comments';
     body.appendChild(commentList);
 
+    async function copyTextToClipboard(text) {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+
+      // User-gesture fallback for restricted content-script contexts where
+      // the modern Clipboard API is unavailable. Keep the temporary input
+      // outside the visible layout and remove it immediately after copying.
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      const copied = document.execCommand('copy');
+      textarea.remove();
+      if (!copied) throw new Error('Clipboard write was rejected');
+    }
+
     const renderComment = (c) => {
       const comment = document.createElement('div');
       comment.className = 'grdc-thread-comment';
@@ -2460,6 +2725,13 @@
         : '';
       const deleteLinkMarkup = isOwn
         ? `<button class="grdc-comment-delete-link" title="Delete this comment">Delete</button>`
+        : '';
+      // Copy link is available for every visible comment, regardless of
+      // ownership. Prefer GitHub's canonical URL and reconstruct its stable
+      // discussion fragment only when route data omitted that field.
+      const commentLink = getGitHubCommentLink(c, prInfo);
+      const copyLinkMarkup = commentLink
+        ? '<button class="grdc-comment-copy-link" title="Copy link to this comment">Copy link</button>'
         : '';
       // Avatar — 20×20 circle next to the username. Falls back to a
       // GitHub-hosted avatar URL by login if no explicit URL was captured.
@@ -2497,11 +2769,34 @@
           ${roleMarkup}
           ${authorMarkup}
           <span class="grdc-comment-time">${escapeHtml(timeAgo)}</span>
+          ${copyLinkMarkup}
           ${editLinkMarkup}
           ${deleteLinkMarkup}
         </div>
         ${bodyMarkup}
       `;
+      const copyLinkBtn = comment.querySelector('.grdc-comment-copy-link');
+      if (copyLinkBtn) {
+        copyLinkBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          copyLinkBtn.disabled = true;
+          try {
+            await copyTextToClipboard(commentLink);
+            copyLinkBtn.textContent = 'Copied!';
+            copyLinkBtn.title = 'Comment link copied';
+          } catch (error) {
+            console.log('[GRDC] Failed to copy comment link:', error && error.message ? error.message : error);
+            copyLinkBtn.textContent = 'Copy failed';
+            copyLinkBtn.title = 'Could not copy comment link';
+          }
+          setTimeout(() => {
+            if (!copyLinkBtn.isConnected) return;
+            copyLinkBtn.textContent = 'Copy link';
+            copyLinkBtn.title = 'Copy link to this comment';
+            copyLinkBtn.disabled = false;
+          }, 1600);
+        });
+      }
       // Wire up direct edit / delete affordances for the user's own comments.
       if (isOwn) {
         const editLinkBtn = comment.querySelector('.grdc-comment-edit-link');
@@ -2799,6 +3094,7 @@
     thread.dataset.grdcSnippet = snippet;
     thread.dataset.grdcPath = head.path || '';
     thread.dataset.grdcLine = String(head.line ?? '');
+    thread.dataset.grdcStartLine = String(head.startLine ?? '');
     const peers = document.querySelectorAll(`.grdc-existing-thread[data-grdc-anchor="${CSS.escape(anchorKey)}"]`);
     if (peers.length > 0) {
       peers[peers.length - 1].after(thread);
@@ -2840,10 +3136,10 @@
   // to render after a re-init).
   function clearInjectedDom() {
     document.querySelectorAll(
-      '.grdc-comment-btn, .grdc-collapse-toggle, .grdc-existing-thread, .grdc-comment-box, .grdc-reply-box'
+      '.grdc-comment-btn, .grdc-collapse-toggle, .grdc-existing-thread, .grdc-comment-box, .grdc-reply-box, .grdc-table-thread-marker, .grdc-code-line-thread-marker'
     ).forEach((el) => el.remove());
     document.querySelectorAll(
-      '.grdc-hoverable, .grdc-collapsible, .grdc-section-collapsed, .grdc-collapsed-hidden, .grdc-thread-range, .grdc-range-hover'
+      '.grdc-hoverable, .grdc-collapsible, .grdc-section-collapsed, .grdc-collapsed-hidden, .grdc-thread-range, .grdc-range-hover, .grdc-table-thread-marker-host, .grdc-table-thread-marked, .grdc-code-thread-marker-host'
     ).forEach((el) => {
       el.classList.remove(
         'grdc-hoverable',
@@ -2851,7 +3147,10 @@
         'grdc-section-collapsed',
         'grdc-collapsed-hidden',
         'grdc-thread-range',
-        'grdc-range-hover'
+        'grdc-range-hover',
+        'grdc-table-thread-marker-host',
+        'grdc-table-thread-marked',
+        'grdc-code-thread-marker-host'
       );
     });
     // Note: `.grdc-sidebar` is NOT cleared here — `buildThreadsSidebar()`
@@ -3526,6 +3825,7 @@
     sidebar.classList.toggle('grdc-sidebar-collapsed', collapsed);
     const renderAllBtn = sidebar.querySelector('.grdc-sidebar-render-md');
     const largePrMode = isVirtualizedLargePrMode();
+    const renderState = markdownRenderState();
     if (renderAllBtn) {
       renderAllBtn.hidden = largePrMode;
       if (largePrMode) renderAllBtn.setAttribute('title', largePrRenderHint());
@@ -3564,20 +3864,23 @@
         empty.innerHTML = `<p class="grdc-sidebar-empty-msg">${escapeHtml(largePrRenderHint())}</p>`;
         list.appendChild(empty);
       } else {
+      const offerBulkRender = threadEls.length === 0 && !unresolvedOnly && renderState.hasUnrendered;
       const msg = threadEls.length === 0
         ? (unresolvedOnly
-            ? 'No threads on this page yet.'
-            : 'No review threads visible yet. Render the Markdown files as rich-diff to load any comments on them.')
+            ? 'No unresolved threads visible.'
+            : offerBulkRender
+              ? 'No review threads visible. Render remaining Markdown files as rich-diff to check them for comments.'
+              : 'No review threads visible.')
         : 'All threads on this page are resolved.';
       empty.innerHTML = `
         <p class="grdc-sidebar-empty-msg">${escapeHtml(msg)}</p>
-        <button type="button" class="grdc-sidebar-empty-cta">
+        ${offerBulkRender ? `<button type="button" class="grdc-sidebar-empty-cta">
           <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"/></svg>
           <span>Render all Markdown files as rich-diff</span>
-        </button>
+        </button>` : ''}
       `;
       const cta = empty.querySelector('.grdc-sidebar-empty-cta');
-      cta.addEventListener('click', () => {
+      cta?.addEventListener('click', () => {
         // Render-only — do NOT switch to the Outline tab. The user
         // clicked this CTA inside the Threads pane expecting threads to
         // appear after the render, not to be whisked away to Outline.
@@ -4566,6 +4869,14 @@
           updateChangesCount(sidebar);
           return;
         }
+        if (!markdownRenderState().hasUnrendered) {
+          tab.hidden = true;
+          if (headerCluster) headerCluster.hidden = false;
+          sidebar._grdcChangeBlocks = [];
+          list.innerHTML = '';
+          updateChangesCount(sidebar);
+          return;
+        }
         empty.innerHTML = `
           <p class="grdc-sidebar-empty-msg">No changes visible yet. Render the Markdown files as rich-diff to see them.</p>
           <button type="button" class="grdc-sidebar-empty-cta">
@@ -5172,6 +5483,8 @@
           if (node.classList?.contains('grdc-existing-thread') ||
               node.classList?.contains('grdc-comment-box') ||
               node.classList?.contains('grdc-comment-btn') ||
+              node.classList?.contains('grdc-table-thread-marker') ||
+              node.classList?.contains('grdc-code-line-thread-marker') ||
               node.classList?.contains('grdc-collapse-toggle') ||
               node.classList?.contains('grdc-reply-box') ||
               node.classList?.contains('grdc-comment-edit') ||

@@ -10,6 +10,7 @@ const {
   nextWrappingIndex,
   clampSize,
   isMarkdownPath,
+  getMarkdownRenderState,
   formatLineRange,
   filterSidebarThreadItems,
   sortSidebarThreadItems,
@@ -222,6 +223,35 @@ test('isMarkdownPath — strips ?query / #hash before matching', () => {
   assert.equal(isMarkdownPath('README.md?ts=1'), true);
   assert.equal(isMarkdownPath('README.md#section'), true);
   assert.equal(isMarkdownPath('script.py?foo=.md'), false);
+});
+
+test('getMarkdownRenderState — reports remaining expected Markdown files', () => {
+  assert.deepEqual(
+    getMarkdownRenderState(['README.md', 'docs/guide.md', 'src/app.js'], ['README.md']),
+    { expected: 2, rendered: 1, hasUnrendered: true }
+  );
+  assert.deepEqual(
+    getMarkdownRenderState(['README.md', 'docs/guide.md'], ['README.md', 'docs/guide.md']),
+    { expected: 2, rendered: 2, hasUnrendered: false }
+  );
+});
+
+test('getMarkdownRenderState — uses live rendered observations when metadata is unavailable', () => {
+  assert.deepEqual(
+    getMarkdownRenderState([], ['README.md']),
+    { expected: 0, rendered: 1, hasUnrendered: false }
+  );
+  assert.deepEqual(
+    getMarkdownRenderState(null, null),
+    { expected: 0, rendered: 0, hasUnrendered: true }
+  );
+});
+
+test('getMarkdownRenderState — ignores non-Markdown and duplicate paths', () => {
+  assert.deepEqual(
+    getMarkdownRenderState(['README.md', 'README.md', 'app.js'], ['README.md', 'app.js']),
+    { expected: 1, rendered: 1, hasUnrendered: false }
+  );
 });
 
 test('clampSize — width below floor returns null for width, keeps height', () => {

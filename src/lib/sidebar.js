@@ -103,6 +103,33 @@
     return /\.(md|markdown)$/i.test(cleaned);
   }
 
+  // Summarize whether PR-wide rich-diff rendering still has useful work to
+  // do. Expected paths normally come from the host's change metadata, while
+  // rendered paths come from rich-diff roots observed in the live DOM.
+  // When metadata is unavailable, one observed rendered Markdown file is
+  // enough to avoid presenting a misleading bulk-render action; with no
+  // observations, retain the action as the conservative first-load fallback.
+  function getMarkdownRenderState(expectedPaths, renderedPaths) {
+    const expected = new Set(
+      (Array.isArray(expectedPaths) ? expectedPaths : [])
+        .filter(isMarkdownPath)
+    );
+    const rendered = new Set(
+      (Array.isArray(renderedPaths) ? renderedPaths : [])
+        .filter(isMarkdownPath)
+    );
+    const renderedExpected = expected.size
+      ? Array.from(rendered).filter((path) => expected.has(path)).length
+      : rendered.size;
+    return {
+      expected: expected.size,
+      rendered: renderedExpected,
+      hasUnrendered: expected.size > 0
+        ? renderedExpected < expected.size
+        : rendered.size === 0,
+    };
+  }
+
   // Format a 1-based source-line anchor for compact sidebar display.
   // Single-line: "line 12". Multi-line: "lines 12–18". Invalid starts
   // return an empty string; invalid/earlier ends fall back to single-line.
@@ -292,6 +319,7 @@
     nextWrappingIndex,
     clampSize,
     isMarkdownPath,
+    getMarkdownRenderState,
     formatLineRange,
     filterSidebarThreadItems,
     sortSidebarThreadItems,

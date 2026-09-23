@@ -5,12 +5,40 @@ const {
   looksLikePath,
   findBlobInJson,
   threadResponseToComments,
+  getGitHubCommentLink,
   escapeHtml,
   formatTimeAgo,
   parseMarkersMap,
   buildAnchorKey,
   parseLineFromAnchor,
 } = require('../src/lib/responses.js');
+
+test('getGitHubCommentLink prefers GitHub-provided comment URL', () => {
+  assert.equal(
+    getGitHubCommentLink(
+      { htmlUrl: '  https://github.com/acme/widgets/pull/42#discussion_r123  ', dbId: 999 },
+      { owner: 'ignored', repo: 'ignored', pullNumber: 1 }
+    ),
+    'https://github.com/acme/widgets/pull/42#discussion_r123'
+  );
+});
+
+test('getGitHubCommentLink reconstructs a stable discussion link from comment and PR ids', () => {
+  assert.equal(
+    getGitHubCommentLink(
+      { dbId: 456789 },
+      { owner: 'acme', repo: 'widgets', pullNumber: 42 }
+    ),
+    'https://github.com/acme/widgets/pull/42#discussion_r456789'
+  );
+});
+
+test('getGitHubCommentLink returns empty when neither canonical nor fallback metadata is complete', () => {
+  assert.equal(getGitHubCommentLink({}, { owner: 'acme', repo: 'widgets', pullNumber: 42 }), '');
+  assert.equal(getGitHubCommentLink({ dbId: 123 }, { owner: 'acme', pullNumber: 42 }), '');
+  assert.equal(getGitHubCommentLink({ dbId: 123 }, { owner: 'acme', repo: 'widgets', pullNumber: 0 }), '');
+  assert.equal(getGitHubCommentLink(null, null), '');
+});
 
 test('looksLikePath accepts normal paths', () => {
   assert.equal(looksLikePath('src/foo.js'), true);

@@ -90,6 +90,24 @@
     }));
   }
 
+  // Return the most specific stable GitHub destination available for a
+  // rendered review comment. Route data normally supplies the canonical web
+  // URL. The database id is enough to reconstruct GitHub's public discussion
+  // fragment when that field is absent from an older or partial response.
+  function getGitHubCommentLink(comment, pullRequest) {
+    const direct = comment && comment.htmlUrl;
+    if (typeof direct === 'string' && direct.trim()) return direct.trim();
+
+    const dbId = comment && comment.dbId;
+    const owner = pullRequest && pullRequest.owner;
+    const repo = pullRequest && pullRequest.repo;
+    const pullNumber = pullRequest && Number(pullRequest.pullNumber);
+    if (dbId == null || String(dbId).trim() === '' || !owner || !repo || !Number.isInteger(pullNumber) || pullNumber <= 0) {
+      return '';
+    }
+    return `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pull/${pullNumber}#discussion_r${encodeURIComponent(String(dbId))}`;
+  }
+
   // ── Small formatting / safety helpers ────────────────────────────────────
 
   // Pure HTML escape — no DOM dependency.
@@ -227,6 +245,7 @@
     looksLikePath,
     findBlobInJson,
     threadResponseToComments,
+    getGitHubCommentLink,
     escapeHtml,
     formatTimeAgo,
     parseMarkersMap,

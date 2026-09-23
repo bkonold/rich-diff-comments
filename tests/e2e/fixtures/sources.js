@@ -40,6 +40,17 @@ const YAML_FRONTMATTER_SOURCE = [
   '| 2026-06-16 | Test User | Added sample-feature note about another-feature. |', // 26
 ].join('\n');
 
+const CODE_MARKERS_SOURCE = [
+  '# Code marker fixture', // 1
+  '',                      // 2
+  '```yaml',               // 3
+  'alpha: 1',              // 4
+  'beta: 2',               // 5
+  'gamma: 3',              // 6
+  'delta: 4',              // 7
+  '```',                   // 8
+].join('\n');
+
 module.exports = {
   yamlFrontmatter: {
     path: 'docs/sample-frontmatter.md',
@@ -57,5 +68,9 @@ module.exports = {
         related: 5,
       },
     },
+  },
+  codeMarkers: {
+    path: 'docs/code-markers.md',
+    source: CODE_MARKERS_SOURCE,
   },
 };
