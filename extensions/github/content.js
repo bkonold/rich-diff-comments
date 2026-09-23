@@ -2429,22 +2429,13 @@
         : `<div class="grdc-comment-body">${escapeHtml(c.body || '')}</div>`;
       const viewerLogin = getViewerLogin();
       const isOwn = !!(c.dbId != null && viewerLogin && c.user && c.user.toLowerCase() === viewerLogin.toLowerCase());
-      const menuMarkup = isOwn
-        ? `<button class="grdc-comment-menu" title="More actions" aria-haspopup="true">⋯</button>`
-        : '';
-      // Direct "Edit" affordance for own comments — sits in the header next to
-      // "GitHub ↗" so editing is one click (no `⋯` menu detour). Delete stays
-      // inside `⋯` because it's destructive. Rendered as a `<button>` (not `<a>`)
-      // because it has no destination — it just opens the inline editor in place.
+      // Direct actions are limited to the viewer's own comments. Both are
+      // buttons because they operate inline rather than navigating elsewhere.
       const editLinkMarkup = isOwn
         ? `<button class="grdc-comment-edit-link" title="Edit this comment">Edit</button>`
         : '';
-      // "View on GitHub" lives in the header (next to the time) so it doesn't
-      // take a full row below the body. Rendered as a small muted link via
-      // `.grdc-comment-link` styles. Title attribute exposes the full URL on
-      // hover so users still see where they're going.
-      const linkMarkup = c.htmlUrl
-        ? `<a class="grdc-comment-link" href="${escapeHtml(c.htmlUrl)}" target="_blank" rel="noopener" title="Open this comment on GitHub">GitHub ↗</a>`
+      const deleteLinkMarkup = isOwn
+        ? `<button class="grdc-comment-delete-link" title="Delete this comment">Delete</button>`
         : '';
       // Avatar — 20×20 circle next to the username. Falls back to a
       // GitHub-hosted avatar URL by login if no explicit URL was captured.
@@ -2483,17 +2474,14 @@
           ${authorMarkup}
           <span class="grdc-comment-time">${escapeHtml(timeAgo)}</span>
           ${editLinkMarkup}
-          ${linkMarkup}
-          ${menuMarkup}
+          ${deleteLinkMarkup}
         </div>
         ${bodyMarkup}
       `;
-      // Wire up edit / delete affordances for the user's own comments. Edit
-      // is a direct one-click link in the header (`.grdc-comment-edit-link`);
-      // Delete stays behind the `⋯` menu because it's destructive.
+      // Wire up direct edit / delete affordances for the user's own comments.
       if (isOwn) {
-        const menuBtn = comment.querySelector('.grdc-comment-menu');
         const editLinkBtn = comment.querySelector('.grdc-comment-edit-link');
+        const deleteLinkBtn = comment.querySelector('.grdc-comment-delete-link');
         const bodyEl = comment.querySelector('.grdc-comment-body');
         // Stash the original body text so edits hash it for `body_version`
         // and so Cancel can restore the rendered markup.
@@ -2576,68 +2564,38 @@
           editor.focus();
         };
 
-        // Direct Edit link in the header — peer affordance to `GitHub ↗`.
+        // Direct Edit action in the header.
         if (editLinkBtn) {
           editLinkBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            // Close the `⋯` popover if it happens to be open — Edit is a
-            // peer action, not a popover item, but we don't want a stale
-            // popover hanging around once the editor takes focus. The popover's
-            // own outside-click listener would normally handle this, but we
-            // `stopPropagation()` above so it never fires.
-            comment.querySelector('.grdc-comment-menu-popover')?.remove();
             openEditor();
           });
         }
 
-        // `⋯` menu → Delete (with confirm). Edit was promoted out of this
-        // popover to its own header link; only the destructive action stays
-        // behind the extra click.
-        menuBtn.addEventListener('click', (e) => {
+        // Keep the destructive action protected by the existing confirmation.
+        deleteLinkBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
-          let popover = comment.querySelector('.grdc-comment-menu-popover');
-          if (popover) { popover.remove(); return; }
-          popover = document.createElement('div');
-          popover.className = 'grdc-comment-menu-popover';
-          popover.innerHTML = `
-            <button class="grdc-menu-item grdc-menu-delete">Delete</button>
-          `;
-          comment.querySelector('.grdc-comment-header').appendChild(popover);
-          const closeMenu = () => popover.remove();
-          // Close on outside click.
-          setTimeout(() => {
-            document.addEventListener('click', function onDoc(ev) {
-              if (!popover.contains(ev.target) && ev.target !== menuBtn) {
-                closeMenu();
-                document.removeEventListener('click', onDoc);
-              }
-            });
-          }, 0);
-
-          popover.querySelector('.grdc-menu-delete').addEventListener('click', async () => {
-            closeMenu();
-            if (!confirm('Delete this comment?')) return;
-            menuBtn.disabled = true;
-            const result = await deleteReviewComment(c.dbId);
-            if (result.ok) {
-              invalidateRouteData();
-              comment.remove();
-              // If this was the last comment in the thread, remove the whole thread.
-              if (!commentList.children.length) {
-                thread.remove();
-              }
-              // Refresh the sidebar so the deleted comment / thread
-              // disappears from the cards list (and the head snippet
-              // updates if the deleted comment was the head).
-              scheduleReinit();
-            } else {
-              menuBtn.disabled = false;
-              const err = document.createElement('div');
-              err.className = 'grdc-error';
-              err.textContent = `✗ ${result.error}`;
-              comment.appendChild(err);
+          if (!confirm('Delete this comment?')) return;
+          deleteLinkBtn.disabled = true;
+          const result = await deleteReviewComment(c.dbId);
+          if (result.ok) {
+            invalidateRouteData();
+            comment.remove();
+            // If this was the last comment in the thread, remove the whole thread.
+            if (!commentList.children.length) {
+              thread.remove();
             }
-          });
+            // Refresh the sidebar so the deleted comment / thread
+            // disappears from the cards list (and the head snippet
+            // updates if the deleted comment was the head).
+            scheduleReinit();
+          } else {
+            deleteLinkBtn.disabled = false;
+            const err = document.createElement('div');
+            err.className = 'grdc-error';
+            err.textContent = `✗ ${result.error}`;
+            comment.appendChild(err);
+          }
         });
       }
       commentList.appendChild(comment);
@@ -5088,7 +5046,6 @@
               node.classList?.contains('grdc-collapse-toggle') ||
               node.classList?.contains('grdc-reply-box') ||
               node.classList?.contains('grdc-comment-edit') ||
-              node.classList?.contains('grdc-comment-menu-popover') ||
               node.classList?.contains('grdc-sidebar')) continue;
           if (node.classList?.contains('markdown-body') ||
               node.classList?.contains('rich-diff-level-one') ||

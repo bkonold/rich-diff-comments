@@ -144,9 +144,9 @@ This release candidate closes the two remaining P0 visibility gaps for conversat
 
 ### Review and collaboration
 
-- [ ] **P2 — Simplify actions on the reviewer's own comments**
+- [x] **P2 — Simplify actions on the reviewer's own comments**
   - **Outcome:** Edit and Delete are visible as direct comment-header actions, while the redundant `GitHub ↗` link and one-item overflow menu are removed.
-  - **GitHub:** 📋 Planned for GitHub v1.10.0. Move Delete out of the `⋯` menu beside Edit and retain the deletion confirmation.
+  - **GitHub:** △ Implemented and validated for GitHub v1.10.0; release pending. Delete now sits beside Edit with destructive styling and confirmation, and both actions remain limited to the reviewer's own comments.
   - **ADO:** ↔ Uses its own direct inline comment actions and has no GitHub link.
   - **Constraint:** show destructive styling for Delete, preserve ownership checks, and keep accidental deletion protected by confirmation.
 

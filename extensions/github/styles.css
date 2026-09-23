@@ -181,10 +181,6 @@ li.grdc-hoverable .grdc-comment-btn {
   font-style: normal;
 }
 
-.grdc-comment-link:hover {
-  text-decoration: underline;
-}
-
 .grdc-comment-box {
   position: relative;
   margin: 8px 0;
@@ -636,61 +632,6 @@ li.grdc-hoverable .grdc-comment-btn {
   font-size: 12px;
 }
 
-/* `…` menu trigger on each owned comment. Pushed to the far right. */
-.grdc-comment-menu {
-  margin-left: auto;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  cursor: pointer;
-  color: var(--fgColor-muted, var(--color-fg-muted, #656d76));
-  font-size: 16px;
-  line-height: 1;
-  padding: 2px 6px;
-}
-.grdc-comment-menu:hover {
-  background: var(--bgColor-muted, var(--color-canvas-subtle, #f6f8fa));
-  border-color: var(--borderColor-default, var(--color-border-default, #d0d7de));
-  color: var(--fgColor-default, var(--color-fg-default, #24292f));
-}
-.grdc-comment-menu:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.grdc-comment-menu-popover {
-  position: absolute;
-  right: 0;
-  top: 22px;
-  z-index: 200;
-  background: var(--overlay-bgColor, var(--color-canvas-overlay, #fff));
-  border: 1px solid var(--borderColor-default, var(--color-border-default, #d0d7de));
-  border-radius: 6px;
-  box-shadow: var(--color-shadow-large, 0 8px 24px rgba(140, 149, 159, 0.2));
-  min-width: 120px;
-  padding: 4px 0;
-  display: flex;
-  flex-direction: column;
-}
-.grdc-menu-item {
-  background: transparent;
-  border: none;
-  text-align: left;
-  padding: 6px 12px;
-  font-size: 13px;
-  color: var(--fgColor-default, var(--color-fg-default, #24292f));
-  cursor: pointer;
-}
-.grdc-menu-item:hover {
-  background: var(--bgColor-muted, var(--color-canvas-subtle, #f6f8fa));
-}
-.grdc-menu-delete {
-  color: var(--fgColor-danger, var(--color-danger-fg, #cf222e));
-}
-.grdc-menu-delete:hover {
-  background: var(--bgColor-danger-muted, var(--color-danger-subtle, #ffebe9));
-}
-
 .grdc-comment-edit {
   margin-top: 6px;
 }
@@ -782,41 +723,10 @@ li.grdc-hoverable .grdc-comment-btn {
   border-left: 3px solid var(--borderColor-default, var(--color-border-default, #d0d7de));
 }
 
-.grdc-comment-link {
-  /* Now lives in the comment header next to the timestamp. Pushed to the
-     far right via `margin-left: auto` so it sits opposite the username.
-     If the comment is the user's own and the `⋯` menu is also present,
-     the next sibling selector below tucks the menu right beside the link
-     (overriding the menu's default `margin-left: auto`). */
-  margin-left: auto;
-  font-size: 11px;
-  color: var(--fgColor-muted, var(--color-fg-muted, #59636e));
-  text-decoration: none;
-  opacity: 0.75;
-  white-space: nowrap;
-}
-
-.grdc-comment-link:hover {
-  color: var(--fgColor-accent, var(--color-accent-fg, #0969da));
-  text-decoration: underline;
-  opacity: 1;
-}
-
-/* When the link is present, the menu sits immediately after it (no
-   auto-margin) so both right-side items huddle together. Without this,
-   both would grab `margin-left: auto` and Flexbox would push them apart. */
-.grdc-comment-link + .grdc-comment-menu {
-  margin-left: 4px;
-}
-
-/* Direct "Edit" affordance on the user's own comments. Sits in the header
-   alongside `GitHub ↗` and `⋯` so editing is a single click instead of
-   `⋯` → popover → Edit. Styled to *read as a clickable action* — full
-   opacity, link-blue, slightly bolder — so it pops against the muted
-   timestamp / `GitHub ↗` link sitting next to it. `<button>` (not `<a>`)
-   needs an explicit reset of UA button styles (background, border,
-   padding, font-family). */
-.grdc-comment-edit-link {
+/* Direct Edit/Delete actions on the user's own comments. Buttons are reset to
+  compact link-style controls; Delete keeps GitHub's destructive colour. */
+.grdc-comment-edit-link,
+.grdc-comment-delete-link {
   margin-left: auto;
   background: transparent;
   border: none;
@@ -830,23 +740,20 @@ li.grdc-hoverable .grdc-comment-btn {
   white-space: nowrap;
 }
 
-.grdc-comment-edit-link:hover {
+.grdc-comment-edit-link:hover,
+.grdc-comment-delete-link:hover {
   text-decoration: underline;
 }
 
-/* When Edit is present, it claims `margin-left: auto`, so the GitHub link
-   needs to give up its own auto-margin and just sit a small gap to Edit's
-   right. `~` (general sibling) handles whatever sibling order Flexbox
-   gives us. */
-.grdc-comment-edit-link ~ .grdc-comment-link {
+.grdc-comment-delete-link {
   margin-left: 8px;
+  color: var(--fgColor-danger, var(--color-danger-fg, #cf222e));
 }
 
-/* When Edit directly precedes the menu (no GitHub link in between — e.g.
-   captured comments where we don't have an `htmlUrl`), the menu sits next
-   to Edit instead of grabbing its own `margin-left: auto`. */
-.grdc-comment-edit-link + .grdc-comment-menu {
-  margin-left: 4px;
+.grdc-comment-edit-link:disabled,
+.grdc-comment-delete-link:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 
 /* ── Thread state: resolved / outdated ────────────────────────────────── */

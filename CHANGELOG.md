@@ -7,6 +7,7 @@ All notable changes to Markdown PR Comments for GitHub (formerly *Rich Diff Comm
 ### Changed
 
 - **Authentication is now browser-session only.** The extension no longer offers its dormant Personal Access Token fallback, and upgrading to v1.10.0 removes any GitHub token previously saved by that older mode without reading or transmitting it. Normal commenting on public and private repositories continues to use the GitHub session already open in the browser.
+- **Actions on your own comments are simpler and easier to find.** Edit and Delete now appear together in the comment header, with Delete clearly styled as destructive and still protected by confirmation. The redundant link back to the same comment on GitHub and its one-item overflow menu have been removed.
 
 ### Fixed
 
