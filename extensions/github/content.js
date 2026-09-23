@@ -9,6 +9,16 @@
 (function () {
   "use strict";
 
+  // v1.10.0 removed the dormant PAT fallback. Delete legacy values without
+  // reading them so upgrades cannot retain a credential under github.com.
+  try {
+    localStorage.removeItem('grdc_github_token');
+    localStorage.removeItem('grdc_use_pat');
+  } catch (_) {
+    // Storage can be unavailable in restricted browser contexts. The runtime
+    // remains session-only either way because no code reads these keys.
+  }
+
   // Pure helpers are defined in src/lib/*.js (loaded before this script via manifest.json).
   // They're shared with the Node test suite. See docs/github/APPROACH.md for the strategy.
   const {
@@ -76,14 +86,6 @@
   }
 
   // ── GitHub API ─────────────────────────────────────────────────────────────
-
-  function getGitHubToken() {
-    return localStorage.getItem("grdc_github_token");
-  }
-
-  function setGitHubToken(token) {
-    localStorage.setItem("grdc_github_token", token);
-  }
 
   // Try to discover the head/base commit SHAs from the page DOM.
   function discoverCommitOids() {
@@ -260,52 +262,7 @@
     }
   }
 
-  // PAT-based fallback (kept for compatibility / opt-in)
-  async function postReviewCommentApi(path, line, body, opts) {
-    const token = getGitHubToken();
-    if (!token) {
-      promptForToken();
-      return { ok: false, error: "No token configured" };
-    }
-    opts = opts || {};
-    const startLine = (opts.startLine != null && opts.startLine < line) ? opts.startLine : null;
-
-    if (!prInfo.commitId) {
-      const res0 = await fetch(
-        `https://api.github.com/repos/${prInfo.owner}/${prInfo.repo}/pulls/${prInfo.pullNumber}`,
-        { headers: { Authorization: `token ${token}`, Accept: "application/vnd.github.v3+json" } }
-      );
-      if (res0.ok) prInfo.commitId = (await res0.json()).head.sha;
-    }
-
-    const res = await fetch(
-      `https://api.github.com/repos/${prInfo.owner}/${prInfo.repo}/pulls/${prInfo.pullNumber}/comments`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `token ${token}`,
-          Accept: "application/vnd.github.v3+json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          body, commit_id: prInfo.commitId, path, line, side: "RIGHT",
-          ...(startLine != null ? { start_line: startLine, start_side: "RIGHT" } : {}),
-        }),
-      }
-    );
-
-    if (!res.ok) {
-      const err = await res.json();
-      return { ok: false, error: err.message || `HTTP ${res.status}` };
-    }
-    return { ok: true };
-  }
-
-  // Default: use internal endpoint (session cookies). Set localStorage 'grdc_use_pat' = '1' to use PAT.
   async function postReviewComment(path, line, body, opts) {
-    if (localStorage.getItem("grdc_use_pat") === "1") {
-      return postReviewCommentApi(path, line, body, opts);
-    }
     return postReviewCommentInternal(path, line, body, opts);
   }
 
@@ -851,26 +808,11 @@
     });
   }
 
-  // ── Token Prompt ───────────────────────────────────────────────────────────
-
-
-  function promptForToken() {
-    const existing = getGitHubToken();
-    const token = prompt(
-      "Markdown PR — Markdown PR Comments for GitHub needs a Personal Access Token (PAT) with 'repo' scope.\n\n" +
-        "Create one at: https://github.com/settings/tokens\n\n" +
-        "Enter your token:",
-      existing || ""
-    );
-    if (token && token.trim()) {
-      setGitHubToken(token.trim());
-    }
-  }
-
   // ── Line Number Mapping ────────────────────────────────────────────────────
 
   // Cached route data from /changes endpoint
   let routeData = null;
+  let routeLifecycleGeneration = 0;
   // Map from pathDigest → file path (from diffSummaries)
   let pathDigestMap = new Map();
   // Map from path → GitHub's `changeType` ("ADDED" | "MODIFIED" |
@@ -887,6 +829,23 @@
   function invalidateRouteData() {
     routeData = null;
     markSourceDiffDirty();
+  }
+
+  // A GitHub document can survive client-side navigation between pull
+  // requests. Never let one PR's route payload, source files, comments, or
+  // mention IDs leak into the next PR's review surface.
+  function resetPrScopedState() {
+    routeLifecycleGeneration++;
+    routeData = null;
+    pathDigestMap.clear();
+    pathChangeTypeMap.clear();
+    rawSourceCache.clear();
+    fileLineMap.clear();
+    existingComments = [];
+    mentionSuggestionCache = null;
+    mentionIdsResolved = null;
+    getPRAuthorLogin._cached = undefined;
+    sourceDiffDirty = false;
   }
 
   // ── Source-diff sync (1.0.2) ───────────────────────────────────────────────
@@ -1182,10 +1141,12 @@
   async function fetchRouteData() {
     if (routeData) return routeData;
     if (!prInfo) return null;
+    const fetchGeneration = routeLifecycleGeneration;
+    const requestPr = { ...prInfo };
 
     try {
       const res = await fetch(
-        `https://github.com/${prInfo.owner}/${prInfo.repo}/pull/${prInfo.pullNumber}/changes`,
+        `https://github.com/${requestPr.owner}/${requestPr.repo}/pull/${requestPr.pullNumber}/changes`,
         {
           credentials: 'include',
           headers: {
@@ -1197,6 +1158,7 @@
       );
       if (res.ok) {
         const data = await res.json();
+        if (fetchGeneration !== routeLifecycleGeneration) return null;
         routeData = data?.payload?.pullRequestsChangesRoute || null;
 
         // Build pathDigest → path mapping and path → changeType mapping.
@@ -1277,6 +1239,7 @@
 
   async function fetchRawSource(container, path) {
     if (rawSourceCache.has(path)) return rawSourceCache.get(path);
+    const fetchGeneration = routeLifecycleGeneration;
 
     // Discover head commit SHA from route data or blob links
     let headOid = routeData?.comparison?.fullDiff?.headOid;
@@ -1288,15 +1251,17 @@
       }
     }
     if (!headOid || !prInfo || !looksLikePath(path)) return null;
+    const requestPr = { ...prInfo };
 
     try {
-      const blobUrl = `https://github.com/${prInfo.owner}/${prInfo.repo}/blob/${headOid}/${encodeURI(path)}`;
+      const blobUrl = `https://github.com/${requestPr.owner}/${requestPr.repo}/blob/${headOid}/${encodeURI(path)}`;
       const res = await fetch(blobUrl, { credentials: 'include' });
       if (!res.ok) {
         console.log(`[GRDC] Blob page fetch failed for ${path}: HTTP ${res.status}`);
         return null;
       }
       const html = await res.text();
+      if (fetchGeneration !== routeLifecycleGeneration) return null;
 
       // Strategy A: read-only textarea (older blob views)
       let m = html.match(/<textarea[^>]*id=["']read-only-cursor-text-area["'][^>]*>([\s\S]*?)<\/textarea>/);
@@ -2488,22 +2453,13 @@
         : `<div class="grdc-comment-body">${escapeHtml(c.body || '')}</div>`;
       const viewerLogin = getViewerLogin();
       const isOwn = !!(c.dbId != null && viewerLogin && c.user && c.user.toLowerCase() === viewerLogin.toLowerCase());
-      const menuMarkup = isOwn
-        ? `<button class="grdc-comment-menu" title="More actions" aria-haspopup="true">⋯</button>`
-        : '';
-      // Direct "Edit" affordance for own comments — sits in the header next to
-      // "GitHub ↗" so editing is one click (no `⋯` menu detour). Delete stays
-      // inside `⋯` because it's destructive. Rendered as a `<button>` (not `<a>`)
-      // because it has no destination — it just opens the inline editor in place.
+      // Direct actions are limited to the viewer's own comments. Both are
+      // buttons because they operate inline rather than navigating elsewhere.
       const editLinkMarkup = isOwn
         ? `<button class="grdc-comment-edit-link" title="Edit this comment">Edit</button>`
         : '';
-      // "View on GitHub" lives in the header (next to the time) so it doesn't
-      // take a full row below the body. Rendered as a small muted link via
-      // `.grdc-comment-link` styles. Title attribute exposes the full URL on
-      // hover so users still see where they're going.
-      const linkMarkup = c.htmlUrl
-        ? `<a class="grdc-comment-link" href="${escapeHtml(c.htmlUrl)}" target="_blank" rel="noopener" title="Open this comment on GitHub">GitHub ↗</a>`
+      const deleteLinkMarkup = isOwn
+        ? `<button class="grdc-comment-delete-link" title="Delete this comment">Delete</button>`
         : '';
       // Avatar — 20×20 circle next to the username. Falls back to a
       // GitHub-hosted avatar URL by login if no explicit URL was captured.
@@ -2542,17 +2498,14 @@
           ${authorMarkup}
           <span class="grdc-comment-time">${escapeHtml(timeAgo)}</span>
           ${editLinkMarkup}
-          ${linkMarkup}
-          ${menuMarkup}
+          ${deleteLinkMarkup}
         </div>
         ${bodyMarkup}
       `;
-      // Wire up edit / delete affordances for the user's own comments. Edit
-      // is a direct one-click link in the header (`.grdc-comment-edit-link`);
-      // Delete stays behind the `⋯` menu because it's destructive.
+      // Wire up direct edit / delete affordances for the user's own comments.
       if (isOwn) {
-        const menuBtn = comment.querySelector('.grdc-comment-menu');
         const editLinkBtn = comment.querySelector('.grdc-comment-edit-link');
+        const deleteLinkBtn = comment.querySelector('.grdc-comment-delete-link');
         const bodyEl = comment.querySelector('.grdc-comment-body');
         // Stash the original body text so edits hash it for `body_version`
         // and so Cancel can restore the rendered markup.
@@ -2635,68 +2588,38 @@
           editor.focus();
         };
 
-        // Direct Edit link in the header — peer affordance to `GitHub ↗`.
+        // Direct Edit action in the header.
         if (editLinkBtn) {
           editLinkBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            // Close the `⋯` popover if it happens to be open — Edit is a
-            // peer action, not a popover item, but we don't want a stale
-            // popover hanging around once the editor takes focus. The popover's
-            // own outside-click listener would normally handle this, but we
-            // `stopPropagation()` above so it never fires.
-            comment.querySelector('.grdc-comment-menu-popover')?.remove();
             openEditor();
           });
         }
 
-        // `⋯` menu → Delete (with confirm). Edit was promoted out of this
-        // popover to its own header link; only the destructive action stays
-        // behind the extra click.
-        menuBtn.addEventListener('click', (e) => {
+        // Keep the destructive action protected by the existing confirmation.
+        deleteLinkBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
-          let popover = comment.querySelector('.grdc-comment-menu-popover');
-          if (popover) { popover.remove(); return; }
-          popover = document.createElement('div');
-          popover.className = 'grdc-comment-menu-popover';
-          popover.innerHTML = `
-            <button class="grdc-menu-item grdc-menu-delete">Delete</button>
-          `;
-          comment.querySelector('.grdc-comment-header').appendChild(popover);
-          const closeMenu = () => popover.remove();
-          // Close on outside click.
-          setTimeout(() => {
-            document.addEventListener('click', function onDoc(ev) {
-              if (!popover.contains(ev.target) && ev.target !== menuBtn) {
-                closeMenu();
-                document.removeEventListener('click', onDoc);
-              }
-            });
-          }, 0);
-
-          popover.querySelector('.grdc-menu-delete').addEventListener('click', async () => {
-            closeMenu();
-            if (!confirm('Delete this comment?')) return;
-            menuBtn.disabled = true;
-            const result = await deleteReviewComment(c.dbId);
-            if (result.ok) {
-              invalidateRouteData();
-              comment.remove();
-              // If this was the last comment in the thread, remove the whole thread.
-              if (!commentList.children.length) {
-                thread.remove();
-              }
-              // Refresh the sidebar so the deleted comment / thread
-              // disappears from the cards list (and the head snippet
-              // updates if the deleted comment was the head).
-              scheduleReinit();
-            } else {
-              menuBtn.disabled = false;
-              const err = document.createElement('div');
-              err.className = 'grdc-error';
-              err.textContent = `✗ ${result.error}`;
-              comment.appendChild(err);
+          if (!confirm('Delete this comment?')) return;
+          deleteLinkBtn.disabled = true;
+          const result = await deleteReviewComment(c.dbId);
+          if (result.ok) {
+            invalidateRouteData();
+            comment.remove();
+            // If this was the last comment in the thread, remove the whole thread.
+            if (!commentList.children.length) {
+              thread.remove();
             }
-          });
+            // Refresh the sidebar so the deleted comment / thread
+            // disappears from the cards list (and the head snippet
+            // updates if the deleted comment was the head).
+            scheduleReinit();
+          } else {
+            deleteLinkBtn.disabled = false;
+            const err = document.createElement('div');
+            err.className = 'grdc-error';
+            err.textContent = `✗ ${result.error}`;
+            comment.appendChild(err);
+          }
         });
       }
       commentList.appendChild(comment);
@@ -3137,6 +3060,64 @@
     });
   })();
 
+  // Native `resize: both` can trigger browser scroll anchoring as card text
+  // reflows. That changes scrollTop and visibly slides the scrollbar thumb
+  // while the user drags the sidebar's bottom-right handle. Lock each pane to
+  // its scrollTop at gesture start; resizing should change viewport dimensions,
+  // not navigate the Changes, Threads, or Outline lists.
+  function attachSidebarResizeScrollLock(sidebar) {
+    sidebar.addEventListener('mousedown', (e) => {
+      if (e.button !== 0 || sidebar.classList.contains('grdc-sidebar-collapsed')) return;
+      const rect = sidebar.getBoundingClientRect();
+      const handleSize = 20;
+      if (e.clientX < rect.right - handleSize || e.clientY < rect.bottom - handleSize) return;
+
+      const selectors = [
+        '.grdc-sidebar-changes-list',
+        '.grdc-sidebar-list',
+        '.grdc-sidebar-outline-tree',
+      ];
+      const locked = selectors.map((selector) => {
+        const scroller = sidebar.querySelector(selector);
+        return scroller ? { scroller, scrollTop: scroller.scrollTop } : null;
+      }).filter(Boolean);
+      sidebar._grdcResizeScrollLock = locked;
+
+      const restore = () => {
+        for (const item of locked) {
+          if (item.scroller.isConnected && item.scroller.scrollTop !== item.scrollTop) {
+            item.scroller.scrollTop = item.scrollTop;
+          }
+        }
+      };
+      // ResizeObserver only runs while dimensions are changing. Chromium can
+      // continue scrollbar track auto-repeat after the pointer leaves the
+      // bottom-right corner, so also cancel every scroll event for the full
+      // mouse gesture rather than waiting for another size callback.
+      for (const item of locked) {
+        item.onScroll = restore;
+        item.scroller.addEventListener('scroll', item.onScroll);
+      }
+      const onUp = () => {
+        document.removeEventListener('mouseup', onUp, true);
+        window.removeEventListener('mouseup', onUp, true);
+        window.removeEventListener('pointerup', onUp, true);
+        window.removeEventListener('blur', onUp);
+        for (const item of locked) {
+          item.scroller.removeEventListener('scroll', item.onScroll);
+        }
+        restore();
+        sidebar._grdcResizeScrollLock = null;
+      };
+      // Capture on both document and window so releasing over native browser
+      // chrome or outside a child scroller cannot leave the lock active.
+      document.addEventListener('mouseup', onUp, true);
+      window.addEventListener('mouseup', onUp, true);
+      window.addEventListener('pointerup', onUp, true);
+      window.addEventListener('blur', onUp);
+    });
+  }
+
   // Reset the sidebar to its default right-dock layout: clear persisted
   // position / size / collapsed state, drop inline styles, and rebuild so
   // the user can recover from an offscreen drag or unwanted collapse
@@ -3180,6 +3161,9 @@
     let writeTimer = null;
     const ro = new ResizeObserver(() => {
       if (sidebar.classList.contains('grdc-sidebar-collapsed')) return;
+      for (const item of sidebar._grdcResizeScrollLock || []) {
+        if (item.scroller.isConnected) item.scroller.scrollTop = item.scrollTop;
+      }
       clearTimeout(writeTimer);
       writeTimer = setTimeout(() => {
         try {
@@ -3219,6 +3203,24 @@
     return false;
   }
 
+  // GitHub virtualizes files on its "optimized for large pull requests"
+  // surface. Its URL uses `?mode=virtualization`; the native escape hatch is a
+  // link to `?mode=single`. While either signal is present, rich-diff state
+  // belongs only to currently mounted file nodes and cannot survive a PR-wide
+  // scroll sweep.
+  function isVirtualizedLargePrMode() {
+    try {
+      if (new URL(window.location.href).searchParams.get('mode') === 'virtualization') return true;
+    } catch (_) {}
+    return !!Array.from(document.querySelectorAll('a[href*="mode=single"]')).find((link) =>
+      /switch\s+to\s+single\s+file\s+mode/i.test(link.textContent || link.getAttribute('aria-label') || '')
+    );
+  }
+
+  function largePrRenderHint() {
+    return 'GitHub is optimizing this large pull request and unloads offscreen files. Review Markdown files one at a time and switch each file to rich diff as needed.';
+  }
+
   // Expand the sidebar (if collapsed) and render every `.md` file as
   // rich-diff, with tooltip + disabled feedback on the book button while
   // the work runs. Used by THREE call-sites:
@@ -3232,6 +3234,10 @@
   // signals "show me the outline".
   async function expandAndRenderAllMd(sidebar) {
     const btn = sidebar.querySelector('.grdc-sidebar-render-md');
+    if (isVirtualizedLargePrMode()) {
+      if (btn) btn.setAttribute('title', largePrRenderHint());
+      return 0;
+    }
     const orig = btn ? btn.getAttribute('title') : null;
     if (btn) {
       btn.setAttribute('title', 'Rendering Markdown files as rich-diff…');
@@ -3424,6 +3430,7 @@
       const headerEl = sidebar.querySelector('.grdc-sidebar-header');
       attachSidebarDrag(sidebar, headerEl);
       applySidebarPersistedPos(sidebar);
+      attachSidebarResizeScrollLock(sidebar);
       observeSidebarResize(sidebar);
 
       sidebar.querySelector('.grdc-sidebar-collapse').addEventListener('click', () => {
@@ -3517,6 +3524,12 @@
 
     // Apply persisted state.
     sidebar.classList.toggle('grdc-sidebar-collapsed', collapsed);
+    const renderAllBtn = sidebar.querySelector('.grdc-sidebar-render-md');
+    const largePrMode = isVirtualizedLargePrMode();
+    if (renderAllBtn) {
+      renderAllBtn.hidden = largePrMode;
+      if (largePrMode) renderAllBtn.setAttribute('title', largePrRenderHint());
+    }
     const filterCb = sidebar.querySelector('.grdc-sidebar-filter-cb');
     if (filterCb.checked !== unresolvedOnly) filterCb.checked = unresolvedOnly;
     const headerFilter = sidebar.querySelector('.grdc-sidebar-header-filter');
@@ -3547,6 +3560,10 @@
     if (visible.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'grdc-sidebar-empty';
+      if (largePrMode) {
+        empty.innerHTML = `<p class="grdc-sidebar-empty-msg">${escapeHtml(largePrRenderHint())}</p>`;
+        list.appendChild(empty);
+      } else {
       const msg = threadEls.length === 0
         ? (unresolvedOnly
             ? 'No threads on this page yet.'
@@ -3569,6 +3586,7 @@
         expandAndRenderAllMd(sidebar);
       });
       list.appendChild(empty);
+      }
     }
     visible.forEach((threadEl, idx) => {
       const card = document.createElement('button');
@@ -4542,6 +4560,12 @@
         list.innerHTML = '';
         const empty = document.createElement('div');
         empty.className = 'grdc-sidebar-empty';
+        if (isVirtualizedLargePrMode()) {
+          empty.innerHTML = `<p class="grdc-sidebar-empty-msg">${escapeHtml(largePrRenderHint())}</p>`;
+          list.appendChild(empty);
+          updateChangesCount(sidebar);
+          return;
+        }
         empty.innerHTML = `
           <p class="grdc-sidebar-empty-msg">No changes visible yet. Render the Markdown files as rich-diff to see them.</p>
           <button type="button" class="grdc-sidebar-empty-cta">
@@ -4952,25 +4976,23 @@
     tree.scrollTop = Math.max(0, Math.min(target, maxScroll));
   }
 
-  function tryScrollToHashAnchor() {
-    const hash = (window.location.hash || '').replace(/^#/, '');
+  function findRichDiffHeadingForHash(hash, preferredScope) {
     if (!hash) return;
-    // If the browser already found a target with this id/name, native
-    // anchoring handles it — bail.
-    if (document.getElementById(hash) || document.getElementsByName(hash).length) return;
 
     // Scope to the file matching `?file=<path>` when present; otherwise
     // search across all rich-diff prose bodies on the page.
-    let scope;
-    try {
-      const fileParam = new URL(window.location.href).searchParams.get('file');
-      if (fileParam) {
-        const containers = document.querySelectorAll('div[id^="diff-"]');
-        for (const c of containers) {
-          if (getFilePath(c) === fileParam) { scope = c; break; }
+    let scope = preferredScope;
+    if (!scope) {
+      try {
+        const fileParam = new URL(window.location.href).searchParams.get('file');
+        if (fileParam) {
+          const containers = document.querySelectorAll('div[id^="diff-"]');
+          for (const c of containers) {
+            if (getFilePath(c) === fileParam) { scope = c; break; }
+          }
         }
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
     const roots = scope
       ? [scope.querySelector('.prose-diff .markdown-body, .prose-diff, .rich-diff-level-one .markdown-body')].filter(Boolean)
       : document.querySelectorAll('.prose-diff .markdown-body, .prose-diff, .rich-diff-level-one .markdown-body');
@@ -4979,14 +5001,59 @@
       const headings = root.querySelectorAll('h1, h2, h3, h4, h5, h6');
       for (const h of headings) {
         if (slugifyHeading(h.textContent) === hash) {
-          scrollToWithStickyOffset(h);
-          return;
+          return h;
         }
       }
     }
   }
 
-  window.addEventListener('hashchange', tryScrollToHashAnchor);
+  function tryScrollToHashAnchor(preferredScope) {
+    let hash;
+    try { hash = decodeURIComponent((window.location.hash || '').replace(/^#/, '')); } catch (_) { return; }
+    if (!hash) return;
+    // If the browser already found a target with this id/name, native
+    // anchoring handles it — bail.
+    if (document.getElementById(hash) || document.getElementsByName(hash).length) return;
+
+    const heading = findRichDiffHeadingForHash(hash, preferredScope);
+    if (heading) scrollToWithStickyOffset(heading);
+  }
+
+  // `hashchange` does not fire when a reviewer clicks the same TOC link twice.
+  // Resolve every rendered TOC click directly. For a new hash, push a history
+  // entry without asking the browser to perform native anchor scrolling first;
+  // GitHub strips these heading ids, so that native attempt can jump to the top
+  // and race our manual scroll. Back/forward still emits `hashchange`.
+  // Prefer the clicked file so duplicate headings in another rendered Markdown
+  // file cannot steal the destination.
+  document.addEventListener('click', (e) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const origin = e.target instanceof Element ? e.target : e.target?.parentElement;
+    const link = origin?.closest?.('a[href^="#"]');
+    if (!link || !link.closest('.prose-diff, .rich-diff-level-one')) return;
+
+    const href = link.getAttribute('href') || '';
+    let hash;
+    try { hash = decodeURIComponent(href.replace(/^#/, '')); } catch (_) { return; }
+    if (!hash || document.getElementById(hash) || document.getElementsByName(hash).length) return;
+
+    const fileScope = link.closest('div[id^="diff-"]');
+    const heading = findRichDiffHeadingForHash(hash, fileScope);
+    if (!heading) return;
+
+    e.preventDefault();
+    let currentHash = '';
+    try { currentHash = decodeURIComponent((window.location.hash || '').replace(/^#/, '')); } catch (_) {}
+    if (currentHash === hash) {
+      scrollToWithStickyOffset(heading);
+      return;
+    }
+
+    window.history.pushState(window.history.state, '', href);
+    scrollToWithStickyOffset(heading);
+  }, true);
+
+  window.addEventListener('hashchange', () => tryScrollToHashAnchor());
 
   // Whenever any section toggles (sidebar chevron, fold/unfold button, or
   // the heading's own collapse chevron in the doc), rebuild the outline
@@ -5009,6 +5076,7 @@
   async function init() {
     prInfo = parsePRUrl();
     if (!prInfo) return;
+    const initGeneration = routeLifecycleGeneration;
 
     // Don't blow away an active inline editor (Edit-comment textarea). When
     // the user is mid-edit, a re-init from any source — GitHub's React
@@ -5028,6 +5096,7 @@
 
     // Fetch route data first (builds pathDigest map + caches for comments)
     await fetchRouteData();
+    if (initGeneration !== routeLifecycleGeneration) return;
 
     // Kick off `fetchExistingComments()` in parallel with `buildLineMap()`.
     // Both only need `routeData` (already cached above): `fetchExistingComments`
@@ -5039,10 +5108,12 @@
     const commentsPromise = fetchExistingComments();
 
     await buildLineMap();
+    if (initGeneration !== routeLifecycleGeneration) return;
     attachCommentButtons();
     attachCollapseToggles();
 
     existingComments = await commentsPromise;
+    if (initGeneration !== routeLifecycleGeneration) return;
     console.log(`[GRDC] Fetched ${existingComments.length} existing comments`);
     renderExistingComments();
     buildThreadsSidebar();
@@ -5104,7 +5175,6 @@
               node.classList?.contains('grdc-collapse-toggle') ||
               node.classList?.contains('grdc-reply-box') ||
               node.classList?.contains('grdc-comment-edit') ||
-              node.classList?.contains('grdc-comment-menu-popover') ||
               node.classList?.contains('grdc-sidebar')) continue;
           if (node.classList?.contains('markdown-body') ||
               node.classList?.contains('rich-diff-level-one') ||
@@ -5246,10 +5316,20 @@
   // latency when clicking a tab. Also listen for `popstate` (fires across
   // worlds for back/forward navigation) so we react instantly to those.
   let lastInitPath = null;
+  let activePrKey = null;
   function maybeInit() {
     const path = window.location.pathname;
     if (path === lastInitPath) return;
     lastInitPath = path;
+    const nextPr = parsePRUrl();
+    const nextPrKey = nextPr
+      ? `${nextPr.owner}/${nextPr.repo}#${nextPr.pullNumber}`
+      : null;
+
+    if (nextPrKey !== activePrKey) {
+      resetPrScopedState();
+      activePrKey = nextPrKey;
+    }
     // If the user navigated away from Files-changed (e.g. clicked
     // Conversation / Commits / Checks, or left the PR entirely), the
     // sidebar has nothing to do: existing threads are rendered inline
@@ -5262,7 +5342,7 @@
     // We also drop any injected `+` buttons / thread badges via
     // `clearInjectedDom` for the same reason — they're anchored to
     // rich-diff blocks that no longer exist.
-    if (!parsePRUrl()) {
+    if (!nextPr) {
       const stale = document.querySelector('.grdc-sidebar');
       if (stale) {
         console.log(`[GRDC] URL changed → ${path}, removing sidebar (not on Files-changed)`);

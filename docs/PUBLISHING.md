@@ -197,7 +197,7 @@ Both stores require a justification for each requested permission. Use the exact
 
 Check only these two boxes:
 
-- ☑ **Authentication information** — the extension reads the user's existing github.com session cookies and an optional opt-in PAT from `localStorage`. Never transmitted anywhere except back to github.com.
+- ☑ **Authentication information** — the extension relies on the browser-managed github.com session for same-origin requests. It does not read or store passwords, raw session cookies, Personal Access Tokens, or OAuth tokens.
 - ☑ **Website content** — the extension reads the content of github.com PR pages (rendered diff DOM, raw markdown source of changed files, existing review threads). Processed locally in the browser.
 
 Tick all three certifications (do-not-sell / do-not-misuse / do-not-use-for-credit-decisions). All three are truthful for this extension.

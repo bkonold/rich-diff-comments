@@ -112,36 +112,79 @@ Priority applies to the shared user outcome:
 
 ## 🎯 GitHub v1.10.0 candidate
 
-This release candidate closes the two remaining P0 visibility gaps for conversations attached inside compound rendered blocks and adds a complete way to dismiss and restore the sidebar. Marker implementation starts only after the current GitHub rich-diff table and code-block DOM has been captured and recorded in the GitHub developer notes.
+This release removes dormant credential storage, simplifies comment actions, and fixes navigation, sidebar-resizing, and large-PR workflow friction.
 
 ### Security and authentication
 
-- [ ] **P0 — Remove dormant Personal Access Token mode and stored credentials**
+- [x] **P0 — Remove dormant Personal Access Token mode and stored credentials**
   - **Outcome:** authentication always uses the browser-managed signed-in session, and the extension never asks for or persistently stores a GitHub credential.
-  - **GitHub:** 📋 Planned for GitHub v1.10.0. Remove the hidden PAT/REST fallback, token prompt, and PAT-related privacy documentation; delete any legacy `grdc_github_token` and `grdc_use_pat` values left in GitHub local storage by earlier versions.
+  - **GitHub:** ✅ GitHub v1.10.0. The hidden PAT/REST fallback and token prompt are removed, and upgrades delete legacy PAT values without reading them.
   - **ADO:** ✅ Already session-only and never stores a PAT.
-  - **Constraint:** preserve normal session-cookie comment submission and verify that upgrading users do not retain a previously stored token.
+  - **Constraint:** normal session-cookie comment submission remains covered by the GitHub browser suite.
+
+### Correctness
+
+- [x] **P1 — Make bulk rich-diff rendering reliable on GitHub's large-PR surface**
+  - **Outcome:** “Render all Markdown files as rich-diff” either switches to a GitHub mode that can retain all rendered files and completes there, or clearly explains why PR-wide rendering is unavailable instead of showing temporary progress that disappears.
+  - **GitHub:** ✅ GitHub v1.10.0. On `mode=virtualization`—with GitHub's “Switch to single file mode” link as a fallback signal—the extension hides PR-wide render controls, guards the bulk action, and shows one-file-at-a-time guidance instead.
+  - **ADO:** — Preview uses one selected file and has no equivalent bulk-render action.
+  - **Constraint:** do not navigate modes automatically and do not run the two-pass bulk sweep on the virtualized surface. Preserve the user's original scroll position when bulk rendering is supported.
+
+- [x] **P1 — Allow repeated navigation to the same Table of Contents destination**
+  - **Outcome:** clicking the same rendered Table of Contents link repeatedly always scrolls to its section, even when that anchor is already the current URL fragment.
+  - **GitHub:** ✅ GitHub v1.10.0. Repeated clicks scroll directly, while changed destinations and browser Back/Forward retain hash history.
+  - **ADO:** ✅ No equivalent repeated-anchor issue observed in Preview.
+  - **Constraint:** preserve normal heading-anchor behavior, browser history, and links to a different section.
+
+### Review and collaboration
+
+- [x] **P2 — Simplify actions on the reviewer's own comments**
+  - **Outcome:** Edit and Delete are visible as direct comment-header actions, while the redundant `GitHub ↗` link and one-item overflow menu are removed.
+  - **GitHub:** ✅ GitHub v1.10.0. Delete now sits beside Edit with destructive styling and confirmation, and both actions remain limited to the reviewer's own comments.
+  - **ADO:** ↔ Uses its own direct inline comment actions and has no GitHub link.
+  - **Constraint:** show destructive styling for Delete, preserve ownership checks, and keep accidental deletion protected by confirmation.
+
+### Navigation and focus
+
+- [x] **P0 — Restore the review sidebar after returning from GitHub's pull-request list**
+  - **Outcome:** after visiting a repository's Pull requests list, opening the Files changed view for the same or another pull request activates the sidebar without requiring a page reload.
+  - **GitHub:** ✅ GitHub v1.10.0. The runtime is present but visually inactive on the Pull requests list, then initializes on entry to Files changed. Switching pull requests clears PR-specific route data, comments, source mappings, and mention data before rebuilding Changes, Threads, and Outline.
+  - **ADO:** ✅ Native-equivalent. The extension runtime is already present across the ADO pull-request routes used for Preview navigation.
+  - **Constraint:** the extension must remain visually inactive on the Pull requests list and other non-review pages, and broadening activation must not add permissions or host access.
+
+- [x] **P1 — Keep sidebar content stable while resizing**
+  - **Outcome:** resizing the sidebar changes only its viewport dimensions; the active tab and scroll position in Changes, Threads, and Outline do not move during the drag.
+  - **GitHub:** ✅ GitHub v1.10.0. Each pane's scroll position is locked for the duration of a bottom-right resize gesture so browser scroll anchoring cannot move its scrollbar thumb.
+  - **ADO:** ✅ No equivalent resize movement observed.
+  - **Constraint:** preserve persisted width and height without changing navigation state during intermediate resize events.
+
+---
+
+## 🎯 GitHub v1.11.0 candidate
+
+This release prioritizes the two remaining P0 visibility gaps for conversations attached inside compound rendered blocks, plus targeted sidebar clarity. Compound-marker implementation starts only after the current GitHub rich-diff table and code-block DOM has been captured and recorded in the GitHub developer notes.
 
 ### Correctness
 
 - [ ] **P0 — Inline markers for table rows that already have comments**
   - **Outcome:** a reviewer can see which exact table row has a conversation even though the thread body remains below the complete table.
-  - **GitHub:** 📋 Planned for GitHub v1.10.0. Blocked on capturing the current rich-diff table DOM before implementation.
+  - **GitHub:** 📋 Planned for GitHub v1.11.0. Blocked on capturing the current rich-diff table DOM before implementation.
   - **ADO:** ✅ ADO v1.3.0. One persistent, keyboard-accessible marker in the row's first cell displays the thread count and cycles through that row's conversations when activated.
   - **Constraint:** keep valid table structure, preserve the existing `+` control, and omit threads with no visible comments.
 
 - [ ] **P0 — Inline markers for code lines that already have comments**
   - **Outcome:** a reviewer can see which exact code line has a conversation even though the thread body remains below the complete code block.
-  - **GitHub:** 📋 Planned for GitHub v1.10.0. Blocked on capturing the current rich-diff code-block DOM and computed layout before implementation.
+  - **GitHub:** 📋 Planned for GitHub v1.11.0. Blocked on capturing the current rich-diff code-block DOM and computed layout before implementation.
   - **ADO:** ✅ ADO v1.3.0. A keyboard-accessible marker identifies each affected source line, shows the thread count, and cycles through conversations on that line.
   - **Constraint:** use a non-destructive overlay and never split or rewrite syntax-highlighted code DOM. Position markers proportionally when wrapping or syntax-highlighter row compression prevents exact visual alignment.
 
 ### Navigation and focus
 
-- [ ] **P2 — Dismiss and restore the sidebar without losing its layout**
-  - **Outcome:** reviewers can remove the sidebar completely when they need the full page width, then restore it from a small launcher without losing its saved position and size.
-  - **GitHub:** 📋 Planned for GitHub v1.10.0; collapse and keyboard toggle are available, but there is no full-dismiss control or launcher.
-  - **ADO:** ✅ The header × hides the sidebar and a launcher restores it.
+- [ ] **P1 — Show bulk rendering only when Markdown files still need it**
+  - **Outcome:** the Threads and Changes empty states distinguish “no comments or changes here” from “Markdown has not been rendered,” and offer bulk rich-diff rendering only while eligible Markdown files remain in source view.
+  - **GitHub:** 📋 Planned for GitHub v1.11.0. The Threads empty state currently shows the bulk-render action whenever no threads are visible, even when rich-diff content is already on screen.
+  - **ADO:** — Preview has no equivalent bulk-render action.
+  - **Constraint:** keep the action available when other Markdown files still need rendering, including when the current file is already rich-diff; preserve the separate one-file guidance for virtualized large PRs.
 
 ---
 
@@ -205,6 +248,12 @@ This release candidate closes the two remaining P0 visibility gaps for conversat
   - Evaluate the reduced click cost against the permanent vertical space added to every expanded thread.
 
 ### Navigation and focus
+
+- [ ] **P2 — Reconsider full sidebar dismissal and restoration**
+  - **Outcome:** reviewers can reclaim page space without creating a hidden state that first-time users cannot easily discover or recover from.
+  - **GitHub:** ⏸ Deferred. Keep the existing collapse control and `t` shortcut; do not add a full-dismiss button or launcher until the restore affordance is proven discoverable.
+  - **ADO:** △ Shipped with a header × and restore launcher, but retained under UX review rather than treated as the parity target. Evaluate whether to remove full dismissal and keep collapse only.
+  - **Constraint:** do not remove the ADO behavior until its discoverability and usage have been manually reviewed; if full dismissal remains, position, size, active tab, filter, and collapsed state must survive restoration.
 
 - [ ] **P3 — Evaluate active-file prioritization during startup**
   - **Outcome:** reviewers can begin commenting sooner without making Changes, Threads, or Outline feel noticeably slower or incomplete.

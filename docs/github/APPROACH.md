@@ -162,11 +162,7 @@ GitHub could:
 - Rotate any `page_data/*` URL → we'd hit 404, the candidate-list pattern flags it in the console, and we re-discover.
 - Add a new CSRF header → we'd start hitting 422 with a clear error.
 - Move to `SameSite=Strict` cookies + `Origin` checks → unlikely (their own UI depends on the same setup), but a content script extension would still satisfy both.
-- Remove the `page_data/*` endpoints entirely → the **PAT fallback** (`localStorage['grdc_use_pat'] = '1'`) keeps things working via the public REST API.
-
-### PAT fallback
-
-For users who can't rely on cookies (corporate single-sign-on edge cases, or if they want to use a service account), `localStorage['grdc_use_pat'] = '1'` switches everything to the public REST API and prompts for a Personal Access Token. Disabled by default — it's strictly worse UX for normal use (token setup, expiry management, no `@mention` autocomplete, etc.).
+- Remove the `page_data/*` endpoints entirely → posting and thread actions would stop until a new browser-session-authenticated path is discovered. The extension deliberately does not collect or store a PAT as a fallback.
 
 
 ## Inline rendering: avoid the refresh
@@ -183,7 +179,7 @@ So a new comment, reply, or resolve toggle all appear immediately — no page re
 
 - **Render markdown ourselves.** GitHub already does this perfectly. Reusing their DOM is simpler and always up to date.
 - **Re-implement `+ comment` for source-diff view.** GitHub already provides it. We only fill the gap in rich-diff.
-- **Use the public GitHub REST/GraphQL API by default.** It works but requires a PAT and breaks the "just works for private repos" promise. PAT path is kept as opt-in fallback.
+- **Use the public GitHub REST/GraphQL API.** It requires separate credentials for private repositories and breaks the browser-session-only promise.
 - **Try to match every block with perfect accuracy.** The editable line input is the escape hatch — if matching is slightly off, the user fixes it in one click before posting.
 - **Build a VS Code extension.** The browser extension is ~1000 lines and gets rendering / auth / navigation / non-md files for free from GitHub. A VS Code version would be 10× the code for marginal gain.
 

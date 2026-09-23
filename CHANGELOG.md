@@ -4,6 +4,20 @@ All notable changes to Markdown PR Comments for GitHub (formerly *Rich Diff Comm
 
 ## [Unreleased]
 
+## [1.10.0] — 2026-09-23
+
+### Changed
+
+- **Authentication is now browser-session only.** The extension no longer offers its dormant Personal Access Token fallback, and upgrading to v1.10.0 removes any GitHub token previously saved by that older mode without reading or transmitting it. Normal commenting on public and private repositories continues to use the GitHub session already open in the browser.
+- **Actions on your own comments are simpler and easier to find.** Edit and Delete now appear together in the comment header, with Delete clearly styled as destructive and still protected by confirmation. The redundant link back to the same comment on GitHub and its one-item overflow menu have been removed.
+
+### Fixed
+
+- **Table of Contents links work every time, including repeated clicks on the same section.** You can return to a section after scrolling away without first clicking a different heading, while links to other sections and browser Back/Forward navigation continue to work normally.
+- **Sidebar lists now stay at the same scroll position while you resize the sidebar.** Dragging the bottom-right resize handle no longer makes the scrollbar thumb—and the visible place in Changes, Threads, or Outline—slide toward the bottom.
+- **Large pull requests no longer offer a bulk-render action that GitHub cannot retain.** When GitHub optimizes a PR by unloading offscreen files, the sidebar now asks you to review Markdown files one at a time and switch each file to rich diff as needed, instead of showing temporary progress that disappears at the end.
+- **The sidebar now returns when you open a pull request from the repository's Pull requests list.** Moving from the list into Files changed activates Changes, Threads, and Outline without requiring a page reload, including when you switch to a different pull request.
+
 ## [1.9.0] — 2026-07-02
 
 ### Added
