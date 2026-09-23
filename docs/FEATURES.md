@@ -112,7 +112,7 @@ Priority applies to the shared user outcome:
 
 ## 🎯 GitHub v1.10.0 candidate
 
-This release candidate closes the two remaining P0 visibility gaps for conversations attached inside compound rendered blocks, simplifies comment actions, and fixes navigation and sidebar-layout friction. Marker implementation starts only after the current GitHub rich-diff table and code-block DOM has been captured and recorded in the GitHub developer notes.
+This release removes dormant credential storage, simplifies comment actions, and fixes navigation, sidebar-resizing, and large-PR workflow friction.
 
 ### Security and authentication
 
@@ -129,18 +129,6 @@ This release candidate closes the two remaining P0 visibility gaps for conversat
   - **GitHub:** △ Implemented and browser-validated for GitHub v1.10.0; release pending. On `mode=virtualization`—with GitHub's “Switch to single file mode” link as a fallback signal—the extension hides PR-wide render controls, guards the bulk action, and shows one-file-at-a-time guidance instead.
   - **ADO:** — Preview uses one selected file and has no equivalent bulk-render action.
   - **Constraint:** do not navigate modes automatically and do not run the two-pass bulk sweep on the virtualized surface. Preserve the user's original scroll position when bulk rendering is supported.
-
-- [ ] **P0 — Inline markers for table rows that already have comments**
-  - **Outcome:** a reviewer can see which exact table row has a conversation even though the thread body remains below the complete table.
-  - **GitHub:** 📋 Planned for GitHub v1.10.0. Blocked on capturing the current rich-diff table DOM before implementation.
-  - **ADO:** ✅ ADO v1.3.0. One persistent, keyboard-accessible marker in the row's first cell displays the thread count and cycles through that row's conversations when activated.
-  - **Constraint:** keep valid table structure, preserve the existing `+` control, and omit threads with no visible comments.
-
-- [ ] **P0 — Inline markers for code lines that already have comments**
-  - **Outcome:** a reviewer can see which exact code line has a conversation even though the thread body remains below the complete code block.
-  - **GitHub:** 📋 Planned for GitHub v1.10.0. Blocked on capturing the current rich-diff code-block DOM and computed layout before implementation.
-  - **ADO:** ✅ ADO v1.3.0. A keyboard-accessible marker identifies each affected source line, shows the thread count, and cycles through conversations on that line.
-  - **Constraint:** use a non-destructive overlay and never split or rewrite syntax-highlighted code DOM. Position markers proportionally when wrapping or syntax-highlighter row compression prevents exact visual alignment.
 
 - [x] **P1 — Allow repeated navigation to the same Table of Contents destination**
   - **Outcome:** clicking the same rendered Table of Contents link repeatedly always scrolls to its section, even when that anchor is already the current URL fragment.
@@ -163,6 +151,26 @@ This release candidate closes the two remaining P0 visibility gaps for conversat
   - **GitHub:** △ Implemented and browser-validated for GitHub v1.10.0; release pending. Each pane's scroll position is locked for the duration of a bottom-right resize gesture so browser scroll anchoring cannot move its scrollbar thumb.
   - **ADO:** ✅ No equivalent resize movement observed.
   - **Constraint:** preserve persisted width and height without changing navigation state during intermediate resize events.
+
+---
+
+## 🎯 GitHub v1.11.0 candidate
+
+This release targets the two remaining P0 visibility gaps for conversations attached inside compound rendered blocks. Implementation starts only after the current GitHub rich-diff table and code-block DOM has been captured and recorded in the GitHub developer notes.
+
+### Correctness
+
+- [ ] **P0 — Inline markers for table rows that already have comments**
+  - **Outcome:** a reviewer can see which exact table row has a conversation even though the thread body remains below the complete table.
+  - **GitHub:** 📋 Planned for GitHub v1.11.0. Blocked on capturing the current rich-diff table DOM before implementation.
+  - **ADO:** ✅ ADO v1.3.0. One persistent, keyboard-accessible marker in the row's first cell displays the thread count and cycles through that row's conversations when activated.
+  - **Constraint:** keep valid table structure, preserve the existing `+` control, and omit threads with no visible comments.
+
+- [ ] **P0 — Inline markers for code lines that already have comments**
+  - **Outcome:** a reviewer can see which exact code line has a conversation even though the thread body remains below the complete code block.
+  - **GitHub:** 📋 Planned for GitHub v1.11.0. Blocked on capturing the current rich-diff code-block DOM and computed layout before implementation.
+  - **ADO:** ✅ ADO v1.3.0. A keyboard-accessible marker identifies each affected source line, shows the thread count, and cycles through conversations on that line.
+  - **Constraint:** use a non-destructive overlay and never split or rewrite syntax-highlighted code DOM. Position markers proportionally when wrapping or syntax-highlighter row compression prevents exact visual alignment.
 
 ---
 
