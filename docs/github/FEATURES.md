@@ -31,7 +31,7 @@ For durable GitHub architecture decisions, see [Approach](./APPROACH.md). For en
 - Outline bulk controls currently apply Fold H1/H2/H3 and Expand all across every rendered Markdown file in the pull request. This is useful for PR-wide triage but broader than ADO's current-file behavior; labels do not yet make that scope explicit.
 - The sidebar can collapse to its header and can be toggled with the keyboard, but unlike ADO it has no × control that fully hides it and no compact launcher for restoring it.
 - Deleted prose appears in rich diff, but posting on it requires LEFT-side source mapping and payloads. That remains tracked in the shared roadmap.
-- Valid HTML and syntax-highlighting constraints place table-row and code-line thread bodies below the containing table or code block. The shared inline-marker feature will provide the missing in-place signal.
+- Valid HTML and syntax-highlighting constraints keep table-row and code-line thread bodies below the containing table or code block. Persistent keyboard-accessible markers now provide the in-place signal, show conversation counts, and cycle through threads without altering table or highlighted-code markup.
 - Changes navigation currently covers rendered Markdown only. Extending it to source-diff hunks for other file types remains shared roadmap work.
 
 ## Open GitHub design notes

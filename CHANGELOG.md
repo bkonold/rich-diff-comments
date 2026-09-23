@@ -7,6 +7,7 @@ All notable changes to Markdown PR Comments for GitHub (formerly *Rich Diff Comm
 ### Added
 
 - **Commented table rows now show a persistent conversation marker.** The marker stays beside the exact row while full conversations remain below the table, shows how many threads belong to that row, and cycles through them when clicked or activated from the keyboard.
+- **Commented lines inside fenced code blocks now show persistent conversation markers.** Each marker stays beside its affected line, displays the number of conversations there, and cycles through them by mouse or keyboard while the full threads remain below the code block.
 - **Every rendered comment now has a Copy link action.** You can copy a direct link to your own comment or another reviewer's comment from its header, with immediate success or failure feedback.
 
 ### Fixed

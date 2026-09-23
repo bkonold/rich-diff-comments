@@ -657,6 +657,12 @@ History of bugs fixed and *why* the fix worked. Read this before re-touching the
 
 ### DOM injection
 
+#### GitHub rich-diff fenced-code capture (2026-09-23)
+
+A live highlighted fence renders as `pre.rich-diff-level-one` with syntax `<span>` elements and changed-line `<ins>` wrappers directly beneath the `<pre>`; there is no `<code>` wrapper or dependable per-line element. The captured block used `position: relative`, `white-space: pre`, `overflow: auto`, 16 px padding, 13.6 px font, and 19.72 px line height. Its 59-line `innerText` occupied the full block rather than a virtualized subset, and the parent `div.changed.rich-diff-level-zero` matched the block height.
+
+Code-line thread controls therefore use a non-destructive absolute overlay inside the `<pre>`, leaving all syntax and diff children untouched. Source fence bounds—not syntax spans—define the line range; marker centers are distributed proportionally through the measured padded content height. This is exact when rendered rows remain one-to-one and is the accepted fallback when host wrapping or diff compression diverges from source rows.
+
 #### GitHub rich-diff table capture (2026-09-23)
 
 A live regular Markdown table renders as `table.rich-diff-level-one` with a conventional `thead > tr > th` header and `tbody > tr > td` body. The first-cell host is therefore stable for both header and data rows. The extension's existing `+` button is a direct child of that first `th` or `td`, followed by the original cell content.

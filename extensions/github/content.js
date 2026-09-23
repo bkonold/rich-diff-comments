@@ -37,6 +37,7 @@
     renderMarkdownPreview,
     findFenceRangeAroundLine,
     sortThreadHeads,
+    codeLineMarkerLayout,
     escapeHtml,
     formatTimeAgo,
     buildAnchorKey,
@@ -1416,7 +1417,23 @@
       const rawSource = rawSources[idx];
       const sourceLines = rawSource ? rawSource.split('\n') : null;
       const perFileMap = mapBlocksToSourceLines(richDiff, sourceLines, path, deps, console.log.bind(console));
-      perFileMap.forEach((info, el) => fileLineMap.set(el, info));
+      perFileMap.forEach((info, el) => {
+        fileLineMap.set(el, info);
+        if (el.tagName !== 'PRE') return;
+
+        // GitHub renders highlighted code directly inside <pre> (syntax spans
+        // and <ins>/<del> wrappers, no per-line elements). Preserve that DOM
+        // and cache the source fence's content range on the block so comment
+        // targeting and existing-thread markers share one line model.
+        const range = rawSource
+          ? findFenceRangeAroundLine(rawSource, info.line)
+          : null;
+        const renderedLines = (el.innerText || '').replace(/\n+$/, '').split('\n');
+        const start = range ? range.start : info.line;
+        const end = range ? range.end : start + Math.max(0, renderedLines.length - 1);
+        el.dataset.grdcRangeStart = String(start);
+        el.dataset.grdcRangeEnd = String(end);
+      });
     });
   }
 
@@ -2196,6 +2213,7 @@
           // which for a drag-selected range is already the start block.
           renderThreadOnElement(element, newComments);
           renderTableRowThreadMarkers();
+          renderCodeLineThreadMarkers();
           buildThreadsSidebar();
         }
         const success = document.createElement('div');
@@ -2336,6 +2354,7 @@
     // Remove previous renders
     document.querySelectorAll('.grdc-existing-thread').forEach(el => el.remove());
     clearTableRowThreadMarkers();
+    clearCodeLineThreadMarkers();
     // Clear any range tints from a previous render so they don't accumulate.
     document.querySelectorAll('.grdc-thread-range').forEach(el => el.classList.remove('grdc-thread-range'));
 
@@ -2405,6 +2424,7 @@
     });
 
     renderTableRowThreadMarkers();
+    renderCodeLineThreadMarkers();
 
     const totalRendered = document.querySelectorAll('.grdc-existing-thread').length;
     console.log(`[GRDC] Rendered ${totalRendered} comment threads`);
@@ -2510,6 +2530,104 @@
     });
   }
 
+  function clearCodeLineThreadMarkers() {
+    document.querySelectorAll('.grdc-code-line-thread-marker').forEach((el) => el.remove());
+    document.querySelectorAll('.grdc-code-thread-marker-host').forEach((el) => {
+      el.classList.remove('grdc-code-thread-marker-host');
+    });
+  }
+
+  // GitHub's current rich diff emits highlighted spans and <ins>/<del>
+  // wrappers directly under <pre>; it has no stable element per source line.
+  // Keep that syntax DOM untouched and position compact controls
+  // proportionally over the measured fenced-content height. The complete
+  // thread bodies remain below the block, where valid markup and the existing
+  // ordering logic already place them.
+  function renderCodeLineThreadMarkers() {
+    clearCodeLineThreadMarkers();
+    if (typeof codeLineMarkerLayout !== 'function') return;
+
+    const codeBlocksByPath = new Map();
+    fileLineMap.forEach((info, element) => {
+      if (!info || !element || element.tagName !== 'PRE' || !info.path) return;
+      const rangeStart = Number(element.dataset.grdcRangeStart);
+      const rangeEnd = Number(element.dataset.grdcRangeEnd);
+      if (!Number.isFinite(rangeStart) || !Number.isFinite(rangeEnd)) return;
+      if (!codeBlocksByPath.has(info.path)) codeBlocksByPath.set(info.path, []);
+      codeBlocksByPath.get(info.path).push({ element, rangeStart, rangeEnd });
+    });
+
+    const blockLines = new Map();
+    document.querySelectorAll('.grdc-existing-thread').forEach((thread) => {
+      const path = thread.dataset.grdcPath || '';
+      const endLine = Number(thread.dataset.grdcLine);
+      const rawStartLine = Number(thread.dataset.grdcStartLine);
+      const startLine = Number.isFinite(rawStartLine) && rawStartLine > 0 ? rawStartLine : endLine;
+      const blocks = codeBlocksByPath.get(path);
+      if (!blocks || !Number.isFinite(startLine) || !Number.isFinite(endLine)) return;
+
+      for (let line = Math.min(startLine, endLine); line <= Math.max(startLine, endLine); line++) {
+        const match = blocks.find(({ rangeStart, rangeEnd }) => line >= rangeStart && line <= rangeEnd);
+        if (!match) continue;
+        if (!blockLines.has(match.element)) blockLines.set(match.element, new Map());
+        const lines = blockLines.get(match.element);
+        if (!lines.has(line)) lines.set(line, []);
+        const lineThreads = lines.get(line);
+        const threadId = thread.dataset.grdcThreadId || '';
+        if (!lineThreads.some((item) => item.dataset.grdcThreadId === threadId)) lineThreads.push(thread);
+      }
+    });
+
+    blockLines.forEach((lines, pre) => {
+      const rangeStart = Number(pre.dataset.grdcRangeStart);
+      const rangeEnd = Number(pre.dataset.grdcRangeEnd);
+      const cs = getComputedStyle(pre);
+      const paddingTop = parseFloat(cs.paddingTop) || 0;
+      const paddingBottom = parseFloat(cs.paddingBottom) || 0;
+      const contentHeight = Math.max(1, pre.getBoundingClientRect().height - paddingTop - paddingBottom);
+      pre.classList.add('grdc-code-thread-marker-host');
+
+      Array.from(lines.entries()).sort((a, b) => a[0] - b[0]).forEach(([line, threads]) => {
+        const layout = codeLineMarkerLayout(line, rangeStart, rangeEnd, contentHeight, paddingTop);
+        if (!layout || threads.length === 0) return;
+
+        const marker = document.createElement('button');
+        marker.type = 'button';
+        marker.className = 'grdc-code-line-thread-marker';
+        marker.dataset.line = String(line);
+        marker.dataset.threadIds = threads.map((thread) => thread.dataset.grdcThreadId || '').join(',');
+        marker.dataset.activeIndex = '0';
+        marker.style.top = `${layout.top}px`;
+        marker.style.height = `${layout.size}px`;
+        marker.style.minWidth = `${layout.size}px`;
+        if (threads.length > 1) marker.dataset.count = String(threads.length);
+        marker.setAttribute('aria-label', threads.length === 1
+          ? `Open the review thread on code line ${line}`
+          : `Open review threads on code line ${line}; ${threads.length} threads`);
+        marker.title = threads.length === 1
+          ? `1 review thread on code line ${line}`
+          : `${threads.length} review threads on code line ${line} · activate to cycle`;
+        marker.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 2.5h11v8h-6l-3.5 3v-3H2.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+
+        marker.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const index = Math.max(0, Math.min(threads.length - 1, Number(marker.dataset.activeIndex) || 0));
+          const thread = threads[index];
+          marker.dataset.activeIndex = String((index + 1) % threads.length);
+          const badge = thread.querySelector('.grdc-thread-badge');
+          const body = thread.querySelector('.grdc-thread-body');
+          if (!badge || !body) return;
+          if (body.style.display === 'none') badge.click();
+          badge.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          badge.focus({ preventScroll: true });
+        });
+
+        pre.appendChild(marker);
+      });
+    });
+  }
+
   function renderThreadOnElement(element, comments) {
     const head = comments[0];
     const isResolved = !!head.isResolved;
@@ -2527,9 +2645,9 @@
     const badge = document.createElement('div');
     badge.className = 'grdc-thread-badge';
     badge.dataset.grdcThreadId = String(threadId);
-    // The table-row marker moves focus here after navigation. Keep it out of
+    // Compound-block markers move focus here after navigation. Keep it out of
     // the ordinary tab order because the marker itself is the accessible
-    // row-level control.
+    // row/line-level control.
     badge.tabIndex = -1;
     const stateBits = [];
     if (isResolved) stateBits.push('✓ resolved');
@@ -3018,10 +3136,10 @@
   // to render after a re-init).
   function clearInjectedDom() {
     document.querySelectorAll(
-      '.grdc-comment-btn, .grdc-collapse-toggle, .grdc-existing-thread, .grdc-comment-box, .grdc-reply-box, .grdc-table-thread-marker'
+      '.grdc-comment-btn, .grdc-collapse-toggle, .grdc-existing-thread, .grdc-comment-box, .grdc-reply-box, .grdc-table-thread-marker, .grdc-code-line-thread-marker'
     ).forEach((el) => el.remove());
     document.querySelectorAll(
-      '.grdc-hoverable, .grdc-collapsible, .grdc-section-collapsed, .grdc-collapsed-hidden, .grdc-thread-range, .grdc-range-hover, .grdc-table-thread-marker-host, .grdc-table-thread-marked'
+      '.grdc-hoverable, .grdc-collapsible, .grdc-section-collapsed, .grdc-collapsed-hidden, .grdc-thread-range, .grdc-range-hover, .grdc-table-thread-marker-host, .grdc-table-thread-marked, .grdc-code-thread-marker-host'
     ).forEach((el) => {
       el.classList.remove(
         'grdc-hoverable',
@@ -3031,7 +3149,8 @@
         'grdc-thread-range',
         'grdc-range-hover',
         'grdc-table-thread-marker-host',
-        'grdc-table-thread-marked'
+        'grdc-table-thread-marked',
+        'grdc-code-thread-marker-host'
       );
     });
     // Note: `.grdc-sidebar` is NOT cleared here — `buildThreadsSidebar()`
@@ -5365,6 +5484,7 @@
               node.classList?.contains('grdc-comment-box') ||
               node.classList?.contains('grdc-comment-btn') ||
               node.classList?.contains('grdc-table-thread-marker') ||
+              node.classList?.contains('grdc-code-line-thread-marker') ||
               node.classList?.contains('grdc-collapse-toggle') ||
               node.classList?.contains('grdc-reply-box') ||
               node.classList?.contains('grdc-comment-edit') ||

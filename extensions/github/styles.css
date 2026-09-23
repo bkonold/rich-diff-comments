@@ -126,6 +126,55 @@ th.grdc-table-thread-marker-host {
   line-height: 1;
 }
 
+/* GitHub highlights code with inline spans and diff wrappers directly under
+   <pre>, without dependable per-line elements. Preserve those children and
+   reserve a narrow right-edge overlay for proportionally positioned thread
+   controls. */
+pre.grdc-code-thread-marker-host {
+  position: relative;
+  padding-right: 38px !important;
+}
+
+.grdc-code-line-thread-marker {
+  position: absolute;
+  right: 5px;
+  transform: translateY(-50%);
+  padding: 0 2px;
+  border: 1px solid var(--bgColor-accent-emphasis, var(--color-accent-emphasis, #0969da));
+  border-radius: 9px;
+  background: var(--bgColor-default, var(--color-canvas-default, #ffffff));
+  color: var(--fgColor-accent, var(--color-accent-fg, #0969da));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 91;
+}
+
+.grdc-code-line-thread-marker:hover {
+  background: var(--bgColor-accent-muted, var(--color-accent-subtle, #ddf4ff));
+}
+
+.grdc-code-line-thread-marker:focus-visible {
+  outline: 2px solid var(--fgColor-accent, var(--color-accent-fg, #0969da));
+  outline-offset: 1px;
+}
+
+.grdc-code-line-thread-marker svg {
+  width: 10px;
+  height: 10px;
+  flex: none;
+}
+
+.grdc-code-line-thread-marker[data-count]::after {
+  content: attr(data-count);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+}
+
 /* <pre> can be wide; keep button visible at the left edge */
 pre.grdc-hoverable .grdc-comment-btn {
   left: 4px;

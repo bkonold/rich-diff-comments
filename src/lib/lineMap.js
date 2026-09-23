@@ -200,7 +200,7 @@
       const clone = block.cloneNode(true);
       clone.querySelectorAll(
         '.grdc-comment-box, .grdc-thread, .grdc-sidebar, .grdc-comment-edit, .grdc-reply-box, ' +
-        '.grdc-table-thread-marker, ' +
+        '.grdc-table-thread-marker, .grdc-code-line-thread-marker, ' +
         '.adrc-editor, .adrc-thread-badge, .adrc-thread-panel, .adrc-sidebar, ' +
         '.adrc-comment-btn, .adrc-collapse-toggle'
       ).forEach((element) => element.remove());
