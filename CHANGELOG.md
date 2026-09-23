@@ -4,6 +4,8 @@ All notable changes to Markdown PR Comments for GitHub (formerly *Rich Diff Comm
 
 ## [Unreleased]
 
+## [1.11.0] — 2026-09-23
+
 ### Added
 
 - **Commented table rows now show a persistent conversation marker.** The marker stays beside the exact row while full conversations remain below the table, shows how many threads belong to that row, and cycles through them when clicked or activated from the keyboard.

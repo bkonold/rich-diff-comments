@@ -22,8 +22,8 @@ How to ship the separate GitHub and Azure DevOps browser-extension targets. This
 
 | Target | Store | Listing | Status | Version |
 |---|---|---|---|---|
-| GitHub | Chrome Web Store | <https://chromewebstore.google.com/detail/markdown-pr-comments-for/bdkcmcdfnhonfcpdgcmemkpcmnhnhemj> | Live (Unlisted) | 1.9.0 |
-| GitHub | Microsoft Edge Add-ons | <https://microsoftedge.microsoft.com/addons/detail/agomibenjlnikaldoddminkjbokfocgb> | Live (Hidden) | 1.9.0 |
+| GitHub | Chrome Web Store | <https://chromewebstore.google.com/detail/markdown-pr-comments-for/bdkcmcdfnhonfcpdgcmemkpcmnhnhemj> | Live (Unlisted) | 1.10.0 |
+| GitHub | Microsoft Edge Add-ons | <https://microsoftedge.microsoft.com/addons/detail/agomibenjlnikaldoddminkjbokfocgb> | Live (Hidden) | 1.10.0 |
 | Azure DevOps | Chrome Web Store | <https://chromewebstore.google.com/detail/markdown-pr-comments-for/habbfnkhgmnkhlbakjlnapadamjijbdh> | Live (Unlisted) | 1.1.0 |
 | Azure DevOps | Microsoft Edge Add-ons | <https://microsoftedge.microsoft.com/addons/detail/ajgoipjphffaapagamibikngconoanac> | Live (Hidden) | 1.1.0 |
 

@@ -160,7 +160,7 @@ This release removes dormant credential storage, simplifies comment actions, and
 
 ---
 
-## 🎯 GitHub v1.11.0 candidate
+## ✅ GitHub v1.11.0
 
 This release prioritizes the two remaining P0 visibility gaps for conversations attached inside compound rendered blocks, plus targeted sidebar clarity. Compound-marker implementation starts only after the relevant current GitHub rich-diff DOM has been captured and recorded in the GitHub developer notes.
 
@@ -168,13 +168,13 @@ This release prioritizes the two remaining P0 visibility gaps for conversations 
 
 - [x] **P0 — Inline markers for table rows that already have comments**
   - **Outcome:** a reviewer can see which exact table row has a conversation even though the thread body remains below the complete table.
-  - **GitHub:** △ Implemented and browser-validated for GitHub v1.11.0; release pending. One persistent, keyboard-accessible marker in the row's first cell displays the thread count and cycles through that row's conversations when activated.
+  - **GitHub:** ✅ GitHub v1.11.0. One persistent, keyboard-accessible marker in the row's first cell displays the thread count and cycles through that row's conversations when activated.
   - **ADO:** ✅ ADO v1.3.0. One persistent, keyboard-accessible marker in the row's first cell displays the thread count and cycles through that row's conversations when activated.
   - **Constraint:** keep valid table structure, preserve the existing `+` control, and omit threads with no visible comments.
 
 - [x] **P0 — Inline markers for code lines that already have comments**
   - **Outcome:** a reviewer can see which exact code line has a conversation even though the thread body remains below the complete code block.
-  - **GitHub:** △ Implemented and browser-validated for GitHub v1.11.0; release pending. A keyboard-accessible right-edge marker identifies each affected source line, shows the thread count, and cycles through conversations on that line.
+  - **GitHub:** ✅ GitHub v1.11.0. A keyboard-accessible right-edge marker identifies each affected source line, shows the thread count, and cycles through conversations on that line.
   - **ADO:** ✅ ADO v1.3.0. A keyboard-accessible marker identifies each affected source line, shows the thread count, and cycles through conversations on that line.
   - **Constraint:** use a non-destructive overlay and never split or rewrite syntax-highlighted code DOM. Position markers proportionally when wrapping or syntax-highlighter row compression prevents exact visual alignment.
 
@@ -182,7 +182,7 @@ This release prioritizes the two remaining P0 visibility gaps for conversations 
 
 - [ ] **P0 — Complete the core Edit, Delete, and Copy link comment actions**
   - **Outcome:** reviewers can edit or delete their own rendered comments and copy a stable link to any visible conversation without leaving the rendered review surface.
-  - **GitHub:** △ Complete for GitHub v1.11.0; release pending. Edit and Delete remain ownership-limited, while Copy link works for every visible comment and uses the canonical URL or a reconstructed stable discussion fragment.
+  - **GitHub:** ✅ GitHub v1.11.0. Edit and Delete remain ownership-limited, while Copy link works for every visible comment and uses the canonical URL or a reconstructed stable discussion fragment.
   - **ADO:** △ Edit and Delete shipped in ADO v1.0.0; Copy link is planned. Azure DevOps exposes a thread-level destination rather than a distinct URL for each reply.
   - **Constraint:** retain ownership checks and deletion confirmation. Copy the most specific stable destination each host supports, provide clear copied feedback, and fall back safely when link metadata is absent.
 
@@ -196,7 +196,7 @@ This release prioritizes the two remaining P0 visibility gaps for conversations 
 
 - [x] **P1 — Show bulk rendering only when Markdown files still need it**
   - **Outcome:** the Threads and Changes empty states distinguish “no comments or changes here” from “Markdown has not been rendered,” and offer bulk rich-diff rendering only while eligible Markdown files remain in source view.
-  - **GitHub:** △ Implemented and browser-validated for GitHub v1.11.0; release pending. Rendered Markdown paths are tracked independently of thread presence, so the action remains available only while another eligible file still needs rich diff.
+  - **GitHub:** ✅ GitHub v1.11.0. Rendered Markdown paths are tracked independently of thread presence, so the action remains available only while another eligible file still needs rich diff.
   - **ADO:** — Preview has no equivalent bulk-render action.
   - **Constraint:** keep the action available when other Markdown files still need rendering, including when the current file is already rich-diff; preserve the separate one-file guidance for virtualized large PRs.
 
