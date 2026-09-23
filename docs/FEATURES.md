@@ -114,6 +114,14 @@ Priority applies to the shared user outcome:
 
 This release candidate closes the two remaining P0 visibility gaps for conversations attached inside compound rendered blocks and adds a complete way to dismiss and restore the sidebar. Marker implementation starts only after the current GitHub rich-diff table and code-block DOM has been captured and recorded in the GitHub developer notes.
 
+### Security and authentication
+
+- [ ] **P0 — Remove dormant Personal Access Token mode and stored credentials**
+  - **Outcome:** authentication always uses the browser-managed signed-in session, and the extension never asks for or persistently stores a GitHub credential.
+  - **GitHub:** 📋 Planned for GitHub v1.10.0. Remove the hidden PAT/REST fallback, token prompt, and PAT-related privacy documentation; delete any legacy `grdc_github_token` and `grdc_use_pat` values left in GitHub local storage by earlier versions.
+  - **ADO:** ✅ Already session-only and never stores a PAT.
+  - **Constraint:** preserve normal session-cookie comment submission and verify that upgrading users do not retain a previously stored token.
+
 ### Correctness
 
 - [ ] **P0 — Inline markers for table rows that already have comments**
