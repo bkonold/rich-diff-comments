@@ -178,6 +178,20 @@ This release prioritizes the two remaining P0 visibility gaps for conversations 
   - **ADO:** ✅ ADO v1.3.0. A keyboard-accessible marker identifies each affected source line, shows the thread count, and cycles through conversations on that line.
   - **Constraint:** use a non-destructive overlay and never split or rewrite syntax-highlighted code DOM. Position markers proportionally when wrapping or syntax-highlighter row compression prevents exact visual alignment.
 
+### Review and collaboration
+
+- [ ] **P0 — Complete the core Edit, Delete, and Copy link comment actions**
+  - **Outcome:** reviewers can edit or delete their own rendered comments and copy a stable link to any visible conversation without leaving the rendered review surface.
+  - **GitHub:** △ Complete for GitHub v1.11.0; release pending. Edit and Delete remain ownership-limited, while Copy link works for every visible comment and uses the canonical URL or a reconstructed stable discussion fragment.
+  - **ADO:** △ Edit and Delete shipped in ADO v1.0.0; Copy link is planned. Azure DevOps exposes a thread-level destination rather than a distinct URL for each reply.
+  - **Constraint:** retain ownership checks and deletion confirmation. Copy the most specific stable destination each host supports, provide clear copied feedback, and fall back safely when link metadata is absent.
+
+- [ ] **P1 — Turn a conversation into tracked work**
+  - **Outcome:** reviewers can carry a rendered-review conversation into the host's work-tracking system with its source link and useful context already attached.
+  - **GitHub:** 📋 Planned after Copy link. Match the native **Reference in a new issue** outcome by opening a new repository issue with the comment reference prefilled.
+  - **ADO:** 📋 Planned after Copy link. Match the native work-item picker with the available Issue, Epic, and Task choices and link the new item to the review conversation.
+  - **Constraint:** open the host's normal creation form so the reviewer confirms title, type, project, permissions, and final content; do not create tracked work silently.
+
 ### Navigation and focus
 
 - [x] **P1 — Show bulk rendering only when Markdown files still need it**
@@ -219,8 +233,26 @@ This release prioritizes the two remaining P0 visibility gaps for conversations 
 ### Review and collaboration
 
 - [ ] **P2 — Reactions on comments**
-  - **GitHub:** 📋 Planned; mutation endpoint needs validation.
-  - **ADO:** 📋 Planned; REST support needs investigation.
+  - **Outcome:** reviewers can acknowledge a comment without adding a reply.
+  - **GitHub:** 📋 Planned; native reactions exist, but the mutation endpoint needs validation.
+  - **ADO:** 📋 Planned; the native thread surface exposes a Like/thumbs-up action, but extension support needs endpoint investigation.
+
+- [ ] **P2 — Quote a comment into a reply**
+  - **Outcome:** one action opens the rendered reply editor with the selected comment represented as a Markdown quote.
+  - **GitHub:** 📋 Planned to match native **Quote reply** behavior.
+  - **ADO:** 📋 Planned as a shared editor convenience; no equivalent action was present in the captured native toolbar.
+  - Preserve attribution where useful, keep the quote editable, and use the existing reply submission path.
+
+- [ ] **P2 — Copy a comment as Markdown**
+  - **Outcome:** reviewers can copy a portable Markdown quotation of a comment for use in another discussion or document.
+  - **GitHub:** 📋 Planned to match native **Copy Markdown** behavior.
+  - **ADO:** 📋 Planned as a parity convenience even though it was not present in the captured native toolbar.
+  - Keep this distinct from Copy link: one copies reusable content, while the P0 action copies a navigable destination.
+
+- [ ] **P3 — Expose host-authorized moderation actions only when safely supported**
+  - **GitHub:** ↔ Native **Hide** remains delegated to GitHub because availability and reason selection depend on repository moderation permissions.
+  - **ADO:** — No corresponding action was present in the captured native toolbar.
+  - Do not infer moderation permission from ordinary comment ownership or substitute Delete for Hide.
 
 - [ ] **P2 — Quick reply from a sidebar thread card**
   - **GitHub:** 📋 Planned.

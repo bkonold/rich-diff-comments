@@ -31,6 +31,7 @@
     looksLikePath,
     findBlobInJson,
     threadResponseToComments,
+    getGitHubCommentLink,
     parseMarkersMap,
     computeTableRowLine,
     renderMarkdownPreview,
@@ -2565,6 +2566,27 @@
     commentList.className = 'grdc-thread-comments';
     body.appendChild(commentList);
 
+    async function copyTextToClipboard(text) {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+
+      // User-gesture fallback for restricted content-script contexts where
+      // the modern Clipboard API is unavailable. Keep the temporary input
+      // outside the visible layout and remove it immediately after copying.
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      const copied = document.execCommand('copy');
+      textarea.remove();
+      if (!copied) throw new Error('Clipboard write was rejected');
+    }
+
     const renderComment = (c) => {
       const comment = document.createElement('div');
       comment.className = 'grdc-thread-comment';
@@ -2585,6 +2607,13 @@
         : '';
       const deleteLinkMarkup = isOwn
         ? `<button class="grdc-comment-delete-link" title="Delete this comment">Delete</button>`
+        : '';
+      // Copy link is available for every visible comment, regardless of
+      // ownership. Prefer GitHub's canonical URL and reconstruct its stable
+      // discussion fragment only when route data omitted that field.
+      const commentLink = getGitHubCommentLink(c, prInfo);
+      const copyLinkMarkup = commentLink
+        ? '<button class="grdc-comment-copy-link" title="Copy link to this comment">Copy link</button>'
         : '';
       // Avatar — 20×20 circle next to the username. Falls back to a
       // GitHub-hosted avatar URL by login if no explicit URL was captured.
@@ -2622,11 +2651,34 @@
           ${roleMarkup}
           ${authorMarkup}
           <span class="grdc-comment-time">${escapeHtml(timeAgo)}</span>
+          ${copyLinkMarkup}
           ${editLinkMarkup}
           ${deleteLinkMarkup}
         </div>
         ${bodyMarkup}
       `;
+      const copyLinkBtn = comment.querySelector('.grdc-comment-copy-link');
+      if (copyLinkBtn) {
+        copyLinkBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          copyLinkBtn.disabled = true;
+          try {
+            await copyTextToClipboard(commentLink);
+            copyLinkBtn.textContent = 'Copied!';
+            copyLinkBtn.title = 'Comment link copied';
+          } catch (error) {
+            console.log('[GRDC] Failed to copy comment link:', error && error.message ? error.message : error);
+            copyLinkBtn.textContent = 'Copy failed';
+            copyLinkBtn.title = 'Could not copy comment link';
+          }
+          setTimeout(() => {
+            if (!copyLinkBtn.isConnected) return;
+            copyLinkBtn.textContent = 'Copy link';
+            copyLinkBtn.title = 'Copy link to this comment';
+            copyLinkBtn.disabled = false;
+          }, 1600);
+        });
+      }
       // Wire up direct edit / delete affordances for the user's own comments.
       if (isOwn) {
         const editLinkBtn = comment.querySelector('.grdc-comment-edit-link');

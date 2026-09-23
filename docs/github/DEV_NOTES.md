@@ -599,6 +599,10 @@ GitHub v1.10.0 removes the dormant PAT plumbing. If these cookie-authenticated e
 
 `route.markers.threads[<id>]` carries `isResolved` and (sometimes) `isOutdated` directly — we surface these in the badge label and dim resolved threads via `.grdc-thread-resolved`. Resolved threads collapse by default; unresolved threads auto-expand.
 
+## Copying comment links
+
+The route payload normally supplies each review comment's canonical web URL through `url` / `htmlUrl` / `html_url`. Copy link is available for every visible comment rather than only comments owned by the current viewer. If the canonical field is absent, the database comment ID and current pull-request identity reconstruct GitHub's stable destination as `https://github.com/<owner>/<repo>/pull/<n>#discussion_r<databaseId>`. If neither form is available, omit the action instead of copying a thread-level or guessed destination. Clipboard success and rejection are reported on the action itself; no additional extension permission is required for the user-initiated write.
+
 ## Resolved issues (changelog)
 
 History of bugs fixed and *why* the fix worked. Read this before re-touching the line-mapping or DOM-injection code — most of these are non-obvious.
