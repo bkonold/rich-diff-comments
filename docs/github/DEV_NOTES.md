@@ -653,6 +653,12 @@ History of bugs fixed and *why* the fix worked. Read this before re-touching the
 
 ### DOM injection
 
+#### GitHub rich-diff table capture (2026-09-23)
+
+A live regular Markdown table renders as `table.rich-diff-level-one` with a conventional `thead > tr > th` header and `tbody > tr > td` body. The first-cell host is therefore stable for both header and data rows. The extension's existing `+` button is a direct child of that first `th` or `td`, followed by the original cell content.
+
+The captured source mapping confirmed the divider-line rule used by the mapper: the header row mapped to source line 107, while the first and second body rows mapped to 109 and 110. Source line 108 is the Markdown table divider and has no rendered row. A persistent thread marker can therefore share the first cell with the left-positioned `+` control, reserve space at the cell's right edge, and leave full thread bodies after the complete table.
+
 | Issue | Root cause | Fix |
 |---|---|---|
 | `+` button missing or jumping out of tables | `<button>` and `<div>` are not valid children of `<tr>` — browsers' HTML parser hoists them out of the table on insertion | Added `buttonAnchor(el)`: for `<tr>`, anchor the `+` to the first `<td>` (valid descendant). Added `siblingAnchor(el)`: for `<tr>`, place comment boxes / thread renders **after the parent `<table>`** instead of between rows. CSS positions the button inside `<td>` (`left: 2px`) since `-30px` falls outside the table. |

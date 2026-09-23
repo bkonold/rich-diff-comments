@@ -4,6 +4,10 @@ All notable changes to Markdown PR Comments for GitHub (formerly *Rich Diff Comm
 
 ## [Unreleased]
 
+### Added
+
+- **Commented table rows now show a persistent conversation marker.** The marker stays beside the exact row while full conversations remain below the table, shows how many threads belong to that row, and cycles through them when clicked or activated from the keyboard.
+
 ### Fixed
 
 - **The sidebar now offers “Render all Markdown files as rich-diff” only when another Markdown file still needs rendering.** When rendered files simply have no visible threads or changes, their empty states now say so without presenting a redundant action.

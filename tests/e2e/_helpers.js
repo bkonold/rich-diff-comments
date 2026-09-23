@@ -52,6 +52,7 @@ function resolveScriptPath(scriptPath) {
 // `repo`, `pullNumber` from the pathname; the values themselves don't
 // matter because all network access is stubbed.
 const FAKE_PR_URL = 'https://github.com/test-owner/test-repo/pull/1/files';
+const FAKE_CHANGES_URL = 'https://github.com/test-owner/test-repo/pull/1/changes';
 const FAKE_HEAD_OID = 'a'.repeat(40);
 
 /**
@@ -63,6 +64,8 @@ const FAKE_HEAD_OID = 'a'.repeat(40);
  * @param {Record<string, string>} [opts.rawSource]  Map of file path → raw
  *     markdown source. Each entry stubs the blob URL `fetchRawSource()`
  *     would request for that path.
+ * @param {object} [opts.routeData] GitHub `/changes` route payload used by
+ *     existing-thread fixtures.
  */
 async function setupFixture(page, fixtureName, opts) {
   opts = opts || {};
@@ -110,6 +113,16 @@ async function setupFixture(page, fixtureName, opts) {
       body: html,
     });
   });
+
+  if (opts.routeData) {
+    await page.route(FAKE_CHANGES_URL, function (route) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json; charset=utf-8',
+        body: JSON.stringify({ payload: { pullRequestsChangesRoute: opts.routeData } }),
+      });
+    });
+  }
 
   // Serve the fixture at the fake PR URL (registered LAST so it wins
   // over the fallback).

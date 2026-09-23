@@ -162,13 +162,13 @@ This release removes dormant credential storage, simplifies comment actions, and
 
 ## 🎯 GitHub v1.11.0 candidate
 
-This release prioritizes the two remaining P0 visibility gaps for conversations attached inside compound rendered blocks, plus targeted sidebar clarity. Compound-marker implementation starts only after the current GitHub rich-diff table and code-block DOM has been captured and recorded in the GitHub developer notes.
+This release prioritizes the two remaining P0 visibility gaps for conversations attached inside compound rendered blocks, plus targeted sidebar clarity. Compound-marker implementation starts only after the relevant current GitHub rich-diff DOM has been captured and recorded in the GitHub developer notes.
 
 ### Correctness
 
-- [ ] **P0 — Inline markers for table rows that already have comments**
+- [x] **P0 — Inline markers for table rows that already have comments**
   - **Outcome:** a reviewer can see which exact table row has a conversation even though the thread body remains below the complete table.
-  - **GitHub:** 📋 Planned for GitHub v1.11.0. Blocked on capturing the current rich-diff table DOM before implementation.
+  - **GitHub:** △ Implemented and browser-validated for GitHub v1.11.0; release pending. One persistent, keyboard-accessible marker in the row's first cell displays the thread count and cycles through that row's conversations when activated.
   - **ADO:** ✅ ADO v1.3.0. One persistent, keyboard-accessible marker in the row's first cell displays the thread count and cycles through that row's conversations when activated.
   - **Constraint:** keep valid table structure, preserve the existing `+` control, and omit threads with no visible comments.
 

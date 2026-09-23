@@ -2194,6 +2194,7 @@
           // whole tint band. `element` is the block the user clicked `+` on,
           // which for a drag-selected range is already the start block.
           renderThreadOnElement(element, newComments);
+          renderTableRowThreadMarkers();
           buildThreadsSidebar();
         }
         const success = document.createElement('div');
@@ -2333,6 +2334,7 @@
   function renderExistingComments() {
     // Remove previous renders
     document.querySelectorAll('.grdc-existing-thread').forEach(el => el.remove());
+    clearTableRowThreadMarkers();
     // Clear any range tints from a previous render so they don't accumulate.
     document.querySelectorAll('.grdc-thread-range').forEach(el => el.classList.remove('grdc-thread-range'));
 
@@ -2401,6 +2403,8 @@
       renderThreadOnElement(target, comments);
     });
 
+    renderTableRowThreadMarkers();
+
     const totalRendered = document.querySelectorAll('.grdc-existing-thread').length;
     console.log(`[GRDC] Rendered ${totalRendered} comment threads`);
   }
@@ -2416,6 +2420,92 @@
       if (info.path !== path) return;
       if (info.line < lo || info.line > hi) return;
       buttonAnchor(el).classList.add('grdc-thread-range');
+    });
+  }
+
+  function clearTableRowThreadMarkers() {
+    document.querySelectorAll('.grdc-table-thread-marker').forEach((el) => el.remove());
+    document.querySelectorAll('.grdc-table-thread-marker-host').forEach((el) => {
+      el.classList.remove('grdc-table-thread-marker-host');
+    });
+    document.querySelectorAll('.grdc-table-thread-marked').forEach((el) => {
+      el.classList.remove('grdc-table-thread-marked');
+    });
+  }
+
+  // Full thread bodies cannot be inserted between <tr> elements without
+  // producing invalid table markup, so they remain below the complete table.
+  // Add one compact, persistent button to each affected row's first cell to
+  // preserve the missing in-place signal. Activating it cycles through the
+  // row's conversations, expands a collapsed thread, and moves focus to its
+  // badge below the table.
+  function renderTableRowThreadMarkers() {
+    clearTableRowThreadMarkers();
+
+    const rowsByPath = new Map();
+    fileLineMap.forEach((info, element) => {
+      if (!info || !element || element.tagName !== 'TR' || !info.path || !Number.isFinite(info.line)) return;
+      if (!rowsByPath.has(info.path)) rowsByPath.set(info.path, new Map());
+      rowsByPath.get(info.path).set(info.line, element);
+    });
+
+    const rowThreads = new Map();
+    document.querySelectorAll('.grdc-existing-thread').forEach((thread) => {
+      const path = thread.dataset.grdcPath || '';
+      const endLine = Number(thread.dataset.grdcLine);
+      const rawStartLine = Number(thread.dataset.grdcStartLine);
+      const startLine = Number.isFinite(rawStartLine) && rawStartLine > 0 ? rawStartLine : endLine;
+      const pathRows = rowsByPath.get(path);
+      if (!pathRows || !Number.isFinite(startLine) || !Number.isFinite(endLine)) return;
+
+      const affectedRows = new Set();
+      for (let line = Math.min(startLine, endLine); line <= Math.max(startLine, endLine); line++) {
+        const row = pathRows.get(line);
+        if (row) affectedRows.add(row);
+      }
+      affectedRows.forEach((row) => {
+        if (!rowThreads.has(row)) rowThreads.set(row, []);
+        const rowItems = rowThreads.get(row);
+        const threadId = thread.dataset.grdcThreadId || '';
+        if (!rowItems.some((item) => item.dataset.grdcThreadId === threadId)) rowItems.push(thread);
+      });
+    });
+
+    rowThreads.forEach((threads, row) => {
+      const host = row.querySelector(':scope > th, :scope > td');
+      if (!host || threads.length === 0) return;
+
+      const marker = document.createElement('button');
+      marker.type = 'button';
+      marker.className = 'grdc-table-thread-marker';
+      marker.dataset.threadIds = threads.map((thread) => thread.dataset.grdcThreadId || '').join(',');
+      marker.dataset.activeIndex = '0';
+      if (threads.length > 1) marker.dataset.count = String(threads.length);
+      marker.setAttribute('aria-label', threads.length === 1
+        ? 'Open the review thread on this table row'
+        : `Open review threads on this table row; ${threads.length} threads`);
+      marker.title = threads.length === 1
+        ? '1 review thread on this row'
+        : `${threads.length} review threads on this row · activate to cycle`;
+      marker.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 2.5h11v8h-6l-3.5 3v-3H2.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+
+      marker.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const index = Math.max(0, Math.min(threads.length - 1, Number(marker.dataset.activeIndex) || 0));
+        const thread = threads[index];
+        marker.dataset.activeIndex = String((index + 1) % threads.length);
+        const badge = thread.querySelector('.grdc-thread-badge');
+        const body = thread.querySelector('.grdc-thread-body');
+        if (!badge || !body) return;
+        if (body.style.display === 'none') badge.click();
+        badge.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        badge.focus({ preventScroll: true });
+      });
+
+      host.classList.add('grdc-table-thread-marker-host');
+      row.classList.add('grdc-table-thread-marked');
+      host.appendChild(marker);
     });
   }
 
@@ -2435,6 +2525,11 @@
 
     const badge = document.createElement('div');
     badge.className = 'grdc-thread-badge';
+    badge.dataset.grdcThreadId = String(threadId);
+    // The table-row marker moves focus here after navigation. Keep it out of
+    // the ordinary tab order because the marker itself is the accessible
+    // row-level control.
+    badge.tabIndex = -1;
     const stateBits = [];
     if (isResolved) stateBits.push('✓ resolved');
     if (isOutdated) stateBits.push('outdated');
@@ -2829,6 +2924,7 @@
     thread.dataset.grdcSnippet = snippet;
     thread.dataset.grdcPath = head.path || '';
     thread.dataset.grdcLine = String(head.line ?? '');
+    thread.dataset.grdcStartLine = String(head.startLine ?? '');
     const peers = document.querySelectorAll(`.grdc-existing-thread[data-grdc-anchor="${CSS.escape(anchorKey)}"]`);
     if (peers.length > 0) {
       peers[peers.length - 1].after(thread);
@@ -2870,10 +2966,10 @@
   // to render after a re-init).
   function clearInjectedDom() {
     document.querySelectorAll(
-      '.grdc-comment-btn, .grdc-collapse-toggle, .grdc-existing-thread, .grdc-comment-box, .grdc-reply-box'
+      '.grdc-comment-btn, .grdc-collapse-toggle, .grdc-existing-thread, .grdc-comment-box, .grdc-reply-box, .grdc-table-thread-marker'
     ).forEach((el) => el.remove());
     document.querySelectorAll(
-      '.grdc-hoverable, .grdc-collapsible, .grdc-section-collapsed, .grdc-collapsed-hidden, .grdc-thread-range, .grdc-range-hover'
+      '.grdc-hoverable, .grdc-collapsible, .grdc-section-collapsed, .grdc-collapsed-hidden, .grdc-thread-range, .grdc-range-hover, .grdc-table-thread-marker-host, .grdc-table-thread-marked'
     ).forEach((el) => {
       el.classList.remove(
         'grdc-hoverable',
@@ -2881,7 +2977,9 @@
         'grdc-section-collapsed',
         'grdc-collapsed-hidden',
         'grdc-thread-range',
-        'grdc-range-hover'
+        'grdc-range-hover',
+        'grdc-table-thread-marker-host',
+        'grdc-table-thread-marked'
       );
     });
     // Note: `.grdc-sidebar` is NOT cleared here — `buildThreadsSidebar()`
@@ -5214,6 +5312,7 @@
           if (node.classList?.contains('grdc-existing-thread') ||
               node.classList?.contains('grdc-comment-box') ||
               node.classList?.contains('grdc-comment-btn') ||
+              node.classList?.contains('grdc-table-thread-marker') ||
               node.classList?.contains('grdc-collapse-toggle') ||
               node.classList?.contains('grdc-reply-box') ||
               node.classList?.contains('grdc-comment-edit') ||
