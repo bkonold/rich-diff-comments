@@ -41,6 +41,24 @@ Priority applies to the shared user outcome:
 
 ---
 
+## 🎯 Current release plans
+
+The targets version and release independently. These lists summarize the intended scope of each next release; the detailed shared outcomes and per-target statuses remain defined once in the roadmap sections below.
+
+### Azure DevOps v1.4.0
+
+- [x] **Copy link for every rendered comment** — implemented, browser-tested, and live-validated; release pending.
+- [ ] **Copy Markdown for every rendered comment** — copy only the original Markdown body, matching GitHub's native **Copy Markdown** behavior. Do not generate an author, timestamp, link, or quote wrapper that was not part of the comment.
+
+Keep v1.4.0 focused on portable comment actions. Work-item creation, reactions, and sidebar quick reply require separate endpoint or UX investigation and remain later work.
+
+### GitHub v1.12.0
+
+- [ ] **Copy Markdown for every rendered comment** — expose the same raw-body behavior as GitHub's native action from the rendered-review comment header.
+- [ ] **Reference a comment in a new issue** — open GitHub's normal new-issue page with useful comment context prefilled; do not depend on private React modal state or create an issue silently.
+
+---
+
 ## ✅ Shipped
 
 ### Rendered commenting
@@ -110,7 +128,7 @@ Priority applies to the shared user outcome:
 
 ---
 
-## 🎯 GitHub v1.10.0 candidate
+## ✅ GitHub v1.10.0
 
 This release removes dormant credential storage, simplifies comment actions, and fixes navigation, sidebar-resizing, and large-PR workflow friction.
 
@@ -162,7 +180,7 @@ This release removes dormant credential storage, simplifies comment actions, and
 
 ## ✅ GitHub v1.11.0
 
-This release prioritizes the two remaining P0 visibility gaps for conversations attached inside compound rendered blocks, plus targeted sidebar clarity. Compound-marker implementation starts only after the relevant current GitHub rich-diff DOM has been captured and recorded in the GitHub developer notes.
+This release closed the two remaining P0 visibility gaps for conversations attached inside compound rendered blocks, added Copy link, and improved targeted sidebar clarity. The relevant GitHub rich-diff DOM captures are recorded in the GitHub developer notes.
 
 ### Correctness
 
@@ -177,20 +195,6 @@ This release prioritizes the two remaining P0 visibility gaps for conversations 
   - **GitHub:** ✅ GitHub v1.11.0. A keyboard-accessible right-edge marker identifies each affected source line, shows the thread count, and cycles through conversations on that line.
   - **ADO:** ✅ ADO v1.3.0. A keyboard-accessible marker identifies each affected source line, shows the thread count, and cycles through conversations on that line.
   - **Constraint:** use a non-destructive overlay and never split or rewrite syntax-highlighted code DOM. Position markers proportionally when wrapping or syntax-highlighter row compression prevents exact visual alignment.
-
-### Review and collaboration
-
-- [ ] **P0 — Complete the core Edit, Delete, and Copy link comment actions**
-  - **Outcome:** reviewers can edit or delete their own rendered comments and copy a stable link to any visible conversation without leaving the rendered review surface.
-  - **GitHub:** ✅ GitHub v1.11.0. Edit and Delete remain ownership-limited, while Copy link works for every visible comment and uses the canonical URL or a reconstructed stable discussion fragment.
-  - **ADO:** △ Implemented, browser-tested, and live-validated for ADO v1.4.0; release pending. Edit and Delete remain ownership-limited, while Copy link works for every visible comment using its native conversation ID and publication-time fragment.
-  - **Constraint:** retain ownership checks and deletion confirmation. Copy the most specific stable destination each host supports, provide clear copied feedback, and fall back safely when link metadata is absent.
-
-- [ ] **P1 — Turn a conversation into tracked work**
-  - **Outcome:** reviewers can carry a rendered-review conversation into the host's work-tracking system with its source link and useful context already attached.
-  - **GitHub:** 📋 Planned after Copy link. Match the native **Reference in a new issue** outcome by opening a new repository issue with the comment reference prefilled.
-  - **ADO:** 📋 Planned after Copy link. Match the native work-item picker with the available Issue, Epic, and Task choices and link the new item to the review conversation.
-  - **Constraint:** open the host's normal creation form so the reviewer confirms title, type, project, permissions, and final content; do not create tracked work silently.
 
 ### Navigation and focus
 
@@ -232,6 +236,18 @@ This release prioritizes the two remaining P0 visibility gaps for conversations 
 
 ### Review and collaboration
 
+- [ ] **P0 — Complete the core Edit, Delete, and Copy link comment actions**
+  - **Outcome:** reviewers can edit or delete their own rendered comments and copy a stable link to any visible comment without leaving the rendered review surface.
+  - **GitHub:** ✅ GitHub v1.11.0. Edit and Delete remain ownership-limited, while Copy link uses the canonical URL or a reconstructed stable discussion fragment.
+  - **ADO:** △ Implemented, browser-tested, and live-validated for ADO v1.4.0; release pending. Edit and Delete remain ownership-limited, while Copy link works for every visible comment using its native conversation ID and comment publication-time fragment.
+  - **Constraint:** retain ownership checks and deletion confirmation, provide clear copied feedback, and fall back safely when link metadata is absent.
+
+- [ ] **P1 — Turn a conversation into tracked work**
+  - **Outcome:** reviewers can carry a rendered-review conversation into the host's work-tracking system with its source link and useful context already attached.
+  - **GitHub:** 📋 Targeted for GitHub v1.12.0. Match **Reference in a new issue** by opening the normal new-issue page with useful comment context prefilled.
+  - **ADO:** 📋 Planned after v1.4.0. Match the native work-item picker with the available Issue, Epic, and Task choices and link the new item to the review conversation.
+  - **Constraint:** open the host's normal creation form so the reviewer confirms title, type, project, permissions, and final content; do not create tracked work silently.
+
 - [ ] **P2 — Reactions on comments**
   - **Outcome:** reviewers can acknowledge a comment without adding a reply.
   - **GitHub:** 📋 Planned; native reactions exist, but the mutation endpoint needs validation.
@@ -244,10 +260,10 @@ This release prioritizes the two remaining P0 visibility gaps for conversations 
   - Preserve attribution where useful, keep the quote editable, and use the existing reply submission path.
 
 - [ ] **P2 — Copy a comment as Markdown**
-  - **Outcome:** reviewers can copy a portable Markdown quotation of a comment for use in another discussion or document.
-  - **GitHub:** 📋 Planned to match native **Copy Markdown** behavior.
-  - **ADO:** 📋 Planned as a parity convenience even though it was not present in the captured native toolbar.
-  - Keep this distinct from Copy link: one copies reusable content, while the P0 action copies a navigable destination.
+  - **Outcome:** reviewers can copy the original Markdown body of a comment for reuse in another discussion or document.
+  - **GitHub:** 📋 Targeted for GitHub v1.12.0, matching native **Copy Markdown** behavior.
+  - **ADO:** 📋 Targeted for ADO v1.4.0 as a parity convenience even though it is absent from the captured native toolbar.
+  - **Constraint:** copy only the stored Markdown body. Do not add generated attribution, timestamps, links, or quote markers; keep this distinct from Copy link, which copies a navigable destination.
 
 - [ ] **P3 — Expose host-authorized moderation actions only when safely supported**
   - **GitHub:** ↔ Native **Hide** remains delegated to GitHub because availability and reason selection depend on repository moderation permissions.

@@ -13,22 +13,33 @@ GitHub rich diff and Azure DevOps Preview render Markdown beautifully, but neith
 
 ## What this does
 
-- Overlays a `+` button on every paragraph, heading, list item, table row, and code block in rich diff.
+### Common features
+
+- Overlays a `+` button on every paragraph, heading, list item, table row, and code block in the rendered Markdown review surface.
 - Click `+` → write a comment → posts as a real PR review comment on the correct source line.
 - Renders existing review threads inline at the rendered block that corresponds to each commented line.
-- **Reply** to threads, **resolve / unresolve** them, and see resolved state — all from the rendered view. GitHub also exposes outdated-thread state.
+- **Reply** to threads, **resolve / unresolve** them, and **edit / delete** your own comments from the rendered view.
 - **Commented table rows and fenced-code lines stay identifiable:** persistent markers show conversation counts and cycle through threads by mouse or keyboard.
-- **Copy a direct link** to any visible GitHub review comment from its header.
+- **Copy a direct link** to any visible review comment from its header.
 - **Threads sidebar** docked to the right edge lists every review thread (author, snippet, file:line, and target-supported status tags) — click to jump, with prev/next chevrons and a comment counter.
 - **Outline tab** in the sidebar shows the heading tree of every changed `.md` file with comment-count pills, per-section folding, and bulk `Fold H1 / H2 / H3` / `Expand all` controls.
 - **Changes tab** in the sidebar lists every changed block (paragraph / list item / table row / code block / heading / blockquote) with a `+` / `−` / `±` kind glyph, file:line, and a snippet. The header also gets a `◀ N/M ▶` counter so you can step through changes without opening the tab. Best way to scan a Markdown PR for the first time without re-reading the unchanged prose.
-- **Start rendered review in one click:** GitHub can render every changed Markdown file as rich diff in one sweep; Azure DevOps can open the selected or first changed Markdown file in its sticky Preview mode.
-- **Azure DevOps Preview highlights:** added sections are green, modified sections use a warm warning highlight, and new files receive a subtle marker.
-- **Azure DevOps mentions:** type `@` in a comment, reply, or edit to find teammates and post a native Azure DevOps mention; inline conversations and sidebar snippets retain readable names.
 - **Keyboard shortcuts:** `j` / `k` next / previous thread, `h` / `l` first / last thread, `[` / `]` previous / next change, `{` / `}` (Shift+[, Shift+]) first / last change, `1` / `2` / `3` switch sidebar tab (Changes / Threads / Outline), `t` toggle the sidebar, `Shift+T` reset its position.
 - No PAT required — each target uses the existing signed-in session for its service.
 
-(For submitting a full review / approve / request changes, use GitHub's native **"Review changes"** button at the top of the Files-changed tab.)
+### GitHub-specific features
+
+- **Start rendered review across the pull request:** render every changed Markdown file as rich diff in one sweep when GitHub's PR mode can retain them; optimized large PRs receive one-file-at-a-time guidance.
+- **Rich-diff integration:** preserve GitHub's added/removed rendering, expose outdated-thread state and author-association badges, and keep heading anchor links working in rendered Markdown.
+- **Native navigation synchronization:** keep GitHub's file tree, changed-file area, and extension sidebar aligned while reviewing.
+- **Complete the review with GitHub:** use GitHub's native **Review changes** button to approve, request changes, or submit a full review.
+
+### Azure DevOps-specific features
+
+- **Open Markdown Preview in one click:** select the current or first changed Markdown file and retain Preview mode while moving between files.
+- **Preview change highlighting:** added sections are green, modified sections use a warm warning highlight, and new files receive a subtle marker.
+- **Azure DevOps mentions:** type `@` in a comment, reply, or edit to find teammates and post a native mention; inline conversations and sidebar snippets retain readable names.
+- **PR-wide source analysis:** build Changes and Outline before every Markdown file has been opened in Preview, while using Azure DevOps' native file tree for cross-file navigation.
 
 See the shared [feature parity roadmap](docs/FEATURES.md) for both targets and the small [GitHub](docs/github/FEATURES.md) / [Azure DevOps](docs/ado/FEATURES.md) platform notes for host-specific behavior.
 
