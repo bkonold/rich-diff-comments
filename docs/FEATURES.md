@@ -50,7 +50,7 @@ The targets version and release independently. These lists summarize the intende
 - [x] **Copy link for every rendered comment** — implemented, browser-tested, and live-validated; release pending.
 - [x] **Copy Markdown for every rendered comment** — implemented, browser-tested, and live-validated; release pending. Copies only the original Markdown body, matching GitHub's native **Copy Markdown** behavior without generated attribution, timestamps, links, or quote wrappers.
 
-Keep v1.4.0 focused on portable comment actions. Work-item creation, reactions, and sidebar quick reply require separate endpoint or UX investigation and remain later work.
+Keep v1.4.0 focused on portable comment actions. Work-item creation is explicitly deferred to a later ADO release; reactions and sidebar quick reply also remain later work.
 
 ### GitHub v1.12.0
 
@@ -245,8 +245,8 @@ This release closed the two remaining P0 visibility gaps for conversations attac
 - [ ] **P1 — Turn a conversation into tracked work**
   - **Outcome:** reviewers can carry a rendered-review conversation into the host's work-tracking system with its source link and useful context already attached.
   - **GitHub:** 📋 Targeted for GitHub v1.12.0. Match **Reference in a new issue** by opening the normal new-issue page with useful comment context prefilled.
-  - **ADO:** 📋 Planned after v1.4.0. Match the native work-item picker with the available Issue, Epic, and Task choices and link the new item to the review conversation.
-  - **Constraint:** open the host's normal creation form so the reviewer confirms title, type, project, permissions, and final content; do not create tracked work silently.
+  - **ADO:** ⏸ Deferred beyond ADO v1.4.0. The native Issue/Epic/Task picker opens a private in-page contribution form rather than a reusable page route. A later implementation should open ADO's standalone native creation form in a new tab with useful comment context, while formal PR/thread linking remains blocked on a captured supported relation payload.
+  - **Constraint:** open the host's normal creation form so the reviewer confirms title, type, project, permissions, and final content; preserve the PR review position, do not depend on private React/contribution state, and do not create tracked work silently.
 
 - [ ] **P2 — Reactions on comments**
   - **Outcome:** reviewers can acknowledge a comment without adding a reply.
