@@ -45,17 +45,15 @@ Priority applies to the shared user outcome:
 
 The targets version and release independently. These lists summarize the intended scope of each next release; the detailed shared outcomes and per-target statuses remain defined once in the roadmap sections below.
 
-### Azure DevOps v1.4.0
+### Azure DevOps v1.5.0
 
-- [x] **Copy link for every rendered comment** — implemented, browser-tested, and live-validated; release pending.
-- [x] **Copy Markdown for every rendered comment** — implemented, browser-tested, and live-validated; release pending. Copies only the original Markdown body, matching GitHub's native **Copy Markdown** behavior without generated attribution, timestamps, links, or quote wrappers.
+- [ ] **Remove full sidebar dismissal and its restore launcher** — keep the sidebar's discoverable collapse/expand behavior instead of allowing it to enter a fully hidden state. Preserve the existing keyboard toggle and saved layout preferences.
 
-Keep v1.4.0 focused on portable comment actions. Work-item creation is explicitly deferred to a later ADO release; reactions and sidebar quick reply also remain later work.
+No other scope is committed to v1.5.0 yet. Work-item creation, reactions, and sidebar quick reply remain later work.
 
 ### GitHub v1.12.0
 
 - [ ] **Copy Markdown for every rendered comment** — expose the same raw-body behavior as GitHub's native action from the rendered-review comment header.
-- [ ] **Reference a comment in a new issue** — open GitHub's normal new-issue page with useful comment context prefilled; do not depend on private React modal state or create an issue silently.
 
 ---
 
@@ -78,7 +76,7 @@ Keep v1.4.0 focused on portable comment actions. Work-item creation is explicitl
 |---|---|---|
 | Render existing conversations beside the corresponding rendered block | ✅ | ✅ |
 | Mark table rows and code lines that contain conversations and navigate among multiple threads at the same position | ✅ GitHub v1.11.0 | ✅ ADO v1.3.0 |
-| Reply, resolve/reopen, edit, and delete comments inline | ✅ | ✅ |
+| Reply, resolve/reopen, edit or delete owned comments, and copy a stable link to any visible comment | ✅ GitHub v1.11.0 | ✅ ADO v1.4.0 |
 | Show resolved state and collapse resolved threads by default | ✅ | ✅ |
 | Write with a Markdown toolbar, Write/Preview tabs, auto-grow, and Cmd/Ctrl+Enter | ✅ | ✅ |
 | Complete `@mention` names with keyboard and mouse selection and preserve host notifications | ✅ | ✅ ADO v1.2.0 |
@@ -162,17 +160,11 @@ Keep v1.4.0 focused on portable comment actions. Work-item creation is explicitl
 
 ### Review and collaboration
 
-- [ ] **P0 — Complete the core Edit, Delete, and Copy link comment actions**
-  - **Outcome:** reviewers can edit or delete their own rendered comments and copy a stable link to any visible comment without leaving the rendered review surface.
-  - **GitHub:** ✅ GitHub v1.11.0. Edit and Delete remain ownership-limited, while Copy link uses the canonical URL or a reconstructed stable discussion fragment.
-  - **ADO:** △ Implemented, browser-tested, and live-validated for ADO v1.4.0; release pending. Edit and Delete remain ownership-limited, while Copy link works for every visible comment using its native conversation ID and comment publication-time fragment.
-  - **Constraint:** retain ownership checks and deletion confirmation, provide clear copied feedback, and fall back safely when link metadata is absent.
-
-- [ ] **P1 — Turn a conversation into tracked work**
+- [ ] **P2 — Turn a conversation into tracked work if demand justifies it**
   - **Outcome:** reviewers can carry a rendered-review conversation into the host's work-tracking system with its source link and useful context already attached.
-  - **GitHub:** 📋 Targeted for GitHub v1.12.0. Match **Reference in a new issue** by opening the normal new-issue page with useful comment context prefilled.
-  - **ADO:** ⏸ Deferred beyond ADO v1.4.0. The native Issue/Epic/Task picker opens a private in-page contribution form rather than a reusable page route. A later implementation should open ADO's standalone native creation form in a new tab with useful comment context, while formal PR/thread linking remains blocked on a captured supported relation payload.
-  - **Constraint:** open the host's normal creation form so the reviewer confirms title, type, project, permissions, and final content; preserve the PR review position, do not depend on private React/contribution state, and do not create tracked work silently.
+  - **GitHub:** 📋 Exploratory. GitHub provides a native **Reference in new issue** action, but there is no usage evidence that duplicating it in rendered review would benefit enough reviewers.
+  - **ADO:** ⏸ Exploratory and technically constrained. The native Issue/Epic/Task picker opens a private in-page contribution form rather than a reusable page route; formal PR/thread linking also lacks a captured supported relation payload.
+  - **Constraint:** do not schedule implementation without user-demand evidence. If justified later, open the host's normal creation form so the reviewer confirms the final work item; do not depend on private application state or create tracked work silently.
 
 - [ ] **P2 — Reactions on comments**
   - **Outcome:** reviewers can acknowledge a comment without adding a reply.
@@ -188,7 +180,7 @@ Keep v1.4.0 focused on portable comment actions. Work-item creation is explicitl
 - [ ] **P2 — Copy a comment as Markdown**
   - **Outcome:** reviewers can copy the original Markdown body of a comment for reuse in another discussion or document.
   - **GitHub:** 📋 Targeted for GitHub v1.12.0, matching native **Copy Markdown** behavior.
-  - **ADO:** △ Implemented, browser-tested, and live-validated for ADO v1.4.0; release pending. Added as a parity convenience even though it is absent from the captured native toolbar.
+  - **ADO:** ✅ ADO v1.4.0. Added as a parity convenience even though it is absent from the captured native toolbar.
   - **Constraint:** copy only the stored Markdown body. Do not add generated attribution, timestamps, links, or quote markers; keep this distinct from Copy link, which copies a navigable destination.
 
 - [ ] **P3 — Expose host-authorized moderation actions only when safely supported**
@@ -223,11 +215,11 @@ Keep v1.4.0 focused on portable comment actions. Work-item creation is explicitl
 
 ### Navigation and focus
 
-- [ ] **P2 — Reconsider full sidebar dismissal and restoration**
-  - **Outcome:** reviewers can reclaim page space without creating a hidden state that first-time users cannot easily discover or recover from.
-  - **GitHub:** ⏸ Deferred. Keep the existing collapse control and `t` shortcut; do not add a full-dismiss button or launcher until the restore affordance is proven discoverable.
-  - **ADO:** △ Shipped with a header × and restore launcher, but retained under UX review rather than treated as the parity target. Evaluate whether to remove full dismissal and keep collapse only.
-  - **Constraint:** do not remove the ADO behavior until its discoverability and usage have been manually reviewed; if full dismissal remains, position, size, active tab, filter, and collapsed state must survive restoration.
+- [ ] **P2 — Use discoverable sidebar collapse instead of full dismissal**
+  - **Outcome:** reviewers can reclaim page space without creating a fully hidden state that is difficult to discover or recover from.
+  - **GitHub:** ✅ The existing collapse control and `t` shortcut provide the intended outcome; do not add a full-dismiss button or separate launcher.
+  - **ADO:** 📋 Targeted for ADO v1.5.0. Remove the header × full-dismiss action and separate restore launcher, keeping collapse/expand as the sole space-saving behavior.
+  - **Constraint:** preserve the existing keyboard toggle and saved position, size, active tab, filter, and collapsed state. Removing full dismissal must not reset the reviewer's sidebar layout.
 
 - [ ] **P3 — Evaluate active-file prioritization during startup**
   - **Outcome:** reviewers can begin commenting sooner without making Changes, Threads, or Outline feel noticeably slower or incomplete.
