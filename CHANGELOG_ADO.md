@@ -7,6 +7,7 @@ All notable user-visible changes to the Azure DevOps browser extension are recor
 ### Added
 
 - **Copy a direct link from any rendered comment.** The comment-header action copies the same comment-specific destination used by Azure DevOps and confirms whether the link reached the clipboard.
+- **Copy any rendered comment as Markdown.** The new comment-header action copies only the original Markdown body, preserving formatting for reuse without adding generated attribution or links.
 
 ## [1.3.0] — 2026-09-21
 

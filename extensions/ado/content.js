@@ -14,7 +14,7 @@
   'use strict';
 
   const LOG = '[ADRC]';
-  const RUNTIME_REVISION = '2026-09-23-copy-thread-link-r37';
+  const RUNTIME_REVISION = '2026-09-23-copy-markdown-r38';
   const adapter = (typeof window !== 'undefined' && window.ADORC) || null;
   const startupTiming = {
     scriptLoadedAt: performance.now(),
@@ -827,9 +827,10 @@
       ? `<img class="adrc-thread-comment-avatar" src="${escapeAttr(imageUrl)}" alt="" />`
       : '';
 
-    // Copy link is available on every visible comment, while Edit / Delete
-    // remain ownership-limited. ADO selects the containing conversation with
-    // discussionId and the individual comment with its timestamp fragment.
+    // Portable copy actions are available on every visible comment, while
+    // Edit / Delete remain ownership-limited. Copy Markdown intentionally uses
+    // the stored body verbatim, matching GitHub's native behavior without
+    // adding attribution, timestamps, links, or quote wrappers.
     const ownActions = isOwnComment(c)
       ? `<button type="button" class="adrc-comment-inline-btn adrc-edit-comment" data-comment-id="${c.id}">Edit</button>` +
         `<button type="button" class="adrc-comment-inline-btn adrc-delete-comment" data-comment-id="${c.id}">Delete</button>`
@@ -837,9 +838,13 @@
     const copyAction = commentLink
       ? `<button type="button" class="adrc-comment-inline-btn adrc-copy-comment-link" title="Copy link to this comment">Copy link</button>`
       : '';
-    const inlineActions = !c.isDeleted && (copyAction || ownActions)
+    const copyMarkdownAction = !c.isDeleted
+      ? `<button type="button" class="adrc-comment-inline-btn adrc-copy-comment-markdown" title="Copy this comment's Markdown source">Copy Markdown</button>`
+      : '';
+    const inlineActions = !c.isDeleted && (copyAction || copyMarkdownAction || ownActions)
       ? `<span class="adrc-comment-inline-actions">` +
           copyAction +
+          copyMarkdownAction +
           ownActions +
         `</span>`
       : '';
@@ -898,6 +903,25 @@
       if (!button.isConnected) return;
       button.textContent = 'Copy link';
       button.title = 'Copy link to this comment';
+      button.disabled = false;
+    }, 1600);
+  }
+
+  async function copyCommentMarkdown(button, markdown) {
+    button.disabled = true;
+    try {
+      await copyTextToClipboard(String(markdown == null ? '' : markdown));
+      button.textContent = 'Copied!';
+      button.title = 'Comment Markdown copied';
+    } catch (error) {
+      console.warn(`${LOG} failed to copy comment Markdown:`, error && error.message ? error.message : error);
+      button.textContent = 'Copy failed';
+      button.title = 'Could not copy comment Markdown';
+    }
+    setTimeout(() => {
+      if (!button.isConnected) return;
+      button.textContent = 'Copy Markdown';
+      button.title = "Copy this comment's Markdown source";
       button.disabled = false;
     }, 1600);
   }
@@ -1281,6 +1305,13 @@
       const comment = (thread.comments || []).find((candidate) => candidate.id === commentId);
       const commentLink = window.GRDC.getAdoCommentLink(thread, comment, ctx);
       btn.addEventListener('click', () => copyCommentLink(btn, commentLink));
+    });
+
+    panel.querySelectorAll('.adrc-copy-comment-markdown').forEach(btn => {
+      const commentEl = btn.closest('.adrc-thread-comment');
+      const commentId = commentEl && parseInt(commentEl.dataset.commentId, 10);
+      const comment = (thread.comments || []).find((candidate) => candidate.id === commentId);
+      if (comment) btn.addEventListener('click', () => copyCommentMarkdown(btn, comment.content));
     });
 
     // Wire per-comment Edit / Delete affordances on any of the current

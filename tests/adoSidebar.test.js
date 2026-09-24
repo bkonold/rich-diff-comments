@@ -39,7 +39,7 @@ test('ADO manifest loads required shared helpers before content.js', () => {
 });
 
 test('ADO exposes a runtime revision for live loaded-script verification', () => {
-  assert.match(content, /const RUNTIME_REVISION = '2026-09-23-copy-thread-link-r37'/);
+  assert.match(content, /const RUNTIME_REVISION = '2026-09-23-copy-markdown-r38'/);
   assert.match(content, /revision: RUNTIME_REVISION/);
 });
 

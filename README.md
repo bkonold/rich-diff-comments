@@ -38,6 +38,7 @@ GitHub rich diff and Azure DevOps Preview render Markdown beautifully, but neith
 
 - **Open Markdown Preview in one click:** select the current or first changed Markdown file and retain Preview mode while moving between files.
 - **Preview change highlighting:** added sections are green, modified sections use a warm warning highlight, and new files receive a subtle marker.
+- **Copy Markdown:** copy only a rendered comment's original Markdown body for reuse without generated attribution or links.
 - **PR-wide source analysis before Preview visits:** build Changes and Outline from pull-request source data before every Markdown file has been opened in Preview.
 
 See the shared [feature parity roadmap](docs/FEATURES.md) for both targets and the small [GitHub](docs/github/FEATURES.md) / [Azure DevOps](docs/ado/FEATURES.md) platform notes for host-specific behavior.

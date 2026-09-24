@@ -467,6 +467,33 @@ test.describe('ADO rendered review surface', () => {
     await expect(copyLink).toHaveAttribute('title', 'Could not copy comment link');
   });
 
+  test('copies only the stored Markdown body for any visible comment', async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          writeText: async (text) => { window.__adrcCopiedText = text; },
+        },
+      });
+    });
+    const threads = fixtures.defaultThreads();
+    threads[1].comments[0].content = 'Please keep **bold** and `code` exactly.\n\n- first\n- second';
+    await setupAdoExtensionPage(page, { threads });
+
+    await page.locator('.adrc-thread-badge[data-thread-id="102"]').click();
+    const panel = page.locator('.adrc-thread-panel[data-thread-id="102"]');
+    const copyMarkdown = panel.locator('.adrc-copy-comment-markdown');
+    await expect(copyMarkdown).toBeVisible();
+    await expect(panel.locator('.adrc-edit-comment')).toHaveCount(0);
+    await copyMarkdown.click();
+
+    await expect.poll(() => page.evaluate(() => window.__adrcCopiedText)).toBe(
+      'Please keep **bold** and `code` exactly.\n\n- first\n- second'
+    );
+    await expect(copyMarkdown).toHaveText('Copied!');
+    await expect(copyMarkdown).toHaveAttribute('title', 'Comment Markdown copied');
+  });
+
   test('edits an own comment and displays the server-updated Markdown', async ({ page }) => {
     const { server } = await setupAdoExtensionPage(page);
     const panel = page.locator('.adrc-thread-panel[data-thread-id="101"]');

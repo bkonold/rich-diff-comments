@@ -1784,9 +1784,9 @@ body.adrc-dragging {
   color: var(--adrc-text-muted);
 }
 
-/* Copy link plus ownership-limited Edit / Delete affordances shown on the
-  meta row's right side, next to the author identity. Small and subtle so
-  they don't pull focus away from the comment content. */
+/* Copy link / Markdown plus ownership-limited Edit / Delete affordances shown
+  on the meta row's right side, next to the author identity. Small and subtle
+  so they don't pull focus away from the comment content. */
 
 .adrc-comment-inline-actions {
   display: inline-flex;

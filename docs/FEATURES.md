@@ -48,7 +48,7 @@ The targets version and release independently. These lists summarize the intende
 ### Azure DevOps v1.4.0
 
 - [x] **Copy link for every rendered comment** — implemented, browser-tested, and live-validated; release pending.
-- [ ] **Copy Markdown for every rendered comment** — copy only the original Markdown body, matching GitHub's native **Copy Markdown** behavior. Do not generate an author, timestamp, link, or quote wrapper that was not part of the comment.
+- [x] **Copy Markdown for every rendered comment** — implemented, browser-tested, and live-validated; release pending. Copies only the original Markdown body, matching GitHub's native **Copy Markdown** behavior without generated attribution, timestamps, links, or quote wrappers.
 
 Keep v1.4.0 focused on portable comment actions. Work-item creation, reactions, and sidebar quick reply require separate endpoint or UX investigation and remain later work.
 
@@ -262,7 +262,7 @@ This release closed the two remaining P0 visibility gaps for conversations attac
 - [ ] **P2 — Copy a comment as Markdown**
   - **Outcome:** reviewers can copy the original Markdown body of a comment for reuse in another discussion or document.
   - **GitHub:** 📋 Targeted for GitHub v1.12.0, matching native **Copy Markdown** behavior.
-  - **ADO:** 📋 Targeted for ADO v1.4.0 as a parity convenience even though it is absent from the captured native toolbar.
+  - **ADO:** △ Implemented, browser-tested, and live-validated for ADO v1.4.0; release pending. Added as a parity convenience even though it is absent from the captured native toolbar.
   - **Constraint:** copy only the stored Markdown body. Do not add generated attribution, timestamps, links, or quote markers; keep this distinct from Copy link, which copies a navigable destination.
 
 - [ ] **P3 — Expose host-authorized moderation actions only when safely supported**
