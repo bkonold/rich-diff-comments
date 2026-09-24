@@ -123,6 +123,16 @@ Threads are returned by `GET /threads`:
 
 **Comment deletion** is soft. DELETE returns 200 with an empty body; the comment stays in the thread with `isDeleted: true`. Deleted-comment placeholders remain inside threads that have another visible comment so replies retain their context. Once every comment is deleted, the retained empty thread record is excluded from inline rendering, sidebar totals, Outline attribution, and navigation.
 
+## Native Copy link destination
+
+Live captures and manual comparison on 2026-09-23 confirmed that Azure DevOps copies a PR URL which selects the conversation and identifies the chosen comment by its publication timestamp:
+
+```text
+https://dev.azure.com/{org}/{project}/_git/{repo}/pullRequest/{prId}?discussionId={threadId}#{publishedAtUnixSeconds}
+```
+
+Captured examples used thread IDs `23`, `24`, and `25`. Their numeric fragments decoded exactly to comment publication times in UTC, and live testing confirmed that separate comments in one conversation receive separate links. The `discussionId` query selects and opens the conversation; the selected comment's publication-time fragment identifies its destination. If a partial comment response lacks its publication time, the `discussionId` URL remains the safe fallback.
+
 ## Native `@mention` discovery — endpoint, payload, and notification verified
 
 A live native ADO PR comment capture on 2026-09-17 showed that typing a mention

@@ -41,6 +41,24 @@ Priority applies to the shared user outcome:
 
 ---
 
+## 🎯 Current release plans
+
+The targets version and release independently. These lists summarize the intended scope of each next release; the detailed shared outcomes and per-target statuses remain defined once in the roadmap sections below.
+
+### Azure DevOps v1.4.0
+
+- [x] **Copy link for every rendered comment** — implemented, browser-tested, and live-validated; release pending.
+- [x] **Copy Markdown for every rendered comment** — implemented, browser-tested, and live-validated; release pending. Copies only the original Markdown body, matching GitHub's native **Copy Markdown** behavior without generated attribution, timestamps, links, or quote wrappers.
+
+Keep v1.4.0 focused on portable comment actions. Work-item creation is explicitly deferred to a later ADO release; reactions and sidebar quick reply also remain later work.
+
+### GitHub v1.12.0
+
+- [ ] **Copy Markdown for every rendered comment** — expose the same raw-body behavior as GitHub's native action from the rendered-review comment header.
+- [ ] **Reference a comment in a new issue** — open GitHub's normal new-issue page with useful comment context prefilled; do not depend on private React modal state or create an issue silently.
+
+---
+
 ## ✅ Shipped
 
 ### Rendered commenting
@@ -59,6 +77,7 @@ Priority applies to the shared user outcome:
 | Capability | GitHub | Azure DevOps |
 |---|---|---|
 | Render existing conversations beside the corresponding rendered block | ✅ | ✅ |
+| Mark table rows and code lines that contain conversations and navigate among multiple threads at the same position | ✅ GitHub v1.11.0 | ✅ ADO v1.3.0 |
 | Reply, resolve/reopen, edit, and delete comments inline | ✅ | ✅ |
 | Show resolved state and collapse resolved threads by default | ✅ | ✅ |
 | Write with a Markdown toolbar, Write/Preview tabs, auto-grow, and Cmd/Ctrl+Enter | ✅ | ✅ |
@@ -71,7 +90,7 @@ Priority applies to the shared user outcome:
 
 | Capability | GitHub | Azure DevOps |
 |---|---|---|
-| Use a draggable, resizable, collapsible sidebar with persistent layout and selected tab | ✅ | ✅ |
+| Use a draggable, resizable, collapsible sidebar with persistent layout and selected tab | ✅ Resizing preserves tab scroll position | ✅ |
 | Browse PR-wide Changes, Threads, and Outline lists grouped in stable file order | ✅ | ✅ |
 | Navigate changed rendered blocks with cards, counters, clicks, and keyboard shortcuts | ✅ | ✅ |
 | Show one summary card for a newly added, deleted, or renamed Markdown file where applicable | ✅ | ✅ |
@@ -81,6 +100,7 @@ Priority applies to the shared user outcome:
 | Fold individual sections or bulk-fold by H1/H2/H3 level and expand all | ✅ Bulk actions affect all rendered files | ✅ Bulk actions affect the current file |
 | Show file-scoped position with a PR-wide total and jump header icons to the current file first | ✅ | ✅ |
 | Follow native file navigation and keep sidebar selection synchronized | ✅ | ✅ |
+| Follow repeated rendered Table of Contents links even when the destination fragment is already active | ✅ GitHub v1.10.0 | ✅ No equivalent Preview issue observed |
 | Hide or stand down outside the host's changed-files review surface | ✅ | ✅ |
 
 ### Activation and lifecycle
@@ -88,6 +108,8 @@ Priority applies to the shared user outcome:
 | Capability | GitHub | Azure DevOps |
 |---|---|---|
 | Provide an obvious action when rendered Markdown is not active | ✅ Render all Markdown files | ✅ Open Markdown Preview, ADO v1.1.0 |
+| Explain when GitHub's large-PR mode prevents PR-wide rendering instead of showing a transient bulk action | ✅ GitHub v1.10.0 | — |
+| Offer bulk rendering from empty Changes or Threads states only while eligible Markdown files still need rich diff | ✅ GitHub v1.11.0 | — |
 | Move between changed Markdown files without rebuilding all PR-wide review data | ✅ | ✅ ADO v1.1.0 |
 | Reject stale navigation and review state when the pull-request identity changes | ✅ | ✅ ADO v1.1.0 |
 | Preserve sidebar layout and user preferences across navigation | ✅ | ✅ |
@@ -107,98 +129,6 @@ Priority applies to the shared user outcome:
 | Build changed-block navigation from the host's available source information | ✅ Native rich-diff markers | ✅ Head/base source comparison |
 | Highlight added and modified rendered blocks persistently | ↔ Native rich diff already supplies this context | ✅ ADO v1.2.0 |
 | Keep diagnostic logging and local inspection hooks available without telemetry | ✅ | ✅ |
-
----
-
-## 🎯 GitHub v1.10.0 candidate
-
-This release removes dormant credential storage, simplifies comment actions, and fixes navigation, sidebar-resizing, and large-PR workflow friction.
-
-### Security and authentication
-
-- [x] **P0 — Remove dormant Personal Access Token mode and stored credentials**
-  - **Outcome:** authentication always uses the browser-managed signed-in session, and the extension never asks for or persistently stores a GitHub credential.
-  - **GitHub:** ✅ GitHub v1.10.0. The hidden PAT/REST fallback and token prompt are removed, and upgrades delete legacy PAT values without reading them.
-  - **ADO:** ✅ Already session-only and never stores a PAT.
-  - **Constraint:** normal session-cookie comment submission remains covered by the GitHub browser suite.
-
-### Correctness
-
-- [x] **P1 — Make bulk rich-diff rendering reliable on GitHub's large-PR surface**
-  - **Outcome:** “Render all Markdown files as rich-diff” either switches to a GitHub mode that can retain all rendered files and completes there, or clearly explains why PR-wide rendering is unavailable instead of showing temporary progress that disappears.
-  - **GitHub:** ✅ GitHub v1.10.0. On `mode=virtualization`—with GitHub's “Switch to single file mode” link as a fallback signal—the extension hides PR-wide render controls, guards the bulk action, and shows one-file-at-a-time guidance instead.
-  - **ADO:** — Preview uses one selected file and has no equivalent bulk-render action.
-  - **Constraint:** do not navigate modes automatically and do not run the two-pass bulk sweep on the virtualized surface. Preserve the user's original scroll position when bulk rendering is supported.
-
-- [x] **P1 — Allow repeated navigation to the same Table of Contents destination**
-  - **Outcome:** clicking the same rendered Table of Contents link repeatedly always scrolls to its section, even when that anchor is already the current URL fragment.
-  - **GitHub:** ✅ GitHub v1.10.0. Repeated clicks scroll directly, while changed destinations and browser Back/Forward retain hash history.
-  - **ADO:** ✅ No equivalent repeated-anchor issue observed in Preview.
-  - **Constraint:** preserve normal heading-anchor behavior, browser history, and links to a different section.
-
-### Review and collaboration
-
-- [x] **P2 — Simplify actions on the reviewer's own comments**
-  - **Outcome:** Edit and Delete are visible as direct comment-header actions, while the redundant `GitHub ↗` link and one-item overflow menu are removed.
-  - **GitHub:** ✅ GitHub v1.10.0. Delete now sits beside Edit with destructive styling and confirmation, and both actions remain limited to the reviewer's own comments.
-  - **ADO:** ↔ Uses its own direct inline comment actions and has no GitHub link.
-  - **Constraint:** show destructive styling for Delete, preserve ownership checks, and keep accidental deletion protected by confirmation.
-
-### Navigation and focus
-
-- [x] **P0 — Restore the review sidebar after returning from GitHub's pull-request list**
-  - **Outcome:** after visiting a repository's Pull requests list, opening the Files changed view for the same or another pull request activates the sidebar without requiring a page reload.
-  - **GitHub:** ✅ GitHub v1.10.0. The runtime is present but visually inactive on the Pull requests list, then initializes on entry to Files changed. Switching pull requests clears PR-specific route data, comments, source mappings, and mention data before rebuilding Changes, Threads, and Outline.
-  - **ADO:** ✅ Native-equivalent. The extension runtime is already present across the ADO pull-request routes used for Preview navigation.
-  - **Constraint:** the extension must remain visually inactive on the Pull requests list and other non-review pages, and broadening activation must not add permissions or host access.
-
-- [x] **P1 — Keep sidebar content stable while resizing**
-  - **Outcome:** resizing the sidebar changes only its viewport dimensions; the active tab and scroll position in Changes, Threads, and Outline do not move during the drag.
-  - **GitHub:** ✅ GitHub v1.10.0. Each pane's scroll position is locked for the duration of a bottom-right resize gesture so browser scroll anchoring cannot move its scrollbar thumb.
-  - **ADO:** ✅ No equivalent resize movement observed.
-  - **Constraint:** preserve persisted width and height without changing navigation state during intermediate resize events.
-
----
-
-## ✅ GitHub v1.11.0
-
-This release prioritizes the two remaining P0 visibility gaps for conversations attached inside compound rendered blocks, plus targeted sidebar clarity. Compound-marker implementation starts only after the relevant current GitHub rich-diff DOM has been captured and recorded in the GitHub developer notes.
-
-### Correctness
-
-- [x] **P0 — Inline markers for table rows that already have comments**
-  - **Outcome:** a reviewer can see which exact table row has a conversation even though the thread body remains below the complete table.
-  - **GitHub:** ✅ GitHub v1.11.0. One persistent, keyboard-accessible marker in the row's first cell displays the thread count and cycles through that row's conversations when activated.
-  - **ADO:** ✅ ADO v1.3.0. One persistent, keyboard-accessible marker in the row's first cell displays the thread count and cycles through that row's conversations when activated.
-  - **Constraint:** keep valid table structure, preserve the existing `+` control, and omit threads with no visible comments.
-
-- [x] **P0 — Inline markers for code lines that already have comments**
-  - **Outcome:** a reviewer can see which exact code line has a conversation even though the thread body remains below the complete code block.
-  - **GitHub:** ✅ GitHub v1.11.0. A keyboard-accessible right-edge marker identifies each affected source line, shows the thread count, and cycles through conversations on that line.
-  - **ADO:** ✅ ADO v1.3.0. A keyboard-accessible marker identifies each affected source line, shows the thread count, and cycles through conversations on that line.
-  - **Constraint:** use a non-destructive overlay and never split or rewrite syntax-highlighted code DOM. Position markers proportionally when wrapping or syntax-highlighter row compression prevents exact visual alignment.
-
-### Review and collaboration
-
-- [ ] **P0 — Complete the core Edit, Delete, and Copy link comment actions**
-  - **Outcome:** reviewers can edit or delete their own rendered comments and copy a stable link to any visible conversation without leaving the rendered review surface.
-  - **GitHub:** ✅ GitHub v1.11.0. Edit and Delete remain ownership-limited, while Copy link works for every visible comment and uses the canonical URL or a reconstructed stable discussion fragment.
-  - **ADO:** △ Edit and Delete shipped in ADO v1.0.0; Copy link is planned. Azure DevOps exposes a thread-level destination rather than a distinct URL for each reply.
-  - **Constraint:** retain ownership checks and deletion confirmation. Copy the most specific stable destination each host supports, provide clear copied feedback, and fall back safely when link metadata is absent.
-
-- [ ] **P1 — Turn a conversation into tracked work**
-  - **Outcome:** reviewers can carry a rendered-review conversation into the host's work-tracking system with its source link and useful context already attached.
-  - **GitHub:** 📋 Planned after Copy link. Match the native **Reference in a new issue** outcome by opening a new repository issue with the comment reference prefilled.
-  - **ADO:** 📋 Planned after Copy link. Match the native work-item picker with the available Issue, Epic, and Task choices and link the new item to the review conversation.
-  - **Constraint:** open the host's normal creation form so the reviewer confirms title, type, project, permissions, and final content; do not create tracked work silently.
-
-### Navigation and focus
-
-- [x] **P1 — Show bulk rendering only when Markdown files still need it**
-  - **Outcome:** the Threads and Changes empty states distinguish “no comments or changes here” from “Markdown has not been rendered,” and offer bulk rich-diff rendering only while eligible Markdown files remain in source view.
-  - **GitHub:** ✅ GitHub v1.11.0. Rendered Markdown paths are tracked independently of thread presence, so the action remains available only while another eligible file still needs rich diff.
-  - **ADO:** — Preview has no equivalent bulk-render action.
-  - **Constraint:** keep the action available when other Markdown files still need rendering, including when the current file is already rich-diff; preserve the separate one-file guidance for virtualized large PRs.
 
 ---
 
@@ -232,6 +162,18 @@ This release prioritizes the two remaining P0 visibility gaps for conversations 
 
 ### Review and collaboration
 
+- [ ] **P0 — Complete the core Edit, Delete, and Copy link comment actions**
+  - **Outcome:** reviewers can edit or delete their own rendered comments and copy a stable link to any visible comment without leaving the rendered review surface.
+  - **GitHub:** ✅ GitHub v1.11.0. Edit and Delete remain ownership-limited, while Copy link uses the canonical URL or a reconstructed stable discussion fragment.
+  - **ADO:** △ Implemented, browser-tested, and live-validated for ADO v1.4.0; release pending. Edit and Delete remain ownership-limited, while Copy link works for every visible comment using its native conversation ID and comment publication-time fragment.
+  - **Constraint:** retain ownership checks and deletion confirmation, provide clear copied feedback, and fall back safely when link metadata is absent.
+
+- [ ] **P1 — Turn a conversation into tracked work**
+  - **Outcome:** reviewers can carry a rendered-review conversation into the host's work-tracking system with its source link and useful context already attached.
+  - **GitHub:** 📋 Targeted for GitHub v1.12.0. Match **Reference in a new issue** by opening the normal new-issue page with useful comment context prefilled.
+  - **ADO:** ⏸ Deferred beyond ADO v1.4.0. The native Issue/Epic/Task picker opens a private in-page contribution form rather than a reusable page route. A later implementation should open ADO's standalone native creation form in a new tab with useful comment context, while formal PR/thread linking remains blocked on a captured supported relation payload.
+  - **Constraint:** open the host's normal creation form so the reviewer confirms title, type, project, permissions, and final content; preserve the PR review position, do not depend on private React/contribution state, and do not create tracked work silently.
+
 - [ ] **P2 — Reactions on comments**
   - **Outcome:** reviewers can acknowledge a comment without adding a reply.
   - **GitHub:** 📋 Planned; native reactions exist, but the mutation endpoint needs validation.
@@ -244,10 +186,10 @@ This release prioritizes the two remaining P0 visibility gaps for conversations 
   - Preserve attribution where useful, keep the quote editable, and use the existing reply submission path.
 
 - [ ] **P2 — Copy a comment as Markdown**
-  - **Outcome:** reviewers can copy a portable Markdown quotation of a comment for use in another discussion or document.
-  - **GitHub:** 📋 Planned to match native **Copy Markdown** behavior.
-  - **ADO:** 📋 Planned as a parity convenience even though it was not present in the captured native toolbar.
-  - Keep this distinct from Copy link: one copies reusable content, while the P0 action copies a navigable destination.
+  - **Outcome:** reviewers can copy the original Markdown body of a comment for reuse in another discussion or document.
+  - **GitHub:** 📋 Targeted for GitHub v1.12.0, matching native **Copy Markdown** behavior.
+  - **ADO:** △ Implemented, browser-tested, and live-validated for ADO v1.4.0; release pending. Added as a parity convenience even though it is absent from the captured native toolbar.
+  - **Constraint:** copy only the stored Markdown body. Do not add generated attribution, timestamps, links, or quote markers; keep this distinct from Copy link, which copies a navigable destination.
 
 - [ ] **P3 — Expose host-authorized moderation actions only when safely supported**
   - **GitHub:** ↔ Native **Hide** remains delegated to GitHub because availability and reason selection depend on repository moderation permissions.

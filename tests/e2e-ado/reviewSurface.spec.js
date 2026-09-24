@@ -413,6 +413,87 @@ test.describe('ADO rendered review surface', () => {
     await expect(page.locator('.adrc-thread-panel[data-thread-id="101"]')).toHaveCount(0);
   });
 
+  test('copies distinct native comment destinations with clear feedback', async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          writeText: async (text) => { window.__adrcCopiedText = text; },
+        },
+      });
+    });
+    const threads = fixtures.defaultThreads();
+    threads[0].comments.push({
+      id: 2,
+      parentCommentId: 1,
+      commentType: 1,
+      content: 'A second comment shares the conversation destination.',
+      author: fixtures.OTHER_USER,
+      publishedDate: '2026-08-20T10:05:00.000Z',
+      lastContentUpdatedDate: '2026-08-20T10:05:00.000Z',
+      isDeleted: false,
+    });
+    await setupAdoExtensionPage(page, { threads });
+
+    const copyLinks = page.locator('.adrc-thread-panel[data-thread-id="101"] .adrc-copy-comment-link');
+    await expect(copyLinks).toHaveCount(2);
+    await copyLinks.nth(1).click();
+
+    await expect.poll(() => page.evaluate(() => window.__adrcCopiedText)).toBe(
+      'https://dev.azure.com/test-org/test-project/_git/test-repo/pullRequest/42?discussionId=101#1787220300'
+    );
+    await expect(copyLinks.nth(1)).toHaveText('Copied!');
+    await expect(copyLinks.nth(1)).toHaveAttribute('title', 'Comment link copied');
+
+    await page.locator('.adrc-thread-badge[data-thread-id="102"]').click();
+    await expect(page.locator('.adrc-thread-panel[data-thread-id="102"] .adrc-copy-comment-link'))
+      .toBeVisible();
+    await expect(page.locator('.adrc-thread-panel[data-thread-id="102"] .adrc-edit-comment'))
+      .toHaveCount(0);
+  });
+
+  test('shows failure feedback when the thread link cannot be copied', async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText: async () => { throw new Error('clipboard denied'); } },
+      });
+    });
+    await setupAdoExtensionPage(page);
+
+    const copyLink = page.locator('.adrc-thread-panel[data-thread-id="101"] .adrc-copy-comment-link');
+    await copyLink.click();
+    await expect(copyLink).toHaveText('Copy failed');
+    await expect(copyLink).toHaveAttribute('title', 'Could not copy comment link');
+  });
+
+  test('copies only the stored Markdown body for any visible comment', async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          writeText: async (text) => { window.__adrcCopiedText = text; },
+        },
+      });
+    });
+    const threads = fixtures.defaultThreads();
+    threads[1].comments[0].content = 'Please keep **bold** and `code` exactly.\n\n- first\n- second';
+    await setupAdoExtensionPage(page, { threads });
+
+    await page.locator('.adrc-thread-badge[data-thread-id="102"]').click();
+    const panel = page.locator('.adrc-thread-panel[data-thread-id="102"]');
+    const copyMarkdown = panel.locator('.adrc-copy-comment-markdown');
+    await expect(copyMarkdown).toBeVisible();
+    await expect(panel.locator('.adrc-edit-comment')).toHaveCount(0);
+    await copyMarkdown.click();
+
+    await expect.poll(() => page.evaluate(() => window.__adrcCopiedText)).toBe(
+      'Please keep **bold** and `code` exactly.\n\n- first\n- second'
+    );
+    await expect(copyMarkdown).toHaveText('Copied!');
+    await expect(copyMarkdown).toHaveAttribute('title', 'Comment Markdown copied');
+  });
+
   test('edits an own comment and displays the server-updated Markdown', async ({ page }) => {
     const { server } = await setupAdoExtensionPage(page);
     const panel = page.locator('.adrc-thread-panel[data-thread-id="101"]');

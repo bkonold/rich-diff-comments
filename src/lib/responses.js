@@ -108,6 +108,27 @@
     return `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pull/${pullNumber}#discussion_r${encodeURIComponent(String(dbId))}`;
   }
 
+  // Match Azure DevOps' native per-comment Copy link destination. The
+  // discussionId selects the conversation and the hash identifies the chosen
+  // comment by its publication time in Unix seconds. The query alone remains
+  // a useful fallback when a partial comment response omits that timestamp.
+  function getAdoCommentLink(thread, comment, pullRequest) {
+    const threadId = thread && Number(thread.id);
+    const org = pullRequest && pullRequest.org;
+    const projectName = pullRequest && pullRequest.projectName;
+    const repoName = pullRequest && pullRequest.repoName;
+    const prId = pullRequest && Number(pullRequest.prId);
+    if (!Number.isInteger(threadId) || threadId <= 0 || !org || !projectName || !repoName || !Number.isInteger(prId) || prId <= 0) {
+      return '';
+    }
+
+    const base = `https://dev.azure.com/${encodeURIComponent(org)}/${encodeURIComponent(projectName)}/_git/${encodeURIComponent(repoName)}/pullRequest/${prId}?discussionId=${threadId}`;
+    const publishedAt = comment && Date.parse(comment.publishedDate);
+    return Number.isFinite(publishedAt) && publishedAt > 0
+      ? `${base}#${Math.floor(publishedAt / 1000)}`
+      : base;
+  }
+
   // ── Small formatting / safety helpers ────────────────────────────────────
 
   // Pure HTML escape — no DOM dependency.
@@ -246,6 +267,7 @@
     findBlobInJson,
     threadResponseToComments,
     getGitHubCommentLink,
+    getAdoCommentLink,
     escapeHtml,
     formatTimeAgo,
     parseMarkersMap,

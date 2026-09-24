@@ -1,4 +1,4 @@
-# Chrome Web Store submission — Azure DevOps v1.3.0
+# Chrome Web Store submission — Azure DevOps v1.4.0
 
 > Canonical living submission document for the separate Azure DevOps extension.
 > Paste each fenced section into the Chrome Web Store Developer Console.
@@ -6,13 +6,13 @@
 
 ## Submission notes
 
-Version 1.3.0 adds persistent markers that identify table rows and fenced-code lines with review conversations, removes a thread after its final visible comment is deleted, and keeps added and modified Preview highlights accurate across complete sections. It remains packaged separately from the GitHub extension, requests no new permissions or hosts, loads no remote code, has no backend, and contains no analytics or telemetry.
+Version 1.4.0 adds actions to copy a direct link or the original Markdown from any rendered comment. It remains packaged separately from the GitHub extension, requests no new permissions or hosts, loads no remote code, has no backend, and contains no analytics or telemetry.
 
 ## Package
 
-- **Zip:** `rdc-ado-1.3.0.zip`
-- **Manifest version:** `1.3.0`
-- **Release folder:** `releases/ado/1.3.0/`
+- **Zip:** `rdc-ado-1.4.0.zip`
+- **Manifest version:** `1.4.0`
+- **Release folder:** `releases/ado/1.4.0/`
 
 ## Product details
 
@@ -31,7 +31,12 @@ Comment on rendered Markdown in Azure DevOps PRs with inline threads, Changes, O
 ### Description
 
 ```
-🆕 What's new — v1.3.0 (2026-09-21)
+🆕 What's new — v1.4.0 (2026-09-23)
+
+• Copy a direct link to any rendered comment and receive clear clipboard feedback.
+• Copy the original Markdown from any rendered comment for reuse without generated attribution or links.
+
+v1.3.0 (2026-09-21)
 
 • See persistent markers on table rows and fenced-code lines that already have review conversations; activate a marker to open or cycle through its threads.
 • Empty threads disappear after their final visible comment is deleted instead of remaining as “0 comments” entries.
@@ -41,11 +46,6 @@ v1.2.0 (2026-09-17)
 
 • See added and modified sections highlighted directly in Markdown Preview, with a subtle marker for completely new files.
 • Mention teammates from comments, replies, and edits with multi-word search; conversations and the Threads sidebar keep names readable.
-
-v1.1.0 (2026-09-15)
-
-• Start rendered Markdown review from any pull request Files page with Open Markdown Preview. It opens the selected Markdown file—or an available one when necessary—and keeps Changes, Threads, and Outline ready as you move between files.
-• When moving directly to another pull request, the extension refreshes the page once to load that pull request's review data.
 
 📌 Just installed? Hard-refresh (Ctrl+Shift+R / Cmd+Shift+R) any Azure DevOps pull request tab that was already open when you clicked Add to Chrome. New tabs work automatically.
 
@@ -59,6 +59,7 @@ What it does:
 • Hover a paragraph, heading, list item, table row, or code block and click the blue “+” to create a real Azure DevOps pull request comment on the matching source line.
 • Drag between rendered blocks to comment on a multi-line range. Inside fenced code, move the “+” to target an individual source line.
 • See existing review conversations beside the rendered section they belong to. Expand a thread to reply, resolve or reopen it, and edit or delete your own comments.
+• Copy a direct link to any visible comment or copy its original Markdown for reuse elsewhere.
 • Persistent markers identify table rows and fenced-code lines with existing conversations. A count appears when several threads share a row or line, and activating the marker cycles through them.
 • Write in Markdown with formatting controls, Write/Preview tabs, automatic textarea growth, and Cmd/Ctrl+Enter submission.
 • Type @ in a comment, reply, or edit to search for teammates and insert a native Azure DevOps mention. Mentioned names remain readable in inline conversations and the Threads sidebar.
@@ -158,7 +159,7 @@ HOW TO TEST
 2. Select Files while no Markdown Preview is open. The sidebar should appear immediately; choose Open Markdown Preview and confirm that it opens an available changed Markdown file in Preview.
 3. Hover a paragraph or heading. A blue “+” appears. Clicking it opens the Markdown comment editor. Posting requires the signed-in account to have normal comment permission on that PR; read-only navigation can be tested without write permission.
 4. In the editor, type `@` followed by at least two characters (spaces are supported). Select a person and confirm the posted conversation shows the readable name.
-5. Existing conversations appear beside rendered content. Table rows and fenced-code lines with conversations show persistent markers; activate a marker to open its thread. The sidebar contains Changes, Threads, and Outline tabs.
+5. Existing conversations appear beside rendered content. Use Copy link on any visible comment and confirm the destination reaches that comment; use Copy Markdown and confirm the original Markdown reaches the clipboard. Table rows and fenced-code lines with conversations show persistent markers; activate a marker to open its thread. The sidebar contains Changes, Threads, and Outline tabs.
 6. Cards and headings can navigate between Markdown files while retaining Preview. Use 1/2/3 to switch tabs, j/k for threads, [ and ] for changes, and t to collapse/expand the sidebar.
 7. Change the Azure DevOps light/dark theme; the interface updates without remounting or losing a draft.
 
@@ -178,6 +179,13 @@ https://github.com/chienyuanchang/rich-diff-comments/blob/main/PRIVACY_ADO.md
 - **Regions:** All regions
 
 ## What's new in this version
+
+### v1.4.0 — 2026-09-23
+
+#### Added
+
+- Copy a direct link from any rendered comment and receive clear feedback when it reaches the clipboard.
+- Copy the original Markdown body from any rendered comment for reuse without generated attribution or links.
 
 ### v1.3.0 — 2026-09-21
 
@@ -207,14 +215,4 @@ https://github.com/chienyuanchang/rich-diff-comments/blob/main/PRIVACY_ADO.md
 
 - Comments on list items stay attached to the selected bullet, with the comment button centered on its first rendered line.
 - Cross-file Outline navigation keeps the selected section centered with nearby headings visible.
-
-### v1.1.0 — 2026-09-15
-
-#### Added
-
-- Start rendered Markdown review from any pull request Files page with **Open Markdown Preview**. It opens the selected Markdown file—or an available one when necessary—and keeps Changes, Threads, and Outline ready as you move between files.
-
-#### Fixed
-
-- When switching directly between pull requests, the extension refreshes the page once so Changes, Threads, and Outline show the newly opened pull request.
 
