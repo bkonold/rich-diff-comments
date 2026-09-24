@@ -91,7 +91,7 @@ test('GitHub and ADO manifests remain separately scoped', () => {
     'https://*.visualstudio.com/*'
   ]);
   assert.equal(githubManifest.version, '1.11.0');
-  assert.equal(adoManifest.version, '1.3.0');
+  assert.equal(adoManifest.version, '1.4.0');
   assert.match(adoManifest.name, /Azure DevOps/);
   assert.doesNotMatch(githubManifest.name, /Azure DevOps/);
 
@@ -126,7 +126,7 @@ test('GitHub and ADO manifests remain separately scoped', () => {
 test('ADO store forms disclose the correct public privacy policy and current package', () => {
   for (const templateName of ['CHROME_SUBMISSION_ADO.md', 'EDGE_SUBMISSION_ADO.md']) {
     const template = read('.github', 'skills', 'rdc-publish-check', 'templates', templateName);
-    assert.match(template, /rdc-ado-1\.3\.0\.zip/);
+    assert.match(template, /rdc-ado-1\.4\.0\.zip/);
     assert.match(template, /PRIVACY_ADO\.md/);
     assert.match(template, /https:\/\/dev\.azure\.com\/\*/);
     assert.match(template, /https:\/\/\*\.visualstudio\.com\/\*/);
