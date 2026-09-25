@@ -1766,39 +1766,69 @@ li.grdc-hoverable .grdc-comment-btn {
    across their full width, a solid rail, and a +/− gutter glyph; changed
    blocks (mixed edits) get a solid attention rail, and their added /
    removed top-level list items get the same full-width treatment.
+
    Block structure (captured 2026-09): top-level blocks under
    `.markdown-body` are `.rich-diff-level-zero` elements with `.added` /
-   `.removed` / `.changed`, or bare block-level `<ins>` / `<del>`
-   wrappers around whole added / removed elements. Inside a `.changed`
-   list, items carry `.added` / `.removed` / `.unchanged`. */
-.prose-diff .rich-diff-level-zero.added,
-.prose-diff .markdown-body > ins {
+   `.removed` / `.changed`, or bare `<ins>` / `<del>` wrappers around
+   whole added / removed elements (one wrapper per element, plus
+   anchor-only wrappers of zero height after headings). Inside a
+   `.changed` list, items carry `.added` / `.removed` / `.unchanged`.
+
+   Specificity: extension stylesheets load before GitHub's, so a tie
+   goes to GitHub. Every selector here starts `.prose-diff.prose-diff`
+   (one extra class) so these rules win over GitHub's equivalents. */
+.prose-diff.prose-diff .rich-diff-level-zero.added,
+.prose-diff.prose-diff .markdown-body > ins {
   position: relative;
   background: var(--diffBlob-additionLine-bgColor, var(--bgColor-success-muted, #dafbe1));
   box-shadow: inset 4px 0 0 var(--bgColor-success-emphasis, var(--color-success-emphasis, #1f883d));
 }
-.prose-diff .rich-diff-level-zero.removed,
-.prose-diff .markdown-body > del {
+.prose-diff.prose-diff .rich-diff-level-zero.removed,
+.prose-diff.prose-diff .markdown-body > del {
   position: relative;
   background: var(--diffBlob-deletionLine-bgColor, var(--bgColor-danger-muted, #ffebe9));
   box-shadow: inset 4px 0 0 var(--bgColor-danger-emphasis, var(--color-danger-emphasis, #cf222e));
 }
-.prose-diff .rich-diff-level-zero.changed {
+.prose-diff.prose-diff .rich-diff-level-zero.changed {
   box-shadow: inset 4px 0 0 var(--bgColor-attention-emphasis, var(--color-attention-emphasis, #9a6700));
 }
+
+/* Cohesive runs. Consecutive added (or removed) blocks should read as one
+   highlighted region, like a hunk in the source diff, but the space
+   between them is margin outside every block and stays white:
+   - `<ins>` / `<del>` wrappers have no margin of their own; their child's
+     margins collapse through them. `flow-root` keeps those margins
+     inside the wrapper, so the tint covers them.
+   - Level-zero `.added` / `.removed` elements carry their own margins.
+     Between two blocks of the same kind, trade that margin for padding
+     of the same size (GitHub's Markdown spacing: 16px below blocks, 24px
+     above headings), which the tint covers. */
+.prose-diff.prose-diff .markdown-body > :is(ins, del) {
+  display: flow-root;
+}
+.prose-diff.prose-diff .rich-diff-level-zero.added:has(+ :is(ins, .rich-diff-level-zero.added)),
+.prose-diff.prose-diff .rich-diff-level-zero.removed:has(+ :is(del, .rich-diff-level-zero.removed)) {
+  margin-bottom: 0;
+  padding-bottom: 16px;
+}
+.prose-diff.prose-diff :is(ins, .rich-diff-level-zero.added) + .rich-diff-level-zero.added,
+.prose-diff.prose-diff :is(del, .rich-diff-level-zero.removed) + .rich-diff-level-zero.removed {
+  margin-top: 0;
+}
+.prose-diff.prose-diff :is(ins, .rich-diff-level-zero.added) + .rich-diff-level-zero.added:is(h1, h2, h3, h4, h5, h6),
+.prose-diff.prose-diff :is(del, .rich-diff-level-zero.removed) + .rich-diff-level-zero.removed:is(h1, h2, h3, h4, h5, h6) {
+  padding-top: 24px;
+}
+
 /* Non-list blocks sit flush with the rail; give the glyph a gutter.
    Lists already indent their items past it. */
-.prose-diff .rich-diff-level-zero.added:not(ul, ol),
-.prose-diff .rich-diff-level-zero.removed:not(ul, ol),
-.prose-diff .markdown-body > ins,
-.prose-diff .markdown-body > del {
+.prose-diff.prose-diff .rich-diff-level-zero:is(.added, .removed):not(ul, ol),
+.prose-diff.prose-diff .markdown-body > :is(ins, del) {
   padding-left: 18px;
 }
-.prose-diff .rich-diff-level-zero.added::before,
-.prose-diff .markdown-body > ins::before,
-.prose-diff .rich-diff-level-zero.removed::before,
-.prose-diff .markdown-body > del::before,
-.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li:is(.added, .removed)::before {
+.prose-diff.prose-diff .rich-diff-level-zero:is(.added, .removed)::before,
+.prose-diff.prose-diff .markdown-body > :is(ins, del)::before,
+.prose-diff.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li:is(.added, .removed)::before {
   position: absolute;
   left: 7px;
   top: 2px;
@@ -1809,36 +1839,47 @@ li.grdc-hoverable .grdc-comment-btn {
   pointer-events: none;
   transition: opacity 0.12s;
 }
-.prose-diff .rich-diff-level-zero.added::before,
-.prose-diff .markdown-body > ins::before,
-.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li.added::before {
+/* A wrapper keeps its heading's 24px top margin inside (flow-root), so
+   drop the glyph to the heading's first line. */
+.prose-diff.prose-diff .markdown-body > :is(ins, del):has(> :is(h1, h2, h3, h4, h5, h6):first-child)::before {
+  top: 30px;
+}
+.prose-diff.prose-diff .rich-diff-level-zero.added::before,
+.prose-diff.prose-diff .markdown-body > ins::before,
+.prose-diff.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li.added::before {
   content: "+";
   color: var(--fgColor-success, var(--color-success-fg, #1a7f37));
 }
-.prose-diff .rich-diff-level-zero.removed::before,
-.prose-diff .markdown-body > del::before,
-.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li.removed::before {
+.prose-diff.prose-diff .rich-diff-level-zero.removed::before,
+.prose-diff.prose-diff .markdown-body > del::before,
+.prose-diff.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li.removed::before {
   content: "\2212";
   color: var(--fgColor-danger, var(--color-danger-fg, #d1242f));
 }
+/* Anchor-only wrappers (GitHub emits one after each heading) have no
+   height; a glyph there would float over the next block. */
+.prose-diff.prose-diff .markdown-body > :is(ins, del):not(:has(> :not(a)))::before {
+  content: none;
+}
+
 /* Items inside a changed list: GitHub tints only the item box, which
    starts 48px in from the block edge (the list's 16px margin + 32px
    padding). Keep the item (and its bullet) in place and paint the rail
    and tint across that gap with the glyph pseudo-element instead. */
-.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li:is(.added, .removed) {
+.prose-diff.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li:is(.added, .removed) {
   position: relative;
   /* Own stacking context so the gutter fill (z-index: -1) paints above
      the item's background but below its content, including the bullet
      marker that sits in the same gutter. */
   isolation: isolate;
 }
-.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li.added {
+.prose-diff.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li.added {
   background: var(--diffBlob-additionLine-bgColor, var(--bgColor-success-muted, #dafbe1));
 }
-.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li.removed {
+.prose-diff.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li.removed {
   background: var(--diffBlob-deletionLine-bgColor, var(--bgColor-danger-muted, #ffebe9));
 }
-.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li:is(.added, .removed)::before {
+.prose-diff.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li:is(.added, .removed)::before {
   left: -48px;
   top: 0;
   bottom: 0;
@@ -1847,21 +1888,19 @@ li.grdc-hoverable .grdc-comment-btn {
   padding: 2px 0 0 7px;
   z-index: -1;
 }
-.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li.added::before {
+.prose-diff.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li.added::before {
   background: linear-gradient(90deg,
     var(--bgColor-success-emphasis, var(--color-success-emphasis, #1f883d)) 0 4px,
     var(--diffBlob-additionLine-bgColor, var(--bgColor-success-muted, #dafbe1)) 4px);
 }
-.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li.removed::before {
+.prose-diff.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li.removed::before {
   background: linear-gradient(90deg,
     var(--bgColor-danger-emphasis, var(--color-danger-emphasis, #cf222e)) 0 4px,
     var(--diffBlob-deletionLine-bgColor, var(--bgColor-danger-muted, #ffebe9)) 4px);
 }
 /* The comment `+` button appears in the same gutter on hover; step the
    glyph out of its way. */
-.prose-diff .rich-diff-level-zero.added:hover::before,
-.prose-diff .markdown-body > ins:hover::before,
-.prose-diff .rich-diff-level-zero.removed:hover::before,
-.prose-diff .markdown-body > del:hover::before {
+.prose-diff.prose-diff .rich-diff-level-zero:is(.added, .removed):hover::before,
+.prose-diff.prose-diff .markdown-body > :is(ins, del):hover::before {
   opacity: 0;
 }

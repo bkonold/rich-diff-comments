@@ -10,7 +10,7 @@ All notable changes to Markdown PR Comments for GitHub (formerly *Rich Diff Comm
 
 ### Changed
 
-- **Changes stand out in rendered Markdown.** Added and removed blocks are highlighted across their full width in the same green and red as GitHub's source diff, with a solid bar and a + or − marker in the margin. Blocks with mixed edits get a solid yellow bar, and the items added or removed inside them are highlighted the same way.
+- **Changes stand out in rendered Markdown.** Added and removed blocks are highlighted across their full width in the same green and red as GitHub's source diff, with a solid bar and a + or − marker in the margin. Blocks with mixed edits get a solid yellow bar, and the items added or removed inside them are highlighted the same way. Consecutive added or removed blocks, such as a brand-new file, read as one continuous highlight instead of a stack of separate strips.
 - **The book button now switches every Markdown file between rendered and source view.** Click it (or press `b`) to render all Markdown files as rich diff; once they are all rendered it turns into a code icon that switches them all back to source. It no longer opens the sidebar or jumps to the Outline tab, which stays one click away.
 - **The sidebar header uses a soft light-blue tint instead of solid blue**, matching the collapsed controls in the toolbar, and expanding or collapsing the sidebar now animates smoothly instead of jumping. The animation is skipped when your system asks for reduced motion.
 - **The sidebar sizes itself to its content.** It opens compact when little is rendered yet and grows as Changes, Threads, and Outline fill in, up to the height you last dragged it to. Previously it could reopen at a much larger, mostly empty size.

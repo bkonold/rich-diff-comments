@@ -45,3 +45,26 @@ test('added, removed and changed blocks are highlighted', async ({ page }) => {
   expect(styles.liGutter.content).toBe('"+"');
   expect(styles.liGutter.image).toContain('linear-gradient');
 });
+
+test('consecutive added blocks form one continuous highlight', async ({ page }) => {
+  await setupExtensionPage(page, 'yaml-frontmatter', {
+    rawSource: { [fm.path]: fm.source },
+  });
+  const gaps = await page.evaluate(() => {
+    const body = document.querySelector('.prose-diff .markdown-body');
+    const run = document.createElement('div');
+    body.append(run);
+    // Mirrors a brand-new file: one <ins> per element (headings followed by
+    // an anchor-only <ins>), plus a level-zero `.added` list.
+    run.outerHTML = `
+      <ins class="t-run"><h1 class="rich-diff-level-zero">Cycling</h1></ins>
+      <ins class="t-run"><a class="anchor rich-diff-level-zero" href="#x"></a></ins>
+      <ins class="t-run"><h2 class="rich-diff-level-zero">Bike shops</h2></ins>
+      <ul class="added rich-diff-level-zero t-run"><li>an item</li></ul>
+      <ins class="t-run"><p class="rich-diff-level-zero">a paragraph</p></ins>`;
+    const els = [...document.querySelectorAll('.t-run')];
+    return els.slice(1).map((el, i) =>
+      Math.round(el.getBoundingClientRect().top - els[i].getBoundingClientRect().bottom));
+  });
+  expect(gaps).toEqual([0, 0, 0, 0]);
+});
