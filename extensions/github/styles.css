@@ -281,31 +281,66 @@ li.grdc-hoverable .grdc-comment-btn {
   font-style: normal;
 }
 
+/* New-comment and reply boxes follow GitHub's native line-comment form: a
+   card holding an optional avatar header, the bordered editor, and a
+   right-aligned button row. */
 .grdc-comment-box {
   position: relative;
   margin: 8px 0;
-  padding: 0;
-  border: 1px solid var(--borderColor-default, var(--color-border-default, #d0d7de));
+  padding: 16px;
+  border: 1px solid var(--borderColor-default, var(--color-border-default, #d1d9e0));
   border-radius: 6px;
   background: var(--bgColor-default, var(--color-canvas-default, #ffffff));
   z-index: 101;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-family: var(--fontStack-sansSerif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif);
+  font-size: 14px;
+  color: var(--fgColor-default, var(--color-fg-default, #1f2328));
 }
 
-/* File · line · code-block hint */
+/* "Add a comment on line N" header with the viewer's avatar. */
 .grdc-comment-box > .grdc-line-info,
 .grdc-reply-box  > .grdc-line-info {
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--borderColor-muted, var(--color-border-muted, #d8dee4));
-  background: var(--bgColor-muted, var(--color-canvas-subtle, #f6f8fa));
-  border-radius: 6px 6px 0 0;
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: var(--fgColor-default, var(--color-fg-default, #1f2328));
+  gap: 8px;
+}
+.grdc-comment-box-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--borderColor-default, var(--color-border-default, #d1d9e0));
+}
+.grdc-comment-box-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
 }
 
 /* Toolbar + textarea wrapper */
+/* Editor frame: bordered box with a tab + toolbar header row. Also the
+   anchor for the @-mention dropdown. */
 .grdc-editor {
   display: flex;
   flex-direction: column;
-  position: relative; /* anchor for @-mention dropdown */
+  position: relative;
+  border: 1px solid var(--borderColor-default, var(--color-border-default, #d1d9e0));
+  border-radius: 6px;
+  background: var(--bgColor-default, var(--color-canvas-default, #ffffff));
+}
+.grdc-editor-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 8px;
+  background: var(--bgColor-muted, var(--color-canvas-subtle, #f6f8fa));
+  border-bottom: 1px solid var(--borderColor-default, var(--color-border-default, #d1d9e0));
+  border-radius: 6px 6px 0 0;
+}
+.grdc-editor-body {
+  padding: 8px;
 }
 
 /* @-mention autocomplete dropdown.
@@ -355,23 +390,20 @@ li.grdc-hoverable .grdc-comment-btn {
 /* Write / Preview tabs */
 .grdc-editor-tabs {
   display: flex;
-  gap: 0;
-  padding: 6px 8px 0;
-  background: var(--bgColor-muted, var(--color-canvas-subtle, #f6f8fa));
-  border-bottom: 1px solid var(--borderColor-muted, var(--color-border-muted, #d8dee4));
+  margin: 0 -1px -1px -9px;
 }
 
 .grdc-tab {
-  padding: 6px 12px;
-  margin-bottom: -1px;
+  padding: 9px 16px;
   border: 1px solid transparent;
   border-bottom: none;
-  background: transparent;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--fgColor-muted, var(--color-fg-muted, #57606a));
-  cursor: pointer;
   border-radius: 6px 6px 0 0;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--fgColor-muted, var(--color-fg-muted, #59636e));
+  cursor: pointer;
 }
 
 .grdc-tab:hover {
@@ -380,17 +412,15 @@ li.grdc-hoverable .grdc-comment-btn {
 
 .grdc-tab-active {
   background: var(--bgColor-default, var(--color-canvas-default, #ffffff));
-  border-color: var(--borderColor-muted, var(--color-border-muted, #d8dee4));
-  color: var(--fgColor-default, var(--color-fg-default, #24292f));
+  border-color: var(--borderColor-default, var(--color-border-default, #d1d9e0));
+  color: var(--fgColor-default, var(--color-fg-default, #1f2328));
 }
 
 .grdc-editor-preview {
-  padding: 12px;
-  min-height: 80px;
-  font-size: 13px;
-  color: var(--fgColor-default, var(--color-fg-default, #24292f));
-  background: var(--bgColor-default, var(--color-canvas-default, #ffffff));
-  border-radius: 0 0 6px 6px;
+  padding: 8px;
+  min-height: 105px;
+  font-size: 14px;
+  color: var(--fgColor-default, var(--color-fg-default, #1f2328));
 }
 
 .grdc-preview-empty {
@@ -402,30 +432,22 @@ li.grdc-hoverable .grdc-comment-btn {
 .grdc-editor-toolbar {
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 6px 10px;
-  background: var(--bgColor-muted, var(--color-canvas-subtle, #f6f8fa));
-  border-bottom: 1px solid var(--borderColor-muted, var(--color-border-muted, #d8dee4));
-}
-
-.grdc-comment-box > .grdc-editor > .grdc-editor-toolbar {
-  /* When directly inside the comment box, sit flush under the line-info header */
-  border-top: none;
+  flex-wrap: wrap;
+  gap: 0;
+  padding: 2px 0;
 }
 
 .grdc-tb-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 26px;
-  height: 26px;
-  padding: 0 6px;
-  font-size: 12px;
-  line-height: 1;
-  color: var(--fgColor-muted, var(--color-fg-muted, #57606a));
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--fgColor-muted, var(--color-fg-muted, #59636e));
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
 }
 
@@ -441,29 +463,31 @@ li.grdc-hoverable .grdc-comment-btn {
 
 .grdc-tb-sep {
   width: 1px;
-  height: 16px;
-  margin: 0 4px;
-  background: var(--borderColor-default, var(--color-border-default, #d0d7de));
+  height: 20px;
+  margin: 0 8px;
+  background: var(--borderColor-default, var(--color-border-default, #d1d9e0));
 }
 
 .grdc-editor-textarea {
+  display: block;
   width: 100%;
-  min-height: 120px;
-  padding: 8px 12px;
-  border: none;
-  border-radius: 0 0 6px 6px;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--fgColor-default, var(--color-fg-default, #24292f));
+  min-height: 105px;
+  padding: 8px;
+  border: 1px solid var(--borderColor-default, var(--color-border-default, #d1d9e0));
+  border-radius: 6px;
+  font-family: var(--fontStack-sansSerif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif);
+  font-size: 14px;
+  line-height: 21px;
+  color: var(--fgColor-default, var(--color-fg-default, #1f2328));
   background: var(--bgColor-default, var(--color-canvas-default, #ffffff));
-  resize: none; /* auto-grow handles height */
+  resize: vertical;
   box-sizing: border-box;
   overflow-y: auto;
 }
 
 .grdc-editor-textarea:focus {
   outline: none;
+  border-color: var(--bgColor-accent-emphasis, var(--color-accent-emphasis, #0969da));
   box-shadow: inset 0 0 0 1px var(--bgColor-accent-emphasis, var(--color-accent-emphasis, #0969da));
 }
 
@@ -471,20 +495,20 @@ li.grdc-hoverable .grdc-comment-btn {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
-  padding: 8px 12px;
-  background: var(--bgColor-muted, var(--color-canvas-subtle, #f6f8fa));
-  border-top: 1px solid var(--borderColor-muted, var(--color-border-muted, #d8dee4));
-  border-radius: 0 0 6px 6px;
+  padding-top: 8px;
 }
 
 .grdc-btn {
-  padding: 5px 16px;
+  height: 32px;
+  padding: 0 12px;
   border-radius: 6px;
-  font-size: 12px;
+  font-family: inherit;
+  font-size: 14px;
   font-weight: 500;
+  line-height: 20px;
   cursor: pointer;
   border: 1px solid var(--button-default-borderColor-rest, var(--color-btn-border, rgba(31, 35, 40, 0.15)));
-  font-family: inherit;
+  box-shadow: 0 1px 0 0 rgba(31, 35, 40, 0.04);
 }
 
 .grdc-btn-primary {
@@ -526,13 +550,15 @@ li.grdc-hoverable .grdc-comment-btn {
 
 .grdc-line-input,
 .grdc-line-start-input {
-  width: 60px;
-  padding: 1px 4px;
-  font-size: 11px;
-  border: 1px solid var(--borderColor-default, var(--color-border-default, #d0d7de));
-  border-radius: 3px;
+  width: 64px;
+  height: 28px;
+  padding: 0 8px;
+  font: inherit;
+  font-weight: 400;
+  border: 1px solid var(--borderColor-default, var(--color-border-default, #d1d9e0));
+  border-radius: 6px;
   background: var(--bgColor-default, var(--color-canvas-default, #ffffff));
-  color: var(--fgColor-default, var(--color-fg-default, #24292f));
+  color: var(--fgColor-default, var(--color-fg-default, #1f2328));
 }
 
 .grdc-line-input:focus,
@@ -902,10 +928,12 @@ li.grdc-hoverable .grdc-comment-btn {
 .grdc-reply-box {
   flex: 1 1 100%;
   margin-top: 8px;
+  padding: 16px;
   background: var(--bgColor-default, var(--color-canvas-default, #ffffff));
-  border: 1px solid var(--borderColor-default, var(--color-border-default, #d0d7de));
+  border: 1px solid var(--borderColor-default, var(--color-border-default, #d1d9e0));
   border-radius: 6px;
-  overflow: hidden;
+  font-family: var(--fontStack-sansSerif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif);
+  font-size: 14px;
 }
 
 /* ─── Threads sidebar (v1) ────────────────────────────────────────────────

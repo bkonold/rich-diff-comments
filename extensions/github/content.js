@@ -1992,6 +1992,39 @@
   // toolbar / mention / upload / preview behaviors all depend on React
   // contexts that don't survive a `cloneNode(true)`. See
   // docs/github/FEATURES.md → "Native comment form cloning".
+  // Markdown toolbar, in the order and with the icons of GitHub's own
+  // comment form. Icon paths are Octicons (MIT, © GitHub), captured from
+  // github.com's native toolbar (2026-09). `null` marks a separator.
+  const MARKDOWN_TOOLBAR = [
+    ['heading', 'Heading', 'M3.75 2a.75.75 0 0 1 .75.75V7h7V2.75a.75.75 0 0 1 1.5 0v10.5a.75.75 0 0 1-1.5 0V8.5h-7v4.75a.75.75 0 0 1-1.5 0V2.75A.75.75 0 0 1 3.75 2Z'],
+    ['bold', 'Bold (Ctrl+B)', 'M4 2h4.5a3.501 3.501 0 0 1 2.852 5.53A3.499 3.499 0 0 1 9.5 14H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm1 7v3h4.5a1.5 1.5 0 0 0 0-3Zm3.5-2a1.5 1.5 0 0 0 0-3H5v3Z'],
+    ['italic', 'Italic (Ctrl+I)', 'M6 2.75A.75.75 0 0 1 6.75 2h6.5a.75.75 0 0 1 0 1.5h-2.505l-3.858 9H9.25a.75.75 0 0 1 0 1.5h-6.5a.75.75 0 0 1 0-1.5h2.505l3.858-9H6.75A.75.75 0 0 1 6 2.75Z'],
+    ['quote', 'Quote', 'M1.75 2.5h10.5a.75.75 0 0 1 0 1.5H1.75a.75.75 0 0 1 0-1.5Zm4 5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5Zm0 5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5ZM2.5 7.75v6a.75.75 0 0 1-1.5 0v-6a.75.75 0 0 1 1.5 0Z'],
+    ['code', 'Code', 'm11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z'],
+    ['link', 'Link', 'm7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z'],
+    null,
+    ['ul', 'Unordered list', 'M5.75 2.5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5Zm0 5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5Zm0 5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5ZM2 14a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm1-6a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM2 4a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z'],
+    ['ol', 'Numbered list', 'M5 3.25a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 0 1.5h-8.5A.75.75 0 0 1 5 3.25Zm0 5a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 0 1.5h-8.5A.75.75 0 0 1 5 8.25Zm0 5a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1-.75-.75ZM.924 10.32a.5.5 0 0 1-.851-.525l.001-.001.001-.002.002-.004.007-.011c.097-.144.215-.273.348-.384.228-.19.588-.392 1.068-.392.468 0 .858.181 1.126.484.259.294.377.673.377 1.038 0 .987-.686 1.495-1.156 1.845l-.047.035c-.303.225-.522.4-.654.597h1.357a.5.5 0 0 1 0 1H.5a.5.5 0 0 1-.5-.5c0-1.005.692-1.52 1.167-1.875l.035-.025c.531-.396.8-.625.8-1.078a.57.57 0 0 0-.128-.376C1.806 10.068 1.695 10 1.5 10a.658.658 0 0 0-.429.163.835.835 0 0 0-.144.153ZM2.003 2.5V6h.503a.5.5 0 0 1 0 1H.5a.5.5 0 0 1 0-1h.503V3.308l-.28.14a.5.5 0 0 1-.446-.895l1.003-.5a.5.5 0 0 1 .723.447Z'],
+    ['task', 'Task list', 'M2 2h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm4.655 8.595a.75.75 0 0 1 0 1.06L4.03 14.28a.75.75 0 0 1-1.06 0l-1.5-1.5a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215l.97.97 2.095-2.095a.75.75 0 0 1 1.06 0ZM9.75 2.5h5.5a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1 0-1.5Zm0 5h5.5a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1 0-1.5Zm0 5h5.5a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1 0-1.5Zm-7.25-9v3h3v-3Z'],
+  ];
+
+  function markdownToolbarHtml() {
+    return MARKDOWN_TOOLBAR.map((item) => {
+      if (!item) return '<span class="grdc-tb-sep" aria-hidden="true"></span>';
+      const [kind, title, path] = item;
+      return `<button type="button" class="grdc-tb-btn" data-grdc-md="${kind}" title="${title}" aria-label="${title}">` +
+        `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="${path}"/></svg></button>`;
+    }).join('');
+  }
+
+  // Keep a submit button disabled while its editor is empty, like GitHub's
+  // own comment form.
+  function disableWhileEmpty(button, textarea) {
+    const sync = () => { button.disabled = !textarea.value.trim(); };
+    textarea.addEventListener('input', sync);
+    sync();
+  }
+
   function buildEditor(opts) {
     opts = opts || {};
     const minRows = opts.minRows || 3;
@@ -2001,25 +2034,17 @@
     const root = document.createElement('div');
     root.className = 'grdc-editor';
     root.innerHTML = `
-      <div class="grdc-editor-tabs" role="tablist">
-        <button type="button" class="grdc-tab grdc-tab-active" data-grdc-tab="write" role="tab" aria-selected="true">Write</button>
-        <button type="button" class="grdc-tab" data-grdc-tab="preview" role="tab" aria-selected="false">Preview</button>
+      <div class="grdc-editor-header">
+        <div class="grdc-editor-tabs" role="tablist">
+          <button type="button" class="grdc-tab grdc-tab-active" data-grdc-tab="write" role="tab" aria-selected="true">Write</button>
+          <button type="button" class="grdc-tab" data-grdc-tab="preview" role="tab" aria-selected="false">Preview</button>
+        </div>
+        <div class="grdc-editor-toolbar" role="toolbar" aria-label="Markdown formatting">${markdownToolbarHtml()}</div>
       </div>
-      <div class="grdc-editor-toolbar" role="toolbar" aria-label="Markdown formatting">
-        <button type="button" class="grdc-tb-btn" data-grdc-md="heading"     title="Heading">H</button>
-        <button type="button" class="grdc-tb-btn" data-grdc-md="bold"        title="Bold (Ctrl+B)"><b>B</b></button>
-        <button type="button" class="grdc-tb-btn" data-grdc-md="italic"      title="Italic (Ctrl+I)"><i>I</i></button>
-        <button type="button" class="grdc-tb-btn" data-grdc-md="code"        title="Inline code">&lt;&gt;</button>
-        <span class="grdc-tb-sep"></span>
-        <button type="button" class="grdc-tb-btn" data-grdc-md="link"        title="Link">🔗</button>
-        <button type="button" class="grdc-tb-btn" data-grdc-md="quote"       title="Quote">❝</button>
-        <span class="grdc-tb-sep"></span>
-        <button type="button" class="grdc-tb-btn" data-grdc-md="ul"          title="Unordered list">• ☰</button>
-        <button type="button" class="grdc-tb-btn" data-grdc-md="ol"          title="Numbered list">1. ☰</button>
-        <button type="button" class="grdc-tb-btn" data-grdc-md="task"        title="Task list">☐ ☰</button>
+      <div class="grdc-editor-body">
+        <textarea class="grdc-editor-textarea" rows="${minRows}" placeholder="${placeholder.replace(/"/g, '&quot;')}"></textarea>
+        <div class="grdc-editor-preview markdown-body" hidden></div>
       </div>
-      <textarea class="grdc-editor-textarea" rows="${minRows}" placeholder="${placeholder.replace(/"/g, '&quot;')}"></textarea>
-      <div class="grdc-editor-preview markdown-body" hidden></div>
     `;
 
     const textarea = root.querySelector('.grdc-editor-textarea');
@@ -2166,23 +2191,25 @@
     // When info.startLine is set, we're posting on a multi-line range — show
     // both inputs (start / end) and pass them through on submit.
     const isRange = info.startLine != null && info.startLine !== info.line;
+    // Mirrors GitHub's "Add a comment on line R10" header: viewer avatar and
+    // title. The line stays editable (code blocks map to a line range), and
+    // the file path moves to the tooltip since the box sits inside the file.
     const header = document.createElement('div');
     header.className = 'grdc-line-info';
-    if (isRange) {
-      header.innerHTML = `
-        ${escapeHtml(info.path)} · lines
-        <input type="number" class="grdc-line-start-input" min="1" value="${info.startLine}" />
-        –
-        <input type="number" class="grdc-line-input" min="1" value="${info.line}" />
-      `;
-    } else {
-      header.innerHTML = `
-        ${escapeHtml(info.path)} · line
-        <input type="number" class="grdc-line-input" min="1" value="${info.line}" />
-        ${lineHint}
-      `;
-    }
+    header.title = info.path;
+    const login = getViewerLogin();
+    const avatar = login
+      ? `<img class="grdc-comment-box-avatar" src="https://github.com/${encodeURIComponent(login)}.png?size=64" alt="@${escapeHtml(login)}" width="32" height="32">`
+      : '';
+    header.innerHTML = isRange
+      ? `${avatar}<span class="grdc-comment-box-title">Add a comment on lines
+          <input type="number" class="grdc-line-start-input" min="1" value="${info.startLine}" aria-label="First line" />
+          –
+          <input type="number" class="grdc-line-input" min="1" value="${info.line}" aria-label="Last line" /></span>`
+      : `${avatar}<span class="grdc-comment-box-title">Add a comment on line
+          <input type="number" class="grdc-line-input" min="1" value="${info.line}" aria-label="Line" /></span>${lineHint}`;
     box.appendChild(header);
+    header.querySelector('.grdc-comment-box-avatar')?.addEventListener('error', (e) => e.target.remove());
 
     // Submit handler (used by both button click and Cmd+Enter)
     let submitBtn; // forward decl so onSubmit can disable it
@@ -2240,7 +2267,7 @@
       }
     };
 
-    editor = buildEditor({ placeholder: 'Leave a comment...', onSubmit: submit });
+    editor = buildEditor({ placeholder: 'Leave a comment', onSubmit: submit });
     box.appendChild(editor.root);
 
     const actions = document.createElement('div');
@@ -2261,6 +2288,7 @@
 
     cancelBtn.addEventListener('click', () => box.remove());
     submitBtn.addEventListener('click', submit);
+    disableWhileEmpty(submitBtn, editor.textarea);
 
     editor.focus();
   }
@@ -3010,6 +3038,7 @@
         submitBtn = box.querySelector('.grdc-reply-submit');
         box.querySelector('.grdc-reply-cancel').addEventListener('click', () => box.remove());
         submitBtn.addEventListener('click', submit);
+        disableWhileEmpty(submitBtn, editor.textarea);
         editor.focus();
       });
       actions.appendChild(replyBtn);
