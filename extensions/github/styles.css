@@ -1026,14 +1026,12 @@ li.grdc-hoverable .grdc-comment-btn {
   /* Compact 40px bar height (option B — 80% of v2 spec's 48px). Still
    * bigger than 1.5.0's ~30px and gives breathing room for 16px icons. */
   min-height: 40px;
-  border-bottom: 1px solid var(--borderColor-default, var(--color-border-default, #c3d4ea));
-  /* Match GitHub's link blue (`--fgColor-accent` — `#0969da` light,
-     `#2f81f7` dark) so the header reads as "part of GitHub's UI". Using
-     the link token instead of `bgColor-accent-emphasis` keeps the shade
-     identical to in-page links in both themes. Text/icons stay white via
-     the rule below. */
-  background: var(--fgColor-accent, var(--color-accent-fg, #0969da));
-  color: var(--fgColor-onEmphasis, var(--color-fg-on-emphasis, #ffffff));
+  border-bottom: 1px solid var(--borderColor-accent-muted, var(--color-accent-muted, #54aeff66));
+  /* A shade darker than the light accent tint used by the docked toolbar
+     pill, so the collapsed and expanded sidebar read as the same control.
+     Icons use GitHub's muted foreground via the rules below. */
+  background: color-mix(in srgb, var(--bgColor-accent-muted, var(--color-accent-subtle, #ddf4ff)), var(--fgColor-accent, var(--color-accent-fg, #0969da)) 8%);
+  color: var(--fgColor-muted, var(--color-fg-muted, #59636e));
   border-top-left-radius: 6px;
   border-top-right-radius: 6px;
   cursor: move;
@@ -1044,17 +1042,17 @@ li.grdc-hoverable .grdc-comment-btn {
   cursor: grabbing;
 }
 .grdc-sidebar-dragging .grdc-sidebar-header { cursor: grabbing; }
-/* Header buttons: white icons (100%), 28×28 click target (option B — 80%
+/* Header buttons: muted icons, 28×28 click target (option B — 80%
    of v2 spec's 32×32). `padding: 6px` on a 16×16 SVG = 28×28 total. */
 .grdc-sidebar-header button {
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: 6px;
   padding: 6px;
   cursor: pointer;
   font-size: 13px;
   line-height: 0;
-  color: var(--fgColor-onEmphasis, var(--color-fg-on-emphasis, #ffffff));
+  color: var(--fgColor-muted, var(--color-fg-muted, #59636e));
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1063,22 +1061,22 @@ li.grdc-hoverable .grdc-comment-btn {
   display: none;
 }
 .grdc-sidebar-header button:hover {
-  /* Hover state per v2 spec: subtle white wash. */
-  background: rgba(255, 255, 255, 0.1);
+  /* Translucent accent wash: reads on the tinted header in both themes. */
+  background: rgba(9, 105, 218, 0.12);
   border-color: transparent;
+  color: var(--fgColor-default, var(--color-fg-default, #1f2328));
 }
 .grdc-sidebar-header button:active {
-  /* Active / pressed state per v2 spec: slightly stronger background. */
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(9, 105, 218, 0.2);
 }
 .grdc-sidebar-header button svg { display: block; }
 /* 1×22px vertical separator (option B — ~55% of the 40px bar height,
-   keeping the spec's visual proportion). White at 24% opacity. */
+   keeping the spec's visual proportion), in the accent border tint. */
 .grdc-sidebar-separator {
   display: inline-block;
   width: 1px;
   height: 22px;
-  background: rgba(255, 255, 255, 0.24);
+  background: var(--borderColor-accent-muted, var(--color-accent-muted, #54aeff66));
   flex-shrink: 0;
 }
 /* Cluster wrappers: keep the chevrons + icon + count tight together
@@ -1108,7 +1106,7 @@ li.grdc-hoverable .grdc-comment-btn {
   font-size: 12px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--fgColor-muted, var(--color-fg-muted, #59636e));
 }
 /* File-scoped counter format (1.8.0 Option 3a): "3/8 (45)" where the
    parenthetical is the PR-wide total, dimmer than the primary N/M. Ships
@@ -1157,9 +1155,7 @@ li.grdc-hoverable .grdc-comment-btn {
   border: 1px solid transparent;
   border-radius: 4px;
   cursor: pointer;
-  /* On the saturated blue header, muted grey is invisible — keep the
-     funnel white at reduced opacity instead. */
-  color: rgba(255, 255, 255, 1);
+  color: var(--fgColor-muted, var(--color-fg-muted, #59636e));
   display: none;
   /* Push the funnel away from the sidebar's rounded right corner. The
      header has 8px right padding; this margin adds another 12px so the
@@ -1177,22 +1173,16 @@ li.grdc-hoverable .grdc-comment-btn {
 .grdc-sidebar-collapsed .grdc-sidebar-header-filter:focus-visible {
   opacity: 1;
 }
-.grdc-sidebar-header-filter[aria-pressed="true"] {
-  /* "Lit pill" on the blue header: white fill, accent-blue funnel.
-     Inverting the colors makes the checked state unmistakable against
-     the saturated background in both light and dark mode. */
+.grdc-sidebar-header-filter[aria-pressed="true"],
+.grdc-sidebar-header-filter[aria-pressed="true"]:hover {
+  /* Solid accent fill with a white funnel: unmistakable against the
+     light tinted header in both light and dark mode. */
   opacity: 1;
-  color: var(--fgColor-accent, var(--color-accent-fg, #0969da));
-  background: rgba(255, 255, 255, 1);
+  color: var(--fgColor-onEmphasis, var(--color-fg-on-emphasis, #ffffff));
+  background: var(--bgColor-accent-emphasis, var(--color-accent-emphasis, #0969da));
 }
 .grdc-sidebar-header-filter:hover {
-  background: rgba(255, 255, 255, 0.18);
-}
-.grdc-sidebar-header-filter[aria-pressed="true"]:hover {
-  /* Keep the "lit" look on hover; just brighten slightly so the user
-     gets feedback that hover is registered without losing the inverted
-     contrast. */
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(9, 105, 218, 0.12);
 }
 /* (The `.grdc-sidebar-count` rule now lives next to `.grdc-sidebar-changes-count`
    higher up — both counters share styling so the two clusters render
@@ -1565,38 +1555,19 @@ li.grdc-hoverable .grdc-comment-btn {
   border: 1px solid var(--borderColor-accent-muted, var(--color-accent-muted, #54aeff66));
   border-radius: 8px;
   background: var(--bgColor-accent-muted, var(--color-accent-subtle, #ddf4ff));
-  color: var(--fgColor-muted, var(--color-fg-muted, #59636e));
   cursor: default;
 }
-.grdc-sidebar-docked .grdc-sidebar-header button,
 .grdc-sidebar-docked .grdc-sidebar-header-filter {
-  border-radius: 6px;
-  color: var(--fgColor-muted, var(--color-fg-muted, #59636e));
   opacity: 1;
   margin-right: 0;
-}
-.grdc-sidebar-docked .grdc-sidebar-header button:hover,
-.grdc-sidebar-docked .grdc-sidebar-header button:active,
-.grdc-sidebar-docked .grdc-sidebar-header-filter:hover {
-  /* Translucent accent wash so hover reads on top of the tinted pill in
-     both themes (an opaque neutral grey would punch a hole in it). */
-  background: rgba(9, 105, 218, 0.12);
-  color: var(--fgColor-default, var(--color-fg-default, #1f2328));
-}
-.grdc-sidebar-docked .grdc-sidebar-header-filter[aria-pressed="true"],
-.grdc-sidebar-docked .grdc-sidebar-header-filter[aria-pressed="true"]:hover {
-  color: var(--fgColor-onEmphasis, var(--color-fg-on-emphasis, #ffffff));
-  background: var(--bgColor-accent-emphasis, var(--color-accent-emphasis, #0969da));
 }
 .grdc-sidebar-docked .grdc-sidebar-separator {
   height: 16px;
   margin: 0 2px;
-  background: var(--borderColor-accent-muted, var(--color-accent-muted, #54aeff66));
 }
 .grdc-sidebar-docked .grdc-sidebar-changes-count,
 .grdc-sidebar-docked .grdc-sidebar-count {
   min-width: 0;
-  color: var(--fgColor-muted, var(--color-fg-muted, #59636e));
 }
 
 /* ── Changes pane ─────────────────────────────────────────────────────
@@ -1739,14 +1710,12 @@ li.grdc-hoverable .grdc-comment-btn {
     background: rgba(28, 36, 56, 1);
     border-color: rgba(48, 54, 61, 1);
   }
-  /* Sidebar header: match GitHub's dark-mode link blue (`#2f81f7`) so
-     the collapsed bar reads the same as in-page links against the dark
-     canvas. Explicit rgba because some PR variants / Enterprise themes
-     don't expose the Primer accent tokens. */
+  /* Sidebar header: the dark-mode accent tint, explicit rgba because
+     some PR variants / Enterprise themes don't expose the Primer accent
+     tokens (the light fallback would be glaring on a dark canvas). */
   .grdc-sidebar-header {
-    background: rgba(47, 129, 247, 1);
-    border-color: rgba(48, 54, 61, 1);
-    color: rgba(255, 255, 255, 1);
+    background: rgba(56, 139, 253, 0.2);
+    border-color: rgba(56, 139, 253, 0.4);
   }
   /* List backdrop: GitHub dark canvas */
   .grdc-sidebar-list {

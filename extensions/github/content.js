@@ -1024,15 +1024,18 @@
   // clicks performed in this pass; populates `seen` so future passes
   // skip files we already handled (including ones that were already
   // pressed). Used by `flipAllMdToRichDiff` across multiple scroll steps.
-  function clickRichTogglesOnce(seen) {
+  //
+  // `target` is 'rich' (click each file's rich-diff segment) or 'source'
+  // (click its source segment, for the header's "back to source" toggle).
+  function clickDiffTogglesOnce(seen, target) {
     const buttons = document.querySelectorAll('button, a[role="button"], [data-tab-item]');
     let count = 0;
     for (const btn of buttons) {
       if (!looksLikeDiffToggle(btn)) continue;
       const haystack = resolveButtonHaystack(btn);
-      const wantsRich = /rich|render/.test(haystack);
-      const isSourceSegment = /\bsource\b/.test(haystack) && !wantsRich;
-      if (!wantsRich || isSourceSegment) continue;
+      const isRichSegment = /rich|render/.test(haystack);
+      const isSourceSegment = /\bsource\b/.test(haystack) && !isRichSegment;
+      if (target === 'source' ? !isSourceSegment : !isRichSegment) continue;
       const container = btn.closest('div[id^="diff-"], [data-tagsearch-path], .file[data-path]');
       const path = container ? getContainerPath(container) : '';
       if (!isMarkdownPath(path)) continue;
@@ -1043,12 +1046,10 @@
                       btn.classList.contains('selected') ||
                       btn.classList.contains('SegmentedControl-item--selected');
       seen.add(path);
-      if (pressed) {
-        renderedMarkdownPaths.add(path);
-        continue;
-      }
-      console.log(`[GRDC]   CLICK ${path}`);
-      renderedMarkdownPaths.add(path);
+      if (target === 'source') renderedMarkdownPaths.delete(path);
+      else renderedMarkdownPaths.add(path);
+      if (pressed) continue;
+      console.log(`[GRDC]   CLICK ${target} ${path}`);
       btn.click();
       count++;
     }
@@ -1062,6 +1063,12 @@
   // after each step so newly-rendered file headers are caught, then
   // restore the user's original scroll position when done.
   async function flipAllMdToRichDiff() {
+    return flipAllMdDiffs('rich');
+  }
+
+  // Same sweep as `flipAllMdToRichDiff`, parameterized by the segment to
+  // click: 'rich' renders every Markdown file, 'source' flips them all back.
+  async function flipAllMdDiffs(target) {
     const seen = new Set();
     let clicked = 0;
     const origScroll = window.scrollY;
@@ -1073,11 +1080,13 @@
     // Diagnostic: how many .md files does the page CLAIM to have?
     const expectedMd = (routeData?.diffSummaries || [])
       .filter(s => isMarkdownPath(s.path)).length;
-    console.log(`[GRDC] flipAllMdToRichDiff: expecting ${expectedMd || '?'} md file(s)`);
+    console.log(`[GRDC] flipAllMdDiffs(${target}): expecting ${expectedMd || '?'} md file(s)`);
 
     const overlay = document.createElement('div');
     overlay.className = 'grdc-render-overlay';
-    overlay.innerHTML = '<div class="grdc-render-overlay-card">Rendering Markdown files as rich-diff…</div>';
+    overlay.innerHTML = `<div class="grdc-render-overlay-card">${target === 'source'
+      ? 'Switching Markdown files to source diff…'
+      : 'Rendering Markdown files as rich-diff…'}</div>`;
     document.body.appendChild(overlay);
 
     try {
@@ -1126,15 +1135,15 @@
         let guard = 0;
         // First scan from current position (bottom of doc) before
         // scrolling back to top — catches any toggles still in view.
-        clicked += clickRichTogglesOnce(seen);
+        clicked += clickDiffTogglesOnce(seen, target);
         window.scrollTo({ top: 0, behavior: 'instant' });
         await new Promise((r) => setTimeout(r, dwell));
-        clicked += clickRichTogglesOnce(seen);
+        clicked += clickDiffTogglesOnce(seen, target);
         while (y < docHeight() && guard < 80) {
           if (expectedMd && seen.size >= expectedMd) break;
           window.scrollTo({ top: y, behavior: 'instant' });
           await new Promise((r) => setTimeout(r, dwell));
-          clicked += clickRichTogglesOnce(seen);
+          clicked += clickDiffTogglesOnce(seen, target);
           y += step;
           guard++;
         }
@@ -3448,13 +3457,58 @@
   // caller (header button, `t`, tab shortcuts, render-all, persisted
   // state) goes through here so the toolbar dock below stays in sync with
   // the collapsed class. `persist: false` is for callers that are
-  // restoring or resetting state rather than recording a user choice.
+  // restoring or resetting state rather than recording a user choice;
+  // only user choices animate.
   function setSidebarCollapsed(sidebar, collapsed, { persist = true } = {}) {
-    sidebar.classList.toggle('grdc-sidebar-collapsed', collapsed);
+    if (sidebar.classList.contains('grdc-sidebar-collapsed') === collapsed) {
+      syncSidebarToolbarDock(sidebar);
+      return;
+    }
+    const apply = () => {
+      sidebar.classList.toggle('grdc-sidebar-collapsed', collapsed);
+      syncSidebarToolbarDock(sidebar);
+    };
     if (persist) {
       try { localStorage.setItem(SIDEBAR_COLLAPSE_KEY, collapsed ? '1' : '0'); } catch (_) {}
+      animateSidebarLayoutChange(sidebar, apply);
+    } else {
+      apply();
     }
-    syncSidebarToolbarDock(sidebar);
+  }
+
+  // FLIP animation for collapse / expand: measure, apply the change, then
+  // animate from the old box to the new one. Expanding reveals the panel
+  // from the old (header-sized) box with a clip-path, so it grows out of
+  // the collapsed strip even when that strip was docked in GitHub's
+  // toolbar. Uses the individual `translate` property so it composes with
+  // the sidebar's own centering `transform`. Skipped for reduced motion.
+  const SIDEBAR_ANIMATION_MS = 180;
+  function animateSidebarLayoutChange(sidebar, apply) {
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion || typeof sidebar.animate !== 'function') {
+      apply();
+      return;
+    }
+    const before = sidebar.getBoundingClientRect();
+    apply();
+    const after = sidebar.getBoundingClientRect();
+    if (!before.width || !after.width) return;
+    const dx = before.left - after.left;
+    const dy = before.top - after.top;
+    const growing = after.width * after.height > before.width * before.height;
+    const keyframes = growing
+      ? [
+          {
+            translate: `${dx}px ${dy}px`,
+            clipPath: `inset(0 ${Math.max(0, after.width - before.width)}px ${Math.max(0, after.height - before.height)}px 0 round 8px)`,
+          },
+          { translate: '0 0', clipPath: 'inset(0 0 0 0 round 6px)' },
+        ]
+      : [
+          { translate: `${dx}px ${dy}px`, opacity: 0.4 },
+          { translate: '0 0', opacity: 1 },
+        ];
+    sidebar.animate(keyframes, { duration: SIDEBAR_ANIMATION_MS, easing: 'cubic-bezier(0.2, 0, 0, 1)' });
   }
 
   // Toggle the sidebar's collapsed state. If the sidebar doesn't exist on
@@ -3623,6 +3677,55 @@
     return 'GitHub is optimizing this large pull request and unloads offscreen files. Review Markdown files one at a time and switch each file to rich diff as needed.';
   }
 
+  // Header book button / `b`: flip every Markdown file to rich diff, or —
+  // once they are all rendered — back to source. Deliberately does NOT
+  // expand the sidebar or switch tabs: the button is a view toggle for the
+  // page, and the reviewer reads the result in the diff itself.
+  async function toggleAllMdRendering(sidebar) {
+    const btn = sidebar.querySelector('.grdc-sidebar-render-md');
+    if (isVirtualizedLargePrMode() || btn?.disabled) return 0;
+    const target = markdownRenderState().hasUnrendered ? 'rich' : 'source';
+    if (btn) btn.disabled = true;
+    try {
+      const n = await flipAllMdDiffs(target);
+      if (target === 'rich') await waitForOutlineHeadings(3000);
+      try { buildThreadsSidebar(); } catch (_) {}
+      return n;
+    } finally {
+      if (btn) btn.disabled = false;
+      updateRenderToggleButton(sidebar);
+    }
+  }
+
+  const RENDER_TOGGLE_ICONS = {
+    // Octicon `book`: "read this as a document".
+    rich: '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"/></svg>',
+    // Octicon `code`: "show the Markdown source".
+    source: '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg>',
+  };
+
+  // The button shows the action it will perform: book while any Markdown
+  // file is still in source view, code once every one is rendered.
+  function updateRenderToggleButton(sidebar, renderState) {
+    const btn = sidebar.querySelector('.grdc-sidebar-render-md');
+    if (!btn || btn.disabled) return;
+    if (isVirtualizedLargePrMode()) {
+      btn.hidden = true;
+      btn.setAttribute('title', largePrRenderHint());
+      return;
+    }
+    btn.hidden = false;
+    const next = (renderState || markdownRenderState()).hasUnrendered ? 'rich' : 'source';
+    if (btn.dataset.grdcNext === next) return;
+    btn.dataset.grdcNext = next;
+    btn.innerHTML = RENDER_TOGGLE_ICONS[next];
+    const label = next === 'rich'
+      ? 'Render all Markdown files (b)'
+      : 'Show source diff for all Markdown files (b)';
+    btn.setAttribute('title', label);
+    btn.setAttribute('aria-label', label);
+  }
+
   // Expand the sidebar (if collapsed) and render every `.md` file as
   // rich-diff, with tooltip + disabled feedback on the book button while
   // the work runs. Used by THREE call-sites:
@@ -3735,9 +3838,7 @@
             <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M1 2.75A.75.75 0 0 1 1.75 2h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 2.75Zm0 5A.75.75 0 0 1 1.75 7h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 7.75Zm0 5a.75.75 0 0 1 .75-.75h12.5a.75.75 0 0 1 0 1.5H1.75a.75.75 0 0 1-.75-.75Z"/></svg>
           </button>
           <span class="grdc-sidebar-separator" aria-hidden="true"></span>
-          <button class="grdc-sidebar-render-md" title="Show Outline — also renders Markdown files (b)" aria-label="Show Outline">
-            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"/></svg>
-          </button>
+          <button class="grdc-sidebar-render-md"></button>
           <span class="grdc-sidebar-separator" aria-hidden="true"></span>
           <span class="grdc-sidebar-changes-nav">
             <button class="grdc-sidebar-diff-icon" title="First change in this file — or next change globally if the file has none" aria-label="First change in this file">
@@ -3818,6 +3919,7 @@
             <button class="grdc-sidebar-fold-level" data-level="1" title="Fold all H1 sections (collapse each document to its title)">Fold H1</button>
             <button class="grdc-sidebar-fold-level" data-level="2" title="Fold all H2 sections">Fold H2</button>
             <button class="grdc-sidebar-fold-level" data-level="3" title="Fold all H3 sections">Fold H3</button>
+            <button class="grdc-sidebar-collapse-all" title="Collapse every section">Collapse all</button>
             <button class="grdc-sidebar-expand-all" title="Expand every section">Expand all</button>
           </div>
           <div class="grdc-sidebar-outline-tree"></div>
@@ -3885,19 +3987,12 @@
         cb.dispatchEvent(new Event('change', { bubbles: true }));
       });
 
-      // Book button = "Show Outline" per the v2 spec. Side effect: also
-      // renders any not-yet-rendered .md files, since the Outline pane is
-      // only meaningful once headings exist in the rendered DOM. The two
-      // actions naturally pair with one user intent: "navigate this PR by
-      // document structure". Implementation:
-      //   1. Expand the panel (if collapsed) and render all .md files
-      //      via `expandAndRenderAllMd` (shared with the empty-state CTAs).
-      //   2. Switch to the Outline tab so the user lands on the result.
-      // Clicking again while already on Outline is a no-op (idempotent).
-      sidebar.querySelector('.grdc-sidebar-render-md').addEventListener('click', async (e) => {
+      // Book / code button: page-level rich ↔ source view toggle for every
+      // Markdown file. See `toggleAllMdRendering`. The Outline stays one
+      // click away via its tab or the `3` shortcut.
+      sidebar.querySelector('.grdc-sidebar-render-md').addEventListener('click', (e) => {
         e.preventDefault();
-        await expandAndRenderAllMd(sidebar);
-        setSidebarTab(sidebar, 'outline');
+        toggleAllMdRendering(sidebar);
       });
 
       // Tab switching. Active state persists in `localStorage` per origin.
@@ -3917,6 +4012,9 @@
           foldOutlineAtLevel(level);
         });
       });
+      sidebar.querySelector('.grdc-sidebar-collapse-all').addEventListener('click', () => {
+        collapseAllOutlineSections();
+      });
       sidebar.querySelector('.grdc-sidebar-expand-all').addEventListener('click', () => {
         expandAllOutlineSections();
       });
@@ -3924,13 +4022,9 @@
 
     // Apply persisted state.
     setSidebarCollapsed(sidebar, collapsed, { persist: false });
-    const renderAllBtn = sidebar.querySelector('.grdc-sidebar-render-md');
     const largePrMode = isVirtualizedLargePrMode();
     const renderState = markdownRenderState();
-    if (renderAllBtn) {
-      renderAllBtn.hidden = largePrMode;
-      if (largePrMode) renderAllBtn.setAttribute('title', largePrRenderHint());
-    }
+    updateRenderToggleButton(sidebar, renderState);
     const filterCb = sidebar.querySelector('.grdc-sidebar-filter-cb');
     if (filterCb.checked !== unresolvedOnly) filterCb.checked = unresolvedOnly;
     const headerFilter = sidebar.querySelector('.grdc-sidebar-header-filter');
@@ -4443,6 +4537,17 @@
     }
     // The toggles dispatch `grdc-section-toggled` which triggers a sidebar
     // rebuild, so we don't need to call buildOutlinePane here.
+  }
+
+  // Fold every heading at every level, so each file shows only its
+  // top-level headings and nested sections stay folded when a parent is
+  // reopened. Complements the per-level Fold buttons, which leave files
+  // without headings at that level untouched.
+  function collapseAllOutlineSections() {
+    for (const h of collectHeadings()) {
+      if (h.el.classList.contains('grdc-section-collapsed')) continue;
+      ensureCollapseToggle(h.el)?.click();
+    }
   }
 
   function expandAllOutlineSections() {
@@ -5216,10 +5321,8 @@
       toggleSidebarCollapsed();
       return;
     }
-    // `b` — "book" / show Outline. Mirrors clicking the header book
-    // button: expand the panel (if collapsed), render all .md files,
-    // then switch to the Outline tab. Idempotent: pressing `b` again
-    // while already on Outline does the render-check and stays put.
+    // `b` — mirrors the header book / code button: render every Markdown
+    // file, or flip them all back to source once they're all rendered.
     if (e.key === 'b' && !e.shiftKey) {
       const sidebar = document.querySelector('.grdc-sidebar');
       if (!sidebar) return;
