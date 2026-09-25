@@ -157,8 +157,13 @@ async function gotoPRPage(page) {
   // is still visible and interactive (needed by keyboard-shortcut tests
   // that toggle its state) but out of the way of typical fixture
   // content at x=0..~600.
+  //
+  // The sidebar is collapsed by default; most specs exercise the expanded
+  // panel, so start from an explicit "expanded" preference. Specs covering
+  // the first-visit default clear it before injecting the extension.
   await page.evaluate(() => {
     localStorage.setItem('grdc_sidebar_pos', JSON.stringify({ left: 840, top: 8 }));
+    localStorage.setItem('grdc_sidebar_collapsed', '0');
   });
 }
 

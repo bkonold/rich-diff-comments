@@ -14,7 +14,9 @@
  * selectors only depend on the stable prefix.
  */
 const { test, expect } = require('@playwright/test');
-const { setupExtensionPage } = require('./_helpers');
+const {
+  setupExtensionPage, setupFixture, gotoPRPage, injectExtension, waitForInit,
+} = require('./_helpers');
 const fixtures = require('./fixtures/sources');
 
 const fm = fixtures.yamlFrontmatter;
@@ -126,4 +128,28 @@ test.describe('toolbar dock', () => {
     await expect(page.locator('.grdc-sidebar')).toHaveCount(1);
     await expect(page.locator('.grdc-toolbar-dock .grdc-sidebar')).toHaveCount(1);
   });
+});
+
+test('first visit: the sidebar starts collapsed and docked', async ({ page }) => {
+  await setupFixture(page, 'yaml-frontmatter', { rawSource: { [fm.path]: fm.source } });
+  await gotoPRPage(page);
+  await page.evaluate(() => localStorage.removeItem('grdc_sidebar_collapsed'));
+  await injectFilesToolbar(page);
+  await injectExtension(page);
+  await waitForInit(page);
+
+  const sidebar = page.locator('.grdc-sidebar');
+  await expect(sidebar).toHaveClass(/grdc-sidebar-collapsed/);
+  await expect(sidebar).toHaveClass(/grdc-sidebar-docked/);
+});
+
+test('Shift+T reset opens the full sidebar', async ({ page }) => {
+  await setupFixture(page, 'yaml-frontmatter', { rawSource: { [fm.path]: fm.source } });
+  await gotoPRPage(page);
+  await page.evaluate(() => localStorage.removeItem('grdc_sidebar_collapsed'));
+  await injectExtension(page);
+  await waitForInit(page);
+
+  await page.keyboard.press('Shift+T');
+  await expect(page.locator('.grdc-sidebar')).not.toHaveClass(/grdc-sidebar-collapsed/);
 });

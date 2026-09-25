@@ -3489,7 +3489,10 @@
     try {
       localStorage.removeItem(SIDEBAR_POS_KEY);
       localStorage.removeItem(SIDEBAR_SIZE_KEY);
-      localStorage.removeItem(SIDEBAR_COLLAPSE_KEY);
+      // Reset recovers a lost or unwanted layout by showing the full
+      // sidebar, so record "expanded" rather than falling back to the
+      // collapsed default.
+      localStorage.setItem(SIDEBAR_COLLAPSE_KEY, '0');
     } catch (_) {}
     const sidebar = document.querySelector('.grdc-sidebar');
     if (sidebar) {
@@ -3867,7 +3870,10 @@
     const forceOutlineTab = threadEls.length === 0 && outlineUseful;
 
     const unresolvedOnly = localStorage.getItem(SIDEBAR_FILTER_KEY) === '1';
-    const collapsed = localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === '1';
+    // Collapsed by default: a first visit shows the compact controls (docked
+    // in GitHub's toolbar where available) rather than a floating panel.
+    // Only an explicit expand, stored as '0', opens the full sidebar.
+    const collapsed = localStorage.getItem(SIDEBAR_COLLAPSE_KEY) !== '0';
 
     // Create shell on first build; reuse it on re-init so user state survives.
     if (!sidebar) {
