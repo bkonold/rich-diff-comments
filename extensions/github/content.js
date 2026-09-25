@@ -3233,8 +3233,10 @@
   // of the header on-screen so a window resize can't strand the sidebar.
   function attachSidebarDrag(sidebar, handle) {
     handle.addEventListener('mousedown', (e) => {
-      // Ignore drags that start on a button (collapse / prev / next).
+      // Ignore drags that start on a button (collapse / prev / next), and
+      // drags while docked in GitHub's toolbar (the toolbar owns layout).
       if (e.target.closest('button')) return;
+      if (sidebar.classList.contains('grdc-sidebar-docked')) return;
       e.preventDefault();
       const startX = e.clientX;
       const startY = e.clientY;
@@ -3437,9 +3439,22 @@
       // Clear inline transform so the CSS default (translateX(-50%) for
       // horizontal centering on the title row) takes over again.
       sidebar.style.transform = '';
-      sidebar.classList.remove('grdc-sidebar-collapsed');
+      setSidebarCollapsed(sidebar, false, { persist: false });
     }
     try { buildThreadsSidebar(); } catch (_) {}
+  }
+
+  // Single entry point for collapsing / expanding the sidebar. Every
+  // caller (header button, `t`, tab shortcuts, render-all, persisted
+  // state) goes through here so the toolbar dock below stays in sync with
+  // the collapsed class. `persist: false` is for callers that are
+  // restoring or resetting state rather than recording a user choice.
+  function setSidebarCollapsed(sidebar, collapsed, { persist = true } = {}) {
+    sidebar.classList.toggle('grdc-sidebar-collapsed', collapsed);
+    if (persist) {
+      try { localStorage.setItem(SIDEBAR_COLLAPSE_KEY, collapsed ? '1' : '0'); } catch (_) {}
+    }
+    syncSidebarToolbarDock(sidebar);
   }
 
   // Toggle the sidebar's collapsed state. If the sidebar doesn't exist on
@@ -3449,8 +3464,96 @@
   function toggleSidebarCollapsed() {
     const sidebar = document.querySelector('.grdc-sidebar');
     if (!sidebar) return;
-    const isCollapsed = sidebar.classList.toggle('grdc-sidebar-collapsed');
-    try { localStorage.setItem(SIDEBAR_COLLAPSE_KEY, isCollapsed ? '1' : '0'); } catch (_) {}
+    setSidebarCollapsed(sidebar, !sidebar.classList.contains('grdc-sidebar-collapsed'));
+  }
+
+  // ─── Toolbar dock ──────────────────────────────────────────────────────
+  // On GitHub's React Files-changed view, the collapsed strip moves out of
+  // its floating position and into GitHub's own sticky files toolbar, just
+  // left of the "N / M viewed" progress. The controls stay visible and
+  // keep working (this is still collapse, not dismissal); they just stop
+  // covering page content. Expanding moves the sidebar back to <body>,
+  // where its persisted position / size inline styles take over again.
+  //
+  // The whole `.grdc-sidebar` element moves, not just its header, so every
+  // `sidebar.querySelector(...)` and `document.querySelector('.grdc-sidebar')`
+  // lookup keeps working unchanged while docked.
+  //
+  // Selectors match CSS-module class prefixes (the hashed suffix changes
+  // between GitHub deploys). When they stop matching — classic `/files`
+  // view, a GitHub redesign — the collapsed strip simply stays floating.
+  const GH_FILES_TOOLBAR_SELECTOR = 'section[class*="PullRequestFilesToolbar-module__toolbar"]';
+  const GH_FILE_CONTROLS_SELECTOR = '[class*="PullRequestFilesToolbar-module__file-controls__"]';
+
+  function findToolbarDockAnchor() {
+    const toolbar = document.querySelector(GH_FILES_TOOLBAR_SELECTOR);
+    return toolbar ? toolbar.querySelector(GH_FILE_CONTROLS_SELECTOR) : null;
+  }
+
+  // Idempotent: performs DOM writes only when the sidebar is not already
+  // where it belongs, so it's safe to call from the MutationObserver.
+  function syncSidebarToolbarDock(sidebar) {
+    if (!sidebar) return;
+    const anchor = sidebar.classList.contains('grdc-sidebar-collapsed')
+      ? findToolbarDockAnchor()
+      : null;
+    let dock = document.querySelector('.grdc-toolbar-dock');
+
+    if (anchor) {
+      if (!dock || dock.nextElementSibling !== anchor) {
+        dock?.remove();
+        dock = document.createElement('div');
+        dock.className = 'grdc-toolbar-dock';
+        const divider = document.createElement('span');
+        divider.className = 'grdc-toolbar-dock-divider';
+        divider.setAttribute('aria-hidden', 'true');
+        dock.appendChild(divider);
+        anchor.parentElement.insertBefore(dock, anchor);
+      }
+      if (sidebar.parentElement !== dock) dock.prepend(sidebar);
+      sidebar.classList.add('grdc-sidebar-docked');
+      return;
+    }
+
+    if (sidebar.classList.contains('grdc-sidebar-docked') || !sidebar.isConnected) {
+      document.body.appendChild(sidebar);
+      sidebar.classList.remove('grdc-sidebar-docked');
+    }
+    dock?.remove();
+  }
+
+  // GitHub re-renders the toolbar on its own schedule (sticky state,
+  // navigation, file-tree toggles). Coalesce DOM mutations into one sync
+  // per frame so the dock is re-created if React dropped it, and a
+  // collapsed strip that loaded before the toolbar docks once it appears.
+  let toolbarDockSyncPending = false;
+  function scheduleToolbarDockSync() {
+    if (toolbarDockSyncPending) return;
+    toolbarDockSyncPending = true;
+    requestAnimationFrame(() => {
+      toolbarDockSyncPending = false;
+      const sidebar = sidebarRef();
+      if (sidebar) syncSidebarToolbarDock(sidebar);
+    });
+  }
+
+  // `document.querySelector('.grdc-sidebar')` returns null if React removed
+  // the toolbar subtree while the sidebar was docked inside it. Keep a
+  // reference so a docked sidebar can be rescued back into the page. Only
+  // a docked sidebar is rescued; intentional removals go through
+  // `removeSidebar()`, which drops the reference.
+  let lastSidebar = null;
+  function sidebarRef() {
+    const live = document.querySelector('.grdc-sidebar');
+    if (live) lastSidebar = live;
+    else if (!lastSidebar?.classList.contains('grdc-sidebar-docked')) lastSidebar = null;
+    return lastSidebar;
+  }
+
+  function removeSidebar() {
+    document.querySelector('.grdc-sidebar')?.remove();
+    document.querySelector('.grdc-toolbar-dock')?.remove();
+    lastSidebar = null;
   }
 
   // Persist resize: watch for size changes via ResizeObserver and write to
@@ -3543,8 +3646,7 @@
       btn.setAttribute('disabled', 'true');
     }
     if (sidebar.classList.contains('grdc-sidebar-collapsed')) {
-      sidebar.classList.remove('grdc-sidebar-collapsed');
-      try { localStorage.setItem(SIDEBAR_COLLAPSE_KEY, '0'); } catch (_) {}
+      setSidebarCollapsed(sidebar, false);
     }
     try {
       const n = await flipAllMdToRichDiff();
@@ -3596,7 +3698,7 @@
     // visible, which made the sidebar disappear on the `/changes` page
     // before any file was toggled — confusing for first-time users.)
     if (!prInfo) {
-      sidebar?.remove();
+      removeSidebar();
       return;
     }
 
@@ -3733,8 +3835,7 @@
       observeSidebarResize(sidebar);
 
       sidebar.querySelector('.grdc-sidebar-collapse').addEventListener('click', () => {
-        const isCollapsed = sidebar.classList.toggle('grdc-sidebar-collapsed');
-        try { localStorage.setItem(SIDEBAR_COLLAPSE_KEY, isCollapsed ? '1' : '0'); } catch (_) {}
+        setSidebarCollapsed(sidebar, !sidebar.classList.contains('grdc-sidebar-collapsed'));
       });
       sidebar.querySelector('.grdc-sidebar-prev').addEventListener('click', () => sidebarJump(-1));
       sidebar.querySelector('.grdc-sidebar-next').addEventListener('click', () => sidebarJump(+1));
@@ -3822,7 +3923,7 @@
     }
 
     // Apply persisted state.
-    sidebar.classList.toggle('grdc-sidebar-collapsed', collapsed);
+    setSidebarCollapsed(sidebar, collapsed, { persist: false });
     const renderAllBtn = sidebar.querySelector('.grdc-sidebar-render-md');
     const largePrMode = isVirtualizedLargePrMode();
     const renderState = markdownRenderState();
@@ -5138,8 +5239,7 @@
       if (!sidebar) return;
       e.preventDefault();
       if (sidebar.classList.contains('grdc-sidebar-collapsed')) {
-        sidebar.classList.remove('grdc-sidebar-collapsed');
-        try { localStorage.setItem(SIDEBAR_COLLAPSE_KEY, '0'); } catch (_) {}
+        setSidebarCollapsed(sidebar, false);
       }
       const target = e.key === '1' ? 'changes'
         : e.key === '2' ? 'threads'
@@ -5476,6 +5576,7 @@
 
   function observe() {
     const observer = new MutationObserver((mutations) => {
+      scheduleToolbarDockSync();
       for (const m of mutations) {
         for (const node of m.addedNodes) {
           if (node.nodeType !== 1) continue;
@@ -5488,7 +5589,8 @@
               node.classList?.contains('grdc-collapse-toggle') ||
               node.classList?.contains('grdc-reply-box') ||
               node.classList?.contains('grdc-comment-edit') ||
-              node.classList?.contains('grdc-sidebar')) continue;
+              node.classList?.contains('grdc-sidebar') ||
+              node.classList?.contains('grdc-toolbar-dock')) continue;
           if (node.classList?.contains('markdown-body') ||
               node.classList?.contains('rich-diff-level-one') ||
               node.querySelector?.('.prose-diff .markdown-body')) {
@@ -5656,11 +5758,10 @@
     // `clearInjectedDom` for the same reason — they're anchored to
     // rich-diff blocks that no longer exist.
     if (!nextPr) {
-      const stale = document.querySelector('.grdc-sidebar');
-      if (stale) {
+      if (document.querySelector('.grdc-sidebar')) {
         console.log(`[GRDC] URL changed → ${path}, removing sidebar (not on Files-changed)`);
-        stale.remove();
       }
+      removeSidebar();
       clearInjectedDom();
       return;
     }

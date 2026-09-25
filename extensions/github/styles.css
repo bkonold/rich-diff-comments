@@ -1519,6 +1519,82 @@ li.grdc-hoverable .grdc-comment-btn {
 .grdc-sidebar-collapsed .grdc-sidebar-tabs,
 .grdc-sidebar-collapsed .grdc-sidebar-pane { display: none; }
 
+/* ── Toolbar dock ─────────────────────────────────────────────────────
+   On the React Files-changed view, the collapsed strip is moved into
+   GitHub's sticky files toolbar (see `syncSidebarToolbarDock` in
+   content.js). There it drops the floating chrome — blue bar, shadow,
+   fixed position — and borrows the look of GitHub's own invisible
+   IconButtons (28×28, muted icon, 6px radius, subtle hover wash) so it
+   reads as part of the toolbar.
+   `!important` is needed on geometry to beat the persisted position and
+   size that live in the sidebar's inline styles; those take effect again
+   as soon as the sidebar is expanded and returns to <body>. */
+.grdc-toolbar-dock {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.grdc-toolbar-dock-divider {
+  width: 1px;
+  height: 28px;
+  margin: 0 4px;
+  background: var(--borderColor-muted, var(--color-border-muted, #d1d9e0));
+}
+.grdc-sidebar.grdc-sidebar-docked {
+  position: static !important;
+  transform: none !important;
+  width: auto !important;
+  min-width: 0 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none;
+  resize: none;
+  /* `inline-size` containment would size the docked element from its
+     container instead of its contents, collapsing it to zero width. */
+  container-type: normal;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  z-index: auto;
+}
+.grdc-sidebar-docked .grdc-sidebar-header {
+  min-height: 0;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fgColor-muted, var(--color-fg-muted, #59636e));
+  cursor: default;
+}
+.grdc-sidebar-docked .grdc-sidebar-header button,
+.grdc-sidebar-docked .grdc-sidebar-header-filter {
+  border-radius: 6px;
+  color: var(--fgColor-muted, var(--color-fg-muted, #59636e));
+  opacity: 1;
+  margin-right: 0;
+}
+.grdc-sidebar-docked .grdc-sidebar-header button:hover,
+.grdc-sidebar-docked .grdc-sidebar-header button:active,
+.grdc-sidebar-docked .grdc-sidebar-header-filter:hover {
+  background: var(--control-bgColor-hover, var(--color-action-list-item-default-hover-bg, #eff2f5));
+  color: var(--fgColor-default, var(--color-fg-default, #1f2328));
+}
+.grdc-sidebar-docked .grdc-sidebar-header-filter[aria-pressed="true"],
+.grdc-sidebar-docked .grdc-sidebar-header-filter[aria-pressed="true"]:hover {
+  color: var(--fgColor-accent, var(--color-accent-fg, #0969da));
+  background: var(--bgColor-accent-muted, var(--color-accent-subtle, #ddf4ff));
+}
+.grdc-sidebar-docked .grdc-sidebar-separator {
+  height: 20px;
+  background: var(--borderColor-muted, var(--color-border-muted, #d1d9e0));
+}
+.grdc-sidebar-docked .grdc-sidebar-changes-count,
+.grdc-sidebar-docked .grdc-sidebar-count {
+  min-width: 0;
+  color: var(--fgColor-muted, var(--color-fg-muted, #59636e));
+}
+
 /* ── Changes pane ─────────────────────────────────────────────────────
    The list pane that backs the Changes tab. Cards mirror the Threads
    cards (same overall shape, padding, hover) but each card has:

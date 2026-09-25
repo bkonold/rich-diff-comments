@@ -4,6 +4,10 @@ All notable changes to Markdown PR Comments for GitHub (formerly *Rich Diff Comm
 
 ## [Unreleased]
 
+### Changed
+
+- **The collapsed sidebar now tucks into GitHub's own Files-changed toolbar.** When you collapse the sidebar, its controls (Outline, change and thread navigation, and the unresolved filter) move into the toolbar next to "N / M viewed" and take on the look of GitHub's own toolbar buttons, so they no longer float over the page. Expanding the sidebar returns it to its saved position and size. On pages without that toolbar, such as the classic Files view, the collapsed bar floats as before.
+
 ## [1.11.0] — 2026-09-23
 
 ### Added
