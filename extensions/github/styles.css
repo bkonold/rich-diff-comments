@@ -1523,9 +1523,10 @@ li.grdc-hoverable .grdc-comment-btn {
    On the React Files-changed view, the collapsed strip is moved into
    GitHub's sticky files toolbar (see `syncSidebarToolbarDock` in
    content.js). There it drops the floating chrome — blue bar, shadow,
-   fixed position — and borrows the look of GitHub's own invisible
-   IconButtons (28×28, muted icon, 6px radius, subtle hover wash) so it
-   reads as part of the toolbar.
+   fixed position — and sits in a faint accent-tinted pill: the tint
+   echoes the extension's blue header and groups the controls as one
+   unit, so they read as the extension's rather than GitHub's own, while
+   the icons keep GitHub's muted IconButton look (28×28, 6px radius).
    `!important` is needed on geometry to beat the persisted position and
    size that live in the sidebar's inline styles; those take effect again
    as soon as the sidebar is expanded and returns to <body>. */
@@ -1559,11 +1560,11 @@ li.grdc-hoverable .grdc-comment-btn {
 }
 .grdc-sidebar-docked .grdc-sidebar-header {
   min-height: 0;
-  gap: 4px;
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  background: transparent;
+  gap: 2px;
+  padding: 1px 4px;
+  border: 1px solid var(--borderColor-accent-muted, var(--color-accent-muted, #54aeff66));
+  border-radius: 8px;
+  background: var(--bgColor-accent-muted, var(--color-accent-subtle, #ddf4ff));
   color: var(--fgColor-muted, var(--color-fg-muted, #59636e));
   cursor: default;
 }
@@ -1577,17 +1578,20 @@ li.grdc-hoverable .grdc-comment-btn {
 .grdc-sidebar-docked .grdc-sidebar-header button:hover,
 .grdc-sidebar-docked .grdc-sidebar-header button:active,
 .grdc-sidebar-docked .grdc-sidebar-header-filter:hover {
-  background: var(--control-bgColor-hover, var(--color-action-list-item-default-hover-bg, #eff2f5));
+  /* Translucent accent wash so hover reads on top of the tinted pill in
+     both themes (an opaque neutral grey would punch a hole in it). */
+  background: rgba(9, 105, 218, 0.12);
   color: var(--fgColor-default, var(--color-fg-default, #1f2328));
 }
 .grdc-sidebar-docked .grdc-sidebar-header-filter[aria-pressed="true"],
 .grdc-sidebar-docked .grdc-sidebar-header-filter[aria-pressed="true"]:hover {
-  color: var(--fgColor-accent, var(--color-accent-fg, #0969da));
-  background: var(--bgColor-accent-muted, var(--color-accent-subtle, #ddf4ff));
+  color: var(--fgColor-onEmphasis, var(--color-fg-on-emphasis, #ffffff));
+  background: var(--bgColor-accent-emphasis, var(--color-accent-emphasis, #0969da));
 }
 .grdc-sidebar-docked .grdc-sidebar-separator {
-  height: 20px;
-  background: var(--borderColor-muted, var(--color-border-muted, #d1d9e0));
+  height: 16px;
+  margin: 0 2px;
+  background: var(--borderColor-accent-muted, var(--color-accent-muted, #54aeff66));
 }
 .grdc-sidebar-docked .grdc-sidebar-changes-count,
 .grdc-sidebar-docked .grdc-sidebar-count {
