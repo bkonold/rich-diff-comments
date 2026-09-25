@@ -12,6 +12,7 @@ All notable changes to Markdown PR Comments for GitHub (formerly *Rich Diff Comm
 
 - **The book button now switches every Markdown file between rendered and source view.** Click it (or press `b`) to render all Markdown files as rich diff; once they are all rendered it turns into a code icon that switches them all back to source. It no longer opens the sidebar or jumps to the Outline tab, which stays one click away.
 - **The sidebar header uses a soft light-blue tint instead of solid blue**, matching the collapsed controls in the toolbar, and expanding or collapsing the sidebar now animates smoothly instead of jumping. The animation is skipped when your system asks for reduced motion.
+- **The sidebar sizes itself to its content.** It opens compact when little is rendered yet and grows as Changes, Threads, and Outline fill in, up to the height you last dragged it to. Previously it could reopen at a much larger, mostly empty size.
 - **The collapsed sidebar now tucks into GitHub's own Files-changed toolbar.** When you collapse the sidebar, its controls (Outline, change and thread navigation, and the unresolved filter) move into the toolbar next to "N / M viewed" and take on the look of GitHub's own toolbar buttons, so they no longer float over the page. Expanding the sidebar returns it to its saved position and size. On pages without that toolbar, such as the classic Files view, the collapsed bar floats as before.
 
 ## [1.11.0] — 2026-09-23

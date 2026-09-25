@@ -3316,9 +3316,36 @@
         const { width, height } = JSON.parse(raw);
         const clamped = window.GRDC.clampSize(width, height, SIDEBAR_MIN_WIDTH, SIDEBAR_MIN_HEIGHT);
         if (clamped.width != null) sidebar.style.width = `${clamped.width}px`;
-        if (clamped.height != null) sidebar.style.height = `${clamped.height}px`;
+        if (clamped.height != null) applySidebarHeightCap(sidebar, clamped.height);
       }
     } catch (_) {}
+  }
+
+  // The saved height is a ceiling, not a fixed size: the panel fits its
+  // content (compact while nothing is rendered yet) and grows as Changes /
+  // Threads / Outline fill in, up to the height the user last dragged it
+  // to. Still capped by the viewport like the CSS default.
+  // `height` is a persisted border-box size (`offsetHeight`) while
+  // `max-height` applies to the content box, so subtract the borders or
+  // the panel would creep taller on every save / restore cycle.
+  function applySidebarHeightCap(sidebar, height) {
+    const cs = getComputedStyle(sidebar);
+    const borders = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+    sidebar.style.height = '';
+    sidebar.style.maxHeight = `min(${height - borders}px, calc(100vh - 40px))`;
+  }
+
+  function persistSidebarSize(sidebar) {
+    try {
+      const clamped = window.GRDC.clampSize(
+        sidebar.offsetWidth, sidebar.offsetHeight, SIDEBAR_MIN_WIDTH, SIDEBAR_MIN_HEIGHT
+      );
+      if (clamped.width == null || clamped.height == null) return null;
+      localStorage.setItem(SIDEBAR_SIZE_KEY, JSON.stringify(clamped));
+      return clamped;
+    } catch (_) {
+      return null;
+    }
   }
 
   // Re-clamp the sidebar's position on window resize so a window shrink
@@ -3392,6 +3419,11 @@
         return scroller ? { scroller, scrollTop: scroller.scrollTop } : null;
       }).filter(Boolean);
       sidebar._grdcResizeScrollLock = locked;
+      // Lift the height cap for the drag so the user can grow the panel
+      // past its previous maximum; the new size becomes the cap on release.
+      sidebar._grdcUserResizing = true;
+      sidebar.style.height = `${rect.height}px`;
+      sidebar.style.maxHeight = '';
 
       const restore = () => {
         for (const item of locked) {
@@ -3418,6 +3450,11 @@
         }
         restore();
         sidebar._grdcResizeScrollLock = null;
+        if (sidebar._grdcUserResizing) {
+          sidebar._grdcUserResizing = false;
+          const saved = persistSidebarSize(sidebar);
+          if (saved) applySidebarHeightCap(sidebar, saved.height);
+        }
       };
       // Capture on both document and window so releasing over native browser
       // chrome or outside a child scroller cannot leave the lock active.
@@ -3445,6 +3482,7 @@
       sidebar.style.right = '';
       sidebar.style.width = '';
       sidebar.style.height = '';
+      sidebar.style.maxHeight = '';
       // Clear inline transform so the CSS default (translateX(-50%) for
       // horizontal centering on the title row) takes over again.
       sidebar.style.transform = '';
@@ -3620,21 +3658,12 @@
       for (const item of sidebar._grdcResizeScrollLock || []) {
         if (item.scroller.isConnected) item.scroller.scrollTop = item.scrollTop;
       }
+      // Only a user drag of the resize handle is a size preference.
+      // Content-driven growth (files rendering, lists filling) must not be
+      // persisted, or it becomes a fixed height on the next page load.
+      if (!sidebar._grdcUserResizing) return;
       clearTimeout(writeTimer);
-      writeTimer = setTimeout(() => {
-        try {
-          const w = sidebar.offsetWidth;
-          const h = sidebar.offsetHeight;
-          // Don't persist obviously-bogus sizes. Anything below the CSS
-          // min-* is a transient render glitch, not a user resize.
-          const clamped = window.GRDC.clampSize(w, h, SIDEBAR_MIN_WIDTH, SIDEBAR_MIN_HEIGHT);
-          if (clamped.width == null || clamped.height == null) return;
-          localStorage.setItem(SIDEBAR_SIZE_KEY, JSON.stringify({
-            width: clamped.width,
-            height: clamped.height,
-          }));
-        } catch (_) {}
-      }, 250);
+      writeTimer = setTimeout(() => persistSidebarSize(sidebar), 250);
     });
     ro.observe(sidebar);
   }
