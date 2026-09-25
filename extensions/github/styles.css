@@ -1763,7 +1763,7 @@ li.grdc-hoverable .grdc-comment-btn {
    GitHub's rich diff marks changed blocks with only a faint 4px inset
    box-shadow rail (40% alpha). Make them as easy to scan as the source
    diff: added / removed blocks get GitHub's own source-diff line tint
-   across their full width, a solid rail, and a +/− gutter glyph; changed
+   across their full width and a solid rail; changed
    blocks (mixed edits) get a solid attention rail, and their added /
    removed top-level list items get the same full-width treatment.
 
@@ -1820,52 +1820,10 @@ li.grdc-hoverable .grdc-comment-btn {
   padding-top: 24px;
 }
 
-/* Non-list blocks sit flush with the rail; give the glyph a gutter.
-   Lists already indent their items past it. */
-.prose-diff.prose-diff .rich-diff-level-zero:is(.added, .removed):not(ul, ol),
-.prose-diff.prose-diff .markdown-body > :is(ins, del) {
-  padding-left: 18px;
-}
-.prose-diff.prose-diff .rich-diff-level-zero:is(.added, .removed)::before,
-.prose-diff.prose-diff .markdown-body > :is(ins, del)::before,
-.prose-diff.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li:is(.added, .removed)::before {
-  position: absolute;
-  left: 7px;
-  top: 2px;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 20px;
-  pointer-events: none;
-  transition: opacity 0.12s;
-}
-/* A wrapper keeps its heading's 24px top margin inside (flow-root), so
-   drop the glyph to the heading's first line. */
-.prose-diff.prose-diff .markdown-body > :is(ins, del):has(> :is(h1, h2, h3, h4, h5, h6):first-child)::before {
-  top: 30px;
-}
-.prose-diff.prose-diff .rich-diff-level-zero.added::before,
-.prose-diff.prose-diff .markdown-body > ins::before,
-.prose-diff.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li.added::before {
-  content: "+";
-  color: var(--fgColor-success, var(--color-success-fg, #1a7f37));
-}
-.prose-diff.prose-diff .rich-diff-level-zero.removed::before,
-.prose-diff.prose-diff .markdown-body > del::before,
-.prose-diff.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li.removed::before {
-  content: "\2212";
-  color: var(--fgColor-danger, var(--color-danger-fg, #d1242f));
-}
-/* Anchor-only wrappers (GitHub emits one after each heading) have no
-   height; a glyph there would float over the next block. */
-.prose-diff.prose-diff .markdown-body > :is(ins, del):not(:has(> :not(a)))::before {
-  content: none;
-}
-
 /* Items inside a changed list: GitHub tints only the item box, which
    starts 48px in from the block edge (the list's 16px margin + 32px
    padding). Keep the item (and its bullet) in place and paint the rail
-   and tint across that gap with the glyph pseudo-element instead. */
+   and tint across that gap with a pseudo-element instead. */
 .prose-diff.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li:is(.added, .removed) {
   position: relative;
   /* Own stacking context so the gutter fill (z-index: -1) paints above
@@ -1880,12 +1838,12 @@ li.grdc-hoverable .grdc-comment-btn {
   background: var(--diffBlob-deletionLine-bgColor, var(--bgColor-danger-muted, #ffebe9));
 }
 .prose-diff.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li:is(.added, .removed)::before {
+  content: "";
+  position: absolute;
   left: -48px;
   top: 0;
   bottom: 0;
   width: 48px;
-  box-sizing: border-box;
-  padding: 2px 0 0 7px;
   z-index: -1;
 }
 .prose-diff.prose-diff .rich-diff-level-zero.changed > :is(ul, ol) > li.added::before {
@@ -1897,10 +1855,4 @@ li.grdc-hoverable .grdc-comment-btn {
   background: linear-gradient(90deg,
     var(--bgColor-danger-emphasis, var(--color-danger-emphasis, #cf222e)) 0 4px,
     var(--diffBlob-deletionLine-bgColor, var(--bgColor-danger-muted, #ffebe9)) 4px);
-}
-/* The comment `+` button appears in the same gutter on hover; step the
-   glyph out of its way. */
-.prose-diff.prose-diff .rich-diff-level-zero:is(.added, .removed):hover::before,
-.prose-diff.prose-diff .markdown-body > :is(ins, del):hover::before {
-  opacity: 0;
 }

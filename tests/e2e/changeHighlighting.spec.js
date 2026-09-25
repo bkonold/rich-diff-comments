@@ -1,8 +1,7 @@
 /**
  * E2E: rich-diff change highlighting.
  *
- * Added / removed blocks get a full-width source-diff tint, a solid rail
- * and a +/− glyph; changed blocks get a solid attention rail. The stand-in
+ * Added / removed blocks get a full-width source-diff tint and a solid rail; changed blocks get a solid attention rail. The stand-in
  * blocks mirror GitHub's rich-diff markup (captured 2026-09): top-level
  * `.rich-diff-level-zero.added` / `.removed` / `.changed` elements and
  * block-level `<ins>` / `<del>` wrappers under `.markdown-body`.
@@ -38,11 +37,11 @@ test('added, removed and changed blocks are highlighted', async ({ page }) => {
 
   expect(styles.removed.bg).toBe('rgb(255, 235, 233)');
   expect(styles.removed.shadow).toBe('rgb(207, 34, 46) 4px 0px 0px 0px inset');
-  expect(styles.removedGlyph.content).toBe('"−"');
+  expect(styles.removedGlyph.content).toBe('none');
   expect(styles.ins.bg).toBe('rgb(218, 251, 225)');
-  expect(styles.insGlyph.content).toBe('"+"');
+  expect(styles.insGlyph.content).toBe('none');
   expect(styles.changed.shadow).toBe('rgb(154, 103, 0) 4px 0px 0px 0px inset');
-  expect(styles.liGutter.content).toBe('"+"');
+  expect(styles.liGutter.content).toBe('""');
   expect(styles.liGutter.image).toContain('linear-gradient');
 });
 
