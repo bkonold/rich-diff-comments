@@ -15,7 +15,6 @@ const SIZE_KEY = 'grdc_sidebar_size';
 async function setup(page, savedSize) {
   await page.addInitScript(([key, size]) => {
     localStorage.setItem(key, JSON.stringify(size));
-    localStorage.setItem('grdc_sidebar_collapsed', '0');
     localStorage.setItem('grdc_sidebar_tab', 'threads');
   }, [SIZE_KEY, savedSize]);
   await setupExtensionPage(page, 'yaml-frontmatter', {

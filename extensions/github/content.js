@@ -3184,7 +3184,10 @@
   // `data-grdc-line` / `data-grdc-thread-id` plus the `grdc-thread-resolved`
   // / `grdc-thread-outdated` classes. The sidebar is a pure consumer.
 
-  const SIDEBAR_COLLAPSE_KEY = 'grdc_sidebar_collapsed';
+  // Collapsed / expanded is deliberately NOT persisted: every page load
+  // starts collapsed (docked in GitHub's toolbar where available). This key
+  // only exists so the obsolete stored value can be cleaned up.
+  const LEGACY_SIDEBAR_COLLAPSE_KEY = 'grdc_sidebar_collapsed';
   const SIDEBAR_FILTER_KEY = 'grdc_sidebar_unresolved_only';
   const SIDEBAR_POS_KEY = 'grdc_sidebar_pos';
   const SIDEBAR_SIZE_KEY = 'grdc_sidebar_size';
@@ -3482,17 +3485,13 @@
   }
 
   // Reset the sidebar to its default right-dock layout: clear persisted
-  // position / size / collapsed state, drop inline styles, and rebuild so
-  // the user can recover from an offscreen drag or unwanted collapse
+  // position / size, drop inline styles, rebuild, and show the full
+  // sidebar so the user can recover from an offscreen drag or a lost panel
   // without DevTools. Bound to `Shift+T`.
   function resetSidebarLayout() {
     try {
       localStorage.removeItem(SIDEBAR_POS_KEY);
       localStorage.removeItem(SIDEBAR_SIZE_KEY);
-      // Reset recovers a lost or unwanted layout by showing the full
-      // sidebar, so record "expanded" rather than falling back to the
-      // collapsed default.
-      localStorage.setItem(SIDEBAR_COLLAPSE_KEY, '0');
     } catch (_) {}
     const sidebar = document.querySelector('.grdc-sidebar');
     if (sidebar) {
@@ -3505,18 +3504,17 @@
       // Clear inline transform so the CSS default (translateX(-50%) for
       // horizontal centering on the title row) takes over again.
       sidebar.style.transform = '';
-      setSidebarCollapsed(sidebar, false, { persist: false });
     }
     try { buildThreadsSidebar(); } catch (_) {}
+    const rebuilt = document.querySelector('.grdc-sidebar');
+    if (rebuilt) setSidebarCollapsed(rebuilt, false, { animate: false });
   }
 
   // Single entry point for collapsing / expanding the sidebar. Every
-  // caller (header button, `t`, tab shortcuts, render-all, persisted
-  // state) goes through here so the toolbar dock below stays in sync with
-  // the collapsed class. `persist: false` is for callers that are
-  // restoring or resetting state rather than recording a user choice;
-  // only user choices animate.
-  function setSidebarCollapsed(sidebar, collapsed, { persist = true } = {}) {
+  // caller (header button, `t`, tab shortcuts, render-all, reset) goes
+  // through here so the toolbar dock below stays in sync with the
+  // collapsed class. User toggles animate; programmatic resets don't.
+  function setSidebarCollapsed(sidebar, collapsed, { animate = true } = {}) {
     if (sidebar.classList.contains('grdc-sidebar-collapsed') === collapsed) {
       syncSidebarToolbarDock(sidebar);
       return;
@@ -3525,12 +3523,8 @@
       sidebar.classList.toggle('grdc-sidebar-collapsed', collapsed);
       syncSidebarToolbarDock(sidebar);
     };
-    if (persist) {
-      try { localStorage.setItem(SIDEBAR_COLLAPSE_KEY, collapsed ? '1' : '0'); } catch (_) {}
-      animateSidebarLayoutChange(sidebar, apply);
-    } else {
-      apply();
-    }
+    if (animate) animateSidebarLayoutChange(sidebar, apply);
+    else apply();
   }
 
   // FLIP animation for collapse / expand: measure, apply the change, then
@@ -3870,15 +3864,13 @@
     const forceOutlineTab = threadEls.length === 0 && outlineUseful;
 
     const unresolvedOnly = localStorage.getItem(SIDEBAR_FILTER_KEY) === '1';
-    // Collapsed by default: a first visit shows the compact controls (docked
-    // in GitHub's toolbar where available) rather than a floating panel.
-    // Only an explicit expand, stored as '0', opens the full sidebar.
-    const collapsed = localStorage.getItem(SIDEBAR_COLLAPSE_KEY) !== '0';
-
     // Create shell on first build; reuse it on re-init so user state survives.
     if (!sidebar) {
       sidebar = document.createElement('div');
-      sidebar.className = 'grdc-sidebar';
+      // Every page load starts collapsed. Rebuilds reuse this shell, so an
+      // expand the user performs survives until the next page load.
+      sidebar.className = 'grdc-sidebar grdc-sidebar-collapsed';
+      try { localStorage.removeItem(LEGACY_SIDEBAR_COLLAPSE_KEY); } catch (_) {}
       sidebar.setAttribute('role', 'complementary');
       sidebar.setAttribute('aria-label', 'Review threads');
       sidebar.innerHTML = `
@@ -4069,8 +4061,7 @@
       });
     }
 
-    // Apply persisted state.
-    setSidebarCollapsed(sidebar, collapsed, { persist: false });
+    syncSidebarToolbarDock(sidebar);
     const largePrMode = isVirtualizedLargePrMode();
     const renderState = markdownRenderState();
     updateRenderToggleButton(sidebar, renderState);

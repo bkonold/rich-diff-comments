@@ -130,25 +130,43 @@ test.describe('toolbar dock', () => {
   });
 });
 
-test('first visit: the sidebar starts collapsed and docked', async ({ page }) => {
+test('every page load starts collapsed and docked', async ({ page }) => {
   await setupFixture(page, 'yaml-frontmatter', { rawSource: { [fm.path]: fm.source } });
   await gotoPRPage(page);
-  await page.evaluate(() => localStorage.removeItem('grdc_sidebar_collapsed'));
+  // A stored preference from an older version must not matter.
+  await page.evaluate(() => localStorage.setItem('grdc_sidebar_collapsed', '0'));
   await injectFilesToolbar(page);
   await injectExtension(page);
-  await waitForInit(page);
+  await waitForInit(page, { keepCollapsed: true });
 
   const sidebar = page.locator('.grdc-sidebar');
   await expect(sidebar).toHaveClass(/grdc-sidebar-collapsed/);
   await expect(sidebar).toHaveClass(/grdc-sidebar-docked/);
+  expect(await page.evaluate(() => localStorage.getItem('grdc_sidebar_collapsed'))).toBeNull();
+});
+
+test('expanding is not persisted and survives sidebar rebuilds', async ({ page }) => {
+  await setupExtensionPage(page, 'yaml-frontmatter', {
+    rawSource: { [fm.path]: fm.source },
+  });
+  const sidebar = page.locator('.grdc-sidebar');
+  await expect(sidebar).not.toHaveClass(/grdc-sidebar-collapsed/);
+  expect(await page.evaluate(() => localStorage.getItem('grdc_sidebar_collapsed'))).toBeNull();
+
+  // Toggling the unresolved filter rebuilds the sidebar in place; the
+  // user's expand must stick.
+  await page.keyboard.press('2');
+  await page.locator('.grdc-sidebar-filter-cb').check();
+  await page.waitForTimeout(300);
+  await expect(sidebar).not.toHaveClass(/grdc-sidebar-collapsed/);
 });
 
 test('Shift+T reset opens the full sidebar', async ({ page }) => {
-  await setupFixture(page, 'yaml-frontmatter', { rawSource: { [fm.path]: fm.source } });
-  await gotoPRPage(page);
-  await page.evaluate(() => localStorage.removeItem('grdc_sidebar_collapsed'));
-  await injectExtension(page);
-  await waitForInit(page);
+  await setupExtensionPage(page, 'yaml-frontmatter', {
+    rawSource: { [fm.path]: fm.source },
+    keepCollapsed: true,
+  });
+  await expect(page.locator('.grdc-sidebar')).toHaveClass(/grdc-sidebar-collapsed/);
 
   await page.keyboard.press('Shift+T');
   await expect(page.locator('.grdc-sidebar')).not.toHaveClass(/grdc-sidebar-collapsed/);
