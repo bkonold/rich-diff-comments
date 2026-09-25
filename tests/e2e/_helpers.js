@@ -160,6 +160,9 @@ async function gotoPRPage(page) {
   await page.evaluate(() => {
     localStorage.setItem('grdc_sidebar_pos', JSON.stringify({ left: 840, top: 8 }));
   });
+  // Skip the collapse / expand animation so geometry assertions see final
+  // boxes (the FLIP animation briefly translates the sidebar).
+  await page.emulateMedia({ reducedMotion: 'reduce' });
 }
 
 /**
@@ -185,6 +188,16 @@ async function waitForInit(page, opts) {
     predicate: function (msg) { return /^\[GRDC\] Initialized:/.test(msg.text()); },
     timeout: timeout,
   });
+  // Every page load starts with the sidebar collapsed. Most specs exercise
+  // the full panel, so expand it unless the spec asks to keep the default.
+  if (!opts.keepCollapsed) await expandSidebar(page);
+}
+
+async function expandSidebar(page) {
+  const sidebar = page.locator('.grdc-sidebar');
+  await sidebar.waitFor({ state: 'attached', timeout: 5000 });
+  const collapsed = await sidebar.evaluate((el) => el.classList.contains('grdc-sidebar-collapsed'));
+  if (collapsed) await sidebar.locator('.grdc-sidebar-collapse').click();
 }
 
 /**
@@ -195,7 +208,7 @@ async function setupExtensionPage(page, fixtureName, opts) {
   await setupFixture(page, fixtureName, opts);
   await gotoPRPage(page);
   await injectExtension(page);
-  await waitForInit(page);
+  await waitForInit(page, opts);
 }
 
 module.exports = {
@@ -207,5 +220,6 @@ module.exports = {
   gotoPRPage: gotoPRPage,
   injectExtension: injectExtension,
   waitForInit: waitForInit,
+  expandSidebar: expandSidebar,
   setupExtensionPage: setupExtensionPage,
 };

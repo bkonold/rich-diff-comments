@@ -23,10 +23,10 @@ GitHub rich diff and Azure DevOps Preview render Markdown beautifully, but neith
 - **Commented table rows and fenced-code lines stay identifiable:** persistent markers show conversation counts and cycle through threads by mouse or keyboard.
 - **Copy a direct link** to any visible review comment from its header.
 - **Threads sidebar** docked to the right edge lists every review thread (author, snippet, file:line, and target-supported status tags) — click to jump, with prev/next chevrons and a comment counter.
-- **Outline tab** in the sidebar shows the heading tree of every changed `.md` file with comment-count pills, per-section folding, and bulk `Fold H1 / H2 / H3` / `Expand all` controls.
+- **Outline tab** in the sidebar shows the heading tree of every changed `.md` file with comment-count pills, per-section folding, and bulk `Fold H1 / H2 / H3` / `Collapse all` / `Expand all` controls.
 - **Changes tab** in the sidebar lists every changed block (paragraph / list item / table row / code block / heading / blockquote) with a `+` / `−` / `±` kind glyph, file:line, and a snippet. The header also gets a `◀ N/M ▶` counter so you can step through changes without opening the tab. Best way to scan a Markdown PR for the first time without re-reading the unchanged prose.
 - **Native file navigation stays synchronized:** clicking a file in either host's file tree updates the rendered review surface and the extension's Changes, Threads, and Outline context; extension navigation selects the corresponding native file.
-- **Keyboard shortcuts:** `j` / `k` next / previous thread, `h` / `l` first / last thread, `[` / `]` previous / next change, `{` / `}` (Shift+[, Shift+]) first / last change, `1` / `2` / `3` switch sidebar tab (Changes / Threads / Outline), `t` toggle the sidebar, `Shift+T` reset its position.
+- **Keyboard shortcuts:** `j` / `k` next / previous thread, `h` / `l` first / last thread, `[` / `]` previous / next change, `{` / `}` (Shift+[, Shift+]) first / last change, `1` / `2` / `3` switch sidebar tab (Changes / Threads / Outline), `b` switch every Markdown file between rendered and source view, `t` toggle the sidebar (when collapsed on the Files-changed view it tucks into GitHub's toolbar), `Shift+T` reset its position.
 - No PAT required — each target uses the existing signed-in session for its service.
 
 ### GitHub-specific features
