@@ -3315,7 +3315,13 @@
       if (raw) {
         const { width, height } = JSON.parse(raw);
         const clamped = window.GRDC.clampSize(width, height, SIDEBAR_MIN_WIDTH, SIDEBAR_MIN_HEIGHT);
-        if (clamped.width != null) sidebar.style.width = `${clamped.width}px`;
+        // Persisted sizes are border-box (`offsetWidth` / `offsetHeight`);
+        // inline `width` / `max-height` apply to the content box.
+        if (clamped.width != null) {
+          const cs = getComputedStyle(sidebar);
+          const bordersX = (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.borderRightWidth) || 0);
+          sidebar.style.width = `${clamped.width - bordersX}px`;
+        }
         if (clamped.height != null) applySidebarHeightCap(sidebar, clamped.height);
       }
     } catch (_) {}
@@ -3325,9 +3331,8 @@
   // content (compact while nothing is rendered yet) and grows as Changes /
   // Threads / Outline fill in, up to the height the user last dragged it
   // to. Still capped by the viewport like the CSS default.
-  // `height` is a persisted border-box size (`offsetHeight`) while
-  // `max-height` applies to the content box, so subtract the borders or
-  // the panel would creep taller on every save / restore cycle.
+  // `height` is border-box; subtract the borders or the panel would creep
+  // taller on every save / restore cycle.
   function applySidebarHeightCap(sidebar, height) {
     const cs = getComputedStyle(sidebar);
     const borders = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
@@ -3421,7 +3426,11 @@
       sidebar._grdcResizeScrollLock = locked;
       // Lift the height cap for the drag so the user can grow the panel
       // past its previous maximum; the new size becomes the cap on release.
+      // A press that doesn't change the size (a stray click on the corner)
+      // must restore the old cap rather than persist the current, possibly
+      // content-sized, height as the new maximum.
       sidebar._grdcUserResizing = true;
+      const capBefore = sidebar.style.maxHeight;
       sidebar.style.height = `${rect.height}px`;
       sidebar.style.maxHeight = '';
 
@@ -3452,8 +3461,15 @@
         sidebar._grdcResizeScrollLock = null;
         if (sidebar._grdcUserResizing) {
           sidebar._grdcUserResizing = false;
-          const saved = persistSidebarSize(sidebar);
-          if (saved) applySidebarHeightCap(sidebar, saved.height);
+          const resized = Math.abs(sidebar.offsetWidth - rect.width) > 1 ||
+                          Math.abs(sidebar.offsetHeight - rect.height) > 1;
+          const saved = resized ? persistSidebarSize(sidebar) : null;
+          if (saved) {
+            applySidebarHeightCap(sidebar, saved.height);
+          } else {
+            sidebar.style.height = '';
+            sidebar.style.maxHeight = capBefore;
+          }
         }
       };
       // Capture on both document and window so releasing over native browser
@@ -3652,7 +3668,6 @@
   // localStorage on a debounce so we don't thrash storage during the drag.
   function observeSidebarResize(sidebar) {
     if (typeof ResizeObserver === 'undefined') return;
-    let writeTimer = null;
     const ro = new ResizeObserver(() => {
       if (sidebar.classList.contains('grdc-sidebar-collapsed')) return;
       for (const item of sidebar._grdcResizeScrollLock || []) {
@@ -3661,9 +3676,8 @@
       // Only a user drag of the resize handle is a size preference.
       // Content-driven growth (files rendering, lists filling) must not be
       // persisted, or it becomes a fixed height on the next page load.
-      if (!sidebar._grdcUserResizing) return;
-      clearTimeout(writeTimer);
-      writeTimer = setTimeout(() => persistSidebarSize(sidebar), 250);
+      // The release handler in `attachSidebarResizeScrollLock` persists the
+      // final size once the drag ends, and only if it actually changed.
     });
     ro.observe(sidebar);
   }

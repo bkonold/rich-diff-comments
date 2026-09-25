@@ -44,3 +44,74 @@ test('content taller than the saved height is capped at it', async ({ page }) =>
   const box = await page.locator('.grdc-sidebar').boundingBox();
   expect(box.height).toBeLessThanOrEqual(131);
 });
+
+test('the sidebar grows with its content up to the saved height', async ({ page }) => {
+  await setup(page, { width: 480, height: 600 });
+  const sidebar = page.locator('.grdc-sidebar');
+  const sparse = (await sidebar.boundingBox()).height;
+
+  // Simulate threads arriving as files render.
+  const addRows = (n) => page.evaluate((count) => {
+    const list = document.querySelector('.grdc-sidebar-list');
+    for (let i = 0; i < count; i++) {
+      const row = document.createElement('div');
+      row.style.height = '30px';
+      row.textContent = `thread ${i}`;
+      list.appendChild(row);
+    }
+  }, n);
+
+  await addRows(5);
+  const grown = (await sidebar.boundingBox()).height;
+  expect(grown).toBeGreaterThan(sparse + 100);
+
+  await addRows(40);
+  const capped = (await sidebar.boundingBox()).height;
+  expect(capped).toBeGreaterThan(590);
+  expect(capped).toBeLessThanOrEqual(601);
+  const scrolls = await page.evaluate(() => {
+    const list = document.querySelector('.grdc-sidebar-list');
+    return list.scrollHeight > list.clientHeight;
+  });
+  expect(scrolls).toBe(true);
+});
+
+test('a click on the resize corner without dragging keeps the saved size', async ({ page }) => {
+  await setup(page, { width: 480, height: 600 });
+  const box = await page.locator('.grdc-sidebar').boundingBox();
+  await page.mouse.click(box.x + box.width - 4, box.y + box.height - 4);
+
+  const saved = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), SIZE_KEY);
+  expect(saved).toEqual({ width: 480, height: 600 });
+  // Still content-sized, with the old cap back in place.
+  expect((await page.locator('.grdc-sidebar').boundingBox()).height).toBeCloseTo(box.height, 0);
+  expect(await page.locator('.grdc-sidebar').evaluate((el) => getComputedStyle(el).maxHeight)).toBe('598px');
+});
+
+test('dragging the resize corner saves the new size as the cap', async ({ page }) => {
+  await setup(page, { width: 480, height: 600 });
+  // Headless Chromium can't drive the native `resize: both` grip, so do what
+  // it does: press on the corner, change the inline size, release.
+  const result = await page.evaluate(() => {
+    const sidebar = document.querySelector('.grdc-sidebar');
+    const rect = sidebar.getBoundingClientRect();
+    sidebar.dispatchEvent(new MouseEvent('mousedown', {
+      bubbles: true, button: 0, clientX: rect.right - 4, clientY: rect.bottom - 4,
+    }));
+    sidebar.style.width = '520px';
+    sidebar.style.height = `${rect.height + 150}px`;
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    return { before: rect.height, maxHeight: getComputedStyle(sidebar).maxHeight };
+  });
+
+  const saved = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), SIZE_KEY);
+  expect(saved.width).toBe(522); // border-box: 520 content + 2 × 1px border
+  // Inline height is content-box; the saved size is border-box (+2px).
+  expect(Math.abs(saved.height - (result.before + 152))).toBeLessThanOrEqual(1);
+  expect(result.maxHeight).toBe(`${saved.height - 2}px`);
+});
+
+test('a restored width matches the saved width exactly', async ({ page }) => {
+  await setup(page, { width: 522, height: 600 });
+  expect(await page.locator('.grdc-sidebar').evaluate((el) => el.offsetWidth)).toBe(522);
+});
