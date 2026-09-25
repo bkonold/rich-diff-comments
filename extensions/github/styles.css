@@ -926,6 +926,9 @@ li.grdc-hoverable .grdc-comment-btn {
   top: 16px;
   left: 50%;
   transform: translateX(-50%);
+  /* Border-box so the persisted size (`offsetWidth` / `offsetHeight`) and
+     the inline `width` / `max-height` restored from it are the same number. */
+  box-sizing: border-box;
   width: 480px;
   height: auto;
   min-width: 480px;
@@ -1712,8 +1715,11 @@ li.grdc-hoverable .grdc-comment-btn {
   }
   /* Sidebar header: the dark-mode accent tint, explicit rgba because
      some PR variants / Enterprise themes don't expose the Primer accent
-     tokens (the light fallback would be glaring on a dark canvas). */
-  .grdc-sidebar-header {
+     tokens (the light fallback would be glaring on a dark canvas). The
+     docked selector is repeated so its higher-specificity light rule
+     doesn't win for the docked pill. */
+  .grdc-sidebar-header,
+  .grdc-sidebar-docked .grdc-sidebar-header {
     background: rgba(56, 139, 253, 0.2);
     border-color: rgba(56, 139, 253, 0.4);
   }

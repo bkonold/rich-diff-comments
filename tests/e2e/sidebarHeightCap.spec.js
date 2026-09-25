@@ -32,7 +32,7 @@ test('a tall saved height does not stretch a sparse sidebar', async ({ page }) =
 test('content changes do not overwrite the saved size', async ({ page }) => {
   await setup(page, { width: 480, height: 700 });
   await page.keyboard.press('3'); // Outline: different content height
-  await page.waitForTimeout(600); // longer than the 250 ms persist debounce
+  await page.waitForTimeout(600); // let any sidebar rebuild settle
   const saved = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), SIZE_KEY);
   expect(saved).toEqual({ width: 480, height: 700 });
 });
@@ -84,7 +84,7 @@ test('a click on the resize corner without dragging keeps the saved size', async
   expect(saved).toEqual({ width: 480, height: 600 });
   // Still content-sized, with the old cap back in place.
   expect((await page.locator('.grdc-sidebar').boundingBox()).height).toBeCloseTo(box.height, 0);
-  expect(await page.locator('.grdc-sidebar').evaluate((el) => getComputedStyle(el).maxHeight)).toBe('598px');
+  expect(await page.locator('.grdc-sidebar').evaluate((el) => getComputedStyle(el).maxHeight)).toBe('600px');
 });
 
 test('dragging the resize corner saves the new size as the cap', async ({ page }) => {
@@ -104,13 +104,12 @@ test('dragging the resize corner saves the new size as the cap', async ({ page }
   });
 
   const saved = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), SIZE_KEY);
-  expect(saved.width).toBe(522); // border-box: 520 content + 2 × 1px border
-  // Inline height is content-box; the saved size is border-box (+2px).
-  expect(Math.abs(saved.height - (result.before + 152))).toBeLessThanOrEqual(1);
-  expect(result.maxHeight).toBe(`${saved.height - 2}px`);
+  expect(saved.width).toBe(520);
+  expect(Math.abs(saved.height - (result.before + 150))).toBeLessThanOrEqual(1);
+  expect(result.maxHeight).toBe(`${saved.height}px`);
 });
 
 test('a restored width matches the saved width exactly', async ({ page }) => {
-  await setup(page, { width: 522, height: 600 });
-  expect(await page.locator('.grdc-sidebar').evaluate((el) => el.offsetWidth)).toBe(522);
+  await setup(page, { width: 520, height: 600 });
+  expect(await page.locator('.grdc-sidebar').evaluate((el) => el.offsetWidth)).toBe(520);
 });

@@ -1023,7 +1023,7 @@
   // each one that belongs to an unseen .md file. Returns the number of
   // clicks performed in this pass; populates `seen` so future passes
   // skip files we already handled (including ones that were already
-  // pressed). Used by `flipAllMdToRichDiff` across multiple scroll steps.
+  // pressed). Used by `flipAllMdDiffs` across multiple scroll steps.
   //
   // `target` is 'rich' (click each file's rich-diff segment) or 'source'
   // (click its source segment, for the header's "back to source" toggle).
@@ -1056,18 +1056,13 @@
     return count;
   }
 
-  // Click every per-file "render rich-diff" toggle on the page whose
-  // owning file container belongs to a Markdown file. GitHub lazy-renders
-  // file headers as the user scrolls, so a single top-of-page scan only
-  // sees the first ~2 toggles. We scroll the page in steps, scanning
-  // after each step so newly-rendered file headers are caught, then
-  // restore the user's original scroll position when done.
-  async function flipAllMdToRichDiff() {
-    return flipAllMdDiffs('rich');
-  }
-
-  // Same sweep as `flipAllMdToRichDiff`, parameterized by the segment to
-  // click: 'rich' renders every Markdown file, 'source' flips them all back.
+  // Click every per-file rich-diff (or source) toggle on the page whose
+  // owning file container belongs to a Markdown file. `target` is 'rich'
+  // to render every Markdown file or 'source' to flip them all back.
+  // GitHub lazy-renders file headers as the user scrolls, so a single
+  // top-of-page scan only sees the first ~2 toggles. We scroll the page in
+  // steps, scanning after each step so newly-rendered file headers are
+  // caught, then restore the user's original scroll position when done.
   async function flipAllMdDiffs(target) {
     const seen = new Set();
     let clicked = 0;
@@ -1125,7 +1120,7 @@
         // Final touch at the very bottom for the last header.
         window.scrollTo({ top: docHeight(), behavior: 'instant' });
         await new Promise((r) => setTimeout(r, 200));
-        console.log(`[GRDC] flipAllMdToRichDiff: phase 1 (mount sweep) done`);
+        console.log(`[GRDC] flipAllMdDiffs(${target}): phase 1 (mount sweep) done`);
       }
 
       // Phase 2: click sweep. All headers should now be in the DOM, so
@@ -1147,13 +1142,13 @@
           y += step;
           guard++;
         }
-        console.log(`[GRDC] flipAllMdToRichDiff: phase 2 (click sweep) done — ${seen.size}/${expectedMd || '?'}`);
+        console.log(`[GRDC] flipAllMdDiffs(${target}): phase 2 (click sweep) done — ${seen.size}/${expectedMd || '?'}`);
       }
     } finally {
       window.scrollTo({ top: origScroll, behavior: 'instant' });
       overlay.remove();
     }
-    console.log(`[GRDC] flipAllMdToRichDiff: scanned ${seen.size}/${expectedMd || '?'} md file(s); clicked ${clicked}`);
+    console.log(`[GRDC] flipAllMdDiffs(${target}): scanned ${seen.size}/${expectedMd || '?'} md file(s); clicked ${clicked}`);
     setTimeout(() => { try { buildThreadsSidebar(); } catch (_) {} }, 400);
     return clicked;
   }
@@ -3318,13 +3313,7 @@
       if (raw) {
         const { width, height } = JSON.parse(raw);
         const clamped = window.GRDC.clampSize(width, height, SIDEBAR_MIN_WIDTH, SIDEBAR_MIN_HEIGHT);
-        // Persisted sizes are border-box (`offsetWidth` / `offsetHeight`);
-        // inline `width` / `max-height` apply to the content box.
-        if (clamped.width != null) {
-          const cs = getComputedStyle(sidebar);
-          const bordersX = (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.borderRightWidth) || 0);
-          sidebar.style.width = `${clamped.width - bordersX}px`;
-        }
+        if (clamped.width != null) sidebar.style.width = `${clamped.width}px`;
         if (clamped.height != null) applySidebarHeightCap(sidebar, clamped.height);
       }
     } catch (_) {}
@@ -3334,13 +3323,9 @@
   // content (compact while nothing is rendered yet) and grows as Changes /
   // Threads / Outline fill in, up to the height the user last dragged it
   // to. Still capped by the viewport like the CSS default.
-  // `height` is border-box; subtract the borders or the panel would creep
-  // taller on every save / restore cycle.
   function applySidebarHeightCap(sidebar, height) {
-    const cs = getComputedStyle(sidebar);
-    const borders = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
     sidebar.style.height = '';
-    sidebar.style.maxHeight = `min(${height - borders}px, calc(100vh - 40px))`;
+    sidebar.style.maxHeight = `min(${height}px, calc(100vh - 40px))`;
   }
 
   function persistSidebarSize(sidebar) {
@@ -3432,7 +3417,6 @@
       // A press that doesn't change the size (a stray click on the corner)
       // must restore the old cap rather than persist the current, possibly
       // content-sized, height as the new maximum.
-      sidebar._grdcUserResizing = true;
       const capBefore = sidebar.style.maxHeight;
       sidebar.style.height = `${rect.height}px`;
       sidebar.style.maxHeight = '';
@@ -3462,17 +3446,14 @@
         }
         restore();
         sidebar._grdcResizeScrollLock = null;
-        if (sidebar._grdcUserResizing) {
-          sidebar._grdcUserResizing = false;
-          const resized = Math.abs(sidebar.offsetWidth - rect.width) > 1 ||
-                          Math.abs(sidebar.offsetHeight - rect.height) > 1;
-          const saved = resized ? persistSidebarSize(sidebar) : null;
-          if (saved) {
-            applySidebarHeightCap(sidebar, saved.height);
-          } else {
-            sidebar.style.height = '';
-            sidebar.style.maxHeight = capBefore;
-          }
+        const resized = Math.abs(sidebar.offsetWidth - rect.width) > 1 ||
+                        Math.abs(sidebar.offsetHeight - rect.height) > 1;
+        const saved = resized ? persistSidebarSize(sidebar) : null;
+        if (saved) {
+          applySidebarHeightCap(sidebar, saved.height);
+        } else {
+          sidebar.style.height = '';
+          sidebar.style.maxHeight = capBefore;
         }
       };
       // Capture on both document and window so releasing over native browser
@@ -3661,8 +3642,8 @@
     lastSidebar = null;
   }
 
-  // Persist resize: watch for size changes via ResizeObserver and write to
-  // localStorage on a debounce so we don't thrash storage during the drag.
+  // While a resize drag is in progress, re-pin each child scroller's
+  // scrollTop on every size change (see `attachSidebarResizeScrollLock`).
   function observeSidebarResize(sidebar) {
     if (typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(() => {
@@ -3670,11 +3651,9 @@
       for (const item of sidebar._grdcResizeScrollLock || []) {
         if (item.scroller.isConnected) item.scroller.scrollTop = item.scrollTop;
       }
-      // Only a user drag of the resize handle is a size preference.
-      // Content-driven growth (files rendering, lists filling) must not be
-      // persisted, or it becomes a fixed height on the next page load.
-      // The release handler in `attachSidebarResizeScrollLock` persists the
-      // final size once the drag ends, and only if it actually changed.
+      // Nothing is persisted here: content-driven growth is not a size
+      // preference. The release handler in `attachSidebarResizeScrollLock`
+      // persists the final size, and only if the drag actually changed it.
     });
     ro.observe(sidebar);
   }
@@ -3682,10 +3661,9 @@
   // Poll the DOM for headings (the signal that GitHub has finished
   // mounting the rich-diff prose after a toggle click). Resolves true as
   // soon as at least one heading is visible, OR false at the timeout.
-  // Used by `expandAndRenderAllMd` to avoid the race where we rebuild
-  // the sidebar before GitHub finishes async-rendering the prose — a
-  // race that left users on the Threads tab after clicking the book
-  // button instead of landing on Outline.
+  // Used by `runMdRenderSweep` to avoid the race where we rebuild the
+  // sidebar before GitHub finishes async-rendering the prose — without
+  // it the rebuild finds zero headings and leaves the Outline tab hidden.
   async function waitForOutlineHeadings(maxMs = 3000) {
     const start = Date.now();
     while (Date.now() - start < maxMs) {
@@ -3717,24 +3695,39 @@
     return 'GitHub is optimizing this large pull request and unloads offscreen files. Review Markdown files one at a time and switch each file to rich diff as needed.';
   }
 
-  // Header book button / `b`: flip every Markdown file to rich diff, or —
-  // once they are all rendered — back to source. Deliberately does NOT
-  // expand the sidebar or switch tabs: the button is a view toggle for the
-  // page, and the reviewer reads the result in the diff itself.
-  async function toggleAllMdRendering(sidebar) {
+  // Shared core of every "render all Markdown" entry point: flip every
+  // Markdown file to `target` ('rich' or 'source') and rebuild the sidebar.
+  // The header button is disabled while the sweep runs (which also makes a
+  // second click / `b` press a no-op). Its icon and tooltip are owned
+  // solely by `updateRenderToggleButton`, which skips a disabled button,
+  // so the `finally` re-enables it before refreshing.
+  async function runMdRenderSweep(sidebar, target) {
     const btn = sidebar.querySelector('.grdc-sidebar-render-md');
     if (isVirtualizedLargePrMode() || btn?.disabled) return 0;
-    const target = markdownRenderState().hasUnrendered ? 'rich' : 'source';
     if (btn) btn.disabled = true;
     try {
       const n = await flipAllMdDiffs(target);
+      // GitHub renders the prose async after each toggle click; wait for
+      // the first heading so the rebuild below can unhide the Outline tab.
+      // Gives up after 3 s (PR with no headings) and rebuilds anyway.
       if (target === 'rich') await waitForOutlineHeadings(3000);
+      // `flipAllMdDiffs` also schedules a deferred rebuild ~400 ms later as
+      // a safety net for late-arriving headings; rebuilding is idempotent.
       try { buildThreadsSidebar(); } catch (_) {}
       return n;
     } finally {
       if (btn) btn.disabled = false;
       updateRenderToggleButton(sidebar);
     }
+  }
+
+  // Header book button / `b`: flip every Markdown file to rich diff, or —
+  // once they are all rendered — back to source. Deliberately does NOT
+  // expand the sidebar or switch tabs: the button is a view toggle for the
+  // page, and the reviewer reads the result in the diff itself.
+  async function toggleAllMdRendering(sidebar) {
+    const target = markdownRenderState().hasUnrendered ? 'rich' : 'source';
+    return runMdRenderSweep(sidebar, target);
   }
 
   const RENDER_TOGGLE_ICONS = {
@@ -3766,63 +3759,17 @@
     btn.setAttribute('aria-label', label);
   }
 
-  // Expand the sidebar (if collapsed) and render every `.md` file as
-  // rich-diff, with tooltip + disabled feedback on the book button while
-  // the work runs. Used by THREE call-sites:
-  //   1. The header book button's click handler (which then ALSO switches
-  //      to the Outline tab — see the spec: book = "Toggle outline").
-  //   2. The empty-state CTA in the Threads pane.
-  //   3. The empty-state CTA in the Changes pane.
-  // The CTAs intentionally skip the Outline tab-switch — they live inside
-  // the Threads/Changes panes and the user clicked them expecting to see
-  // those panes populate. Only an explicit click on the book button
-  // signals "show me the outline".
+  // Empty-state CTAs in the Threads and Changes panes: expand the sidebar
+  // (if collapsed) and render every Markdown file. Unlike the header button
+  // these expand, because the CTA lives inside a pane and the user expects
+  // to watch that pane populate. Neither switches tabs; the header button
+  // (`toggleAllMdRendering`) shares the same `runMdRenderSweep` core.
   async function expandAndRenderAllMd(sidebar) {
-    const btn = sidebar.querySelector('.grdc-sidebar-render-md');
-    if (isVirtualizedLargePrMode()) {
-      if (btn) btn.setAttribute('title', largePrRenderHint());
-      return 0;
-    }
-    const orig = btn ? btn.getAttribute('title') : null;
-    if (btn) {
-      btn.setAttribute('title', 'Rendering Markdown files as rich-diff…');
-      btn.setAttribute('disabled', 'true');
-    }
+    if (isVirtualizedLargePrMode()) return 0;
     if (sidebar.classList.contains('grdc-sidebar-collapsed')) {
       setSidebarCollapsed(sidebar, false);
     }
-    try {
-      const n = await flipAllMdToRichDiff();
-      // CRITICAL: wait for GitHub to actually mount the rich-diff prose
-      // in the DOM. `flipAllMdToRichDiff`'s per-step dwell (~100–250 ms)
-      // is often not enough on slow connections — the toggle click
-      // returns immediately but GitHub renders the prose async. Without
-      // this poll, the next sync `buildThreadsSidebar()` finds zero
-      // headings, leaves the Outline tab hidden, and any caller's
-      // `setSidebarTab(..., 'outline')` silently falls back to Threads.
-      // We poll up to 3 s for the first heading to appear; if it never
-      // does (PR has no headings, or no .md files), we proceed with the
-      // rebuild anyway — the caller's tab switch will gracefully fall
-      // back to Threads, which is the correct UX for an outline-less PR.
-      await waitForOutlineHeadings(3000);
-      // Now force a sidebar rebuild so the Outline tab unhides (if
-      // headings appeared) and `buildOutlinePane` runs. `flipAll-
-      // MdToRichDiff` already schedules a deferred rebuild for ~400 ms
-      // later as a safety net for late-arriving headings; calling it
-      // here is idempotent (rebuilds from live DOM each time).
-      try { buildThreadsSidebar(); } catch (_) {}
-      if (btn) {
-        btn.setAttribute('title', n === 0
-          ? 'All Markdown files are already in rich-diff'
-          : `Rendered ${n} Markdown file${n === 1 ? '' : 's'} as rich-diff`);
-      }
-      return n;
-    } finally {
-      if (btn) {
-        btn.removeAttribute('disabled');
-        setTimeout(() => { if (orig) btn.setAttribute('title', orig); }, 2500);
-      }
-    }
+    return runMdRenderSweep(sidebar, 'rich');
   }
 
   function buildThreadsSidebar() {
@@ -4119,8 +4066,6 @@
         // Render-only — do NOT switch to the Outline tab. The user
         // clicked this CTA inside the Threads pane expecting threads to
         // appear after the render, not to be whisked away to Outline.
-        // (The header book button is the explicit "show Outline" entry
-        // point; this CTA is context-bound to the Threads pane.)
         expandAndRenderAllMd(sidebar);
       });
       list.appendChild(empty);
@@ -5134,9 +5079,7 @@
         cta.addEventListener('click', () => {
           // Render-only — do NOT switch to the Outline tab. The user
           // clicked this CTA inside the Changes pane expecting changes
-          // to appear after the render. (The header book button is the
-          // explicit "show Outline" entry point; this CTA is context-
-          // bound to the Changes pane.)
+          // to appear after the render.
           expandAndRenderAllMd(sidebar);
         });
         list.appendChild(empty);

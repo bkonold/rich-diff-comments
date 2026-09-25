@@ -89,6 +89,8 @@ No other scope is committed to v1.5.0 yet. Work-item creation, reactions, and si
 | Capability | GitHub | Azure DevOps |
 |---|---|---|
 | Use a draggable, resizable, collapsible sidebar with persistent layout and selected tab | ✅ Resizing preserves tab scroll position | ✅ |
+| Dock the collapsed sidebar controls into the host's own files toolbar instead of floating over the page | ✅ GitHub (unreleased); floats where the toolbar is absent | — |
+| Treat the saved sidebar height as a ceiling so the panel sizes to its content and only a manual resize changes it | ✅ GitHub (unreleased) | 📋 Not scheduled; the saved height is applied as a fixed size |
 | Browse PR-wide Changes, Threads, and Outline lists grouped in stable file order | ✅ | ✅ |
 | Navigate changed rendered blocks with cards, counters, clicks, and keyboard shortcuts | ✅ | ✅ |
 | Show one summary card for a newly added, deleted, or renamed Markdown file where applicable | ✅ | ✅ |
@@ -96,6 +98,7 @@ No other scope is committed to v1.5.0 yet. Work-item creation, reactions, and si
 | Browse headings across changed Markdown files with per-section thread counts | ✅ | ✅ |
 | Keep the Outline focused when navigating to a heading in another file | ✅ | ✅ ADO v1.2.0 |
 | Fold individual sections or bulk-fold by H1/H2/H3 level and expand all | ✅ Bulk actions affect all rendered files | ✅ Bulk actions affect the current file |
+| Collapse every section to its top-level headings in one action (Collapse all) | ✅ GitHub (unreleased); affects all rendered files | 📋 Not scheduled |
 | Show file-scoped position with a PR-wide total and jump header icons to the current file first | ✅ | ✅ |
 | Follow native file navigation and keep sidebar selection synchronized | ✅ | ✅ |
 | Follow repeated rendered Table of Contents links even when the destination fragment is already active | ✅ GitHub v1.10.0 | ✅ No equivalent Preview issue observed |
@@ -106,6 +109,7 @@ No other scope is committed to v1.5.0 yet. Work-item creation, reactions, and si
 | Capability | GitHub | Azure DevOps |
 |---|---|---|
 | Provide an obvious action when rendered Markdown is not active | ✅ Render all Markdown files | ✅ Open Markdown Preview, ADO v1.1.0 |
+| Switch every Markdown file between rendered and source view with one action | ✅ GitHub (unreleased) | ↔ Preview is PR-wide and sticky |
 | Explain when GitHub's large-PR mode prevents PR-wide rendering instead of showing a transient bulk action | ✅ GitHub v1.10.0 | — |
 | Offer bulk rendering from empty Changes or Threads states only while eligible Markdown files still need rich diff | ✅ GitHub v1.11.0 | — |
 | Move between changed Markdown files without rebuilding all PR-wide review data | ✅ | ✅ ADO v1.1.0 |
@@ -125,7 +129,7 @@ No other scope is committed to v1.5.0 yet. Work-item creation, reactions, and si
 | Map table rows and fenced-code ranges without altering host markup | ✅ | ✅ |
 | Handle YAML frontmatter without shifting the document's later line mappings | ✅ | △ Needs target-specific fixture validation |
 | Build changed-block navigation from the host's available source information | ✅ Native rich-diff markers | ✅ Head/base source comparison |
-| Highlight added and modified rendered blocks persistently | ↔ Native rich diff already supplies this context | ✅ ADO v1.2.0 |
+| Highlight added and modified rendered blocks persistently | ✅ GitHub (unreleased); full-width tint and solid rail over native rich-diff markers | ✅ ADO v1.2.0 |
 | Keep diagnostic logging and local inspection hooks available without telemetry | ✅ | ✅ |
 
 ---
@@ -219,7 +223,7 @@ No other scope is committed to v1.5.0 yet. Work-item creation, reactions, and si
   - **Outcome:** reviewers can reclaim page space without creating a fully hidden state that is difficult to discover or recover from.
   - **GitHub:** ✅ The existing collapse control and `t` shortcut provide the intended outcome; do not add a full-dismiss button or separate launcher.
   - **ADO:** 📋 Targeted for ADO v1.5.0. Remove the header × full-dismiss action and separate restore launcher, keeping collapse/expand as the sole space-saving behavior.
-  - **Constraint:** preserve the existing keyboard toggle and saved position, size, active tab, filter, and collapsed state. Removing full dismissal must not reset the reviewer's sidebar layout.
+  - **Constraint:** preserve the existing keyboard toggle and saved position, size, active tab, and filter. Removing full dismissal must not reset the reviewer's sidebar layout. GitHub deliberately does not persist collapsed state: every page load starts collapsed (docked in the files toolbar where available).
 
 - [ ] **P3 — Evaluate active-file prioritization during startup**
   - **Outcome:** reviewers can begin commenting sooner without making Changes, Threads, or Outline feel noticeably slower or incomplete.
@@ -228,7 +232,7 @@ No other scope is committed to v1.5.0 yet. Work-item creation, reactions, and si
   - Compare current parallel loading with active-file-first scheduling using `ADORC_probe.startup()` on small and large pull requests. Do not change scheduling unless the improvement in comment readiness clearly outweighs delayed PR-wide sidebar readiness.
 
 - [ ] **P2 — Make bulk section-folding scope explicit and predictable**
-  - **Outcome:** reviewers can tell whether Fold H1/H2/H3 and Expand all affect the current file or every Markdown file before applying the action.
+  - **Outcome:** reviewers can tell whether Fold H1/H2/H3, Collapse all, and Expand all affect the current file or every Markdown file before applying the action.
   - **GitHub:** △ Shipped with PR-wide scope across all rendered Markdown files.
   - **ADO:** △ Shipped with current-file scope because Preview renders one file at a time.
   - Do not force identical mechanics without user evidence. First clarify the labels or expose an explicit scope choice; current-file scope is safer for focused review, while all-files scope is useful for PR-wide triage.

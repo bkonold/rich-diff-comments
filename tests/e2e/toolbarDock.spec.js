@@ -16,6 +16,7 @@
 const { test, expect } = require('@playwright/test');
 const {
   setupExtensionPage, setupFixture, gotoPRPage, injectExtension, waitForInit,
+  expandSidebar,
 } = require('./_helpers');
 const fixtures = require('./fixtures/sources');
 
@@ -35,13 +36,6 @@ async function injectFilesToolbar(page) {
   });
 }
 
-async function ensureExpanded(page) {
-  const collapsed = await page.locator('.grdc-sidebar').evaluate((el) =>
-    el.classList.contains('grdc-sidebar-collapsed')
-  );
-  if (collapsed) await page.keyboard.press('t');
-}
-
 test.describe('toolbar dock', () => {
   test.beforeEach(async ({ page }) => {
     await setupExtensionPage(page, 'yaml-frontmatter', {
@@ -52,7 +46,7 @@ test.describe('toolbar dock', () => {
 
   test('collapsing docks the strip before the viewed controls; expanding restores it', async ({ page }) => {
     await injectFilesToolbar(page);
-    await ensureExpanded(page);
+    await expandSidebar(page);
 
     await page.keyboard.press('t');
     const sidebar = page.locator('.grdc-sidebar');
@@ -85,7 +79,7 @@ test.describe('toolbar dock', () => {
 
   test('the docked collapse button expands the sidebar', async ({ page }) => {
     await injectFilesToolbar(page);
-    await ensureExpanded(page);
+    await expandSidebar(page);
     await page.keyboard.press('t');
     await expect(page.locator('.grdc-sidebar')).toHaveClass(/grdc-sidebar-docked/);
 
@@ -95,7 +89,7 @@ test.describe('toolbar dock', () => {
   });
 
   test('without a files toolbar the collapsed strip stays floating', async ({ page }) => {
-    await ensureExpanded(page);
+    await expandSidebar(page);
     await page.keyboard.press('t');
     const sidebar = page.locator('.grdc-sidebar');
     await expect(sidebar).toHaveClass(/grdc-sidebar-collapsed/);
@@ -104,7 +98,7 @@ test.describe('toolbar dock', () => {
   });
 
   test('a collapsed strip docks when the toolbar renders later', async ({ page }) => {
-    await ensureExpanded(page);
+    await expandSidebar(page);
     await page.keyboard.press('t');
     await expect(page.locator('.grdc-sidebar')).not.toHaveClass(/grdc-sidebar-docked/);
 
@@ -114,7 +108,7 @@ test.describe('toolbar dock', () => {
 
   test('re-docks after GitHub replaces the toolbar it was docked in', async ({ page }) => {
     await injectFilesToolbar(page);
-    await ensureExpanded(page);
+    await expandSidebar(page);
     await page.keyboard.press('t');
     await expect(page.locator('.grdc-sidebar')).toHaveClass(/grdc-sidebar-docked/);
 
