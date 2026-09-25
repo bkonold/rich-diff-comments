@@ -52,9 +52,10 @@ test.describe('+ click → comment box', () => {
     const box = page.locator('.grdc-comment-box');
     await expect(box).toBeVisible();
 
-    // The header inside the box shows the file path and the source line.
+    // The header names the file (in its tooltip, like GitHub's own
+    // "Add a comment on line N" header) and pre-fills the source line.
     const header = box.locator('.grdc-line-info');
-    await expect(header).toContainText(fm.path);
+    await expect(header).toHaveAttribute('title', fm.path);
 
     // The line-number input is pre-filled with the H1's source line.
     const lineInput = box.locator('.grdc-line-input');
@@ -69,7 +70,7 @@ test.describe('+ click → comment box', () => {
 
     const box = page.locator('.grdc-comment-box');
     await expect(box).toBeVisible();
-    await expect(box.locator('.grdc-line-info')).toContainText(fm.path);
+    await expect(box.locator('.grdc-line-info')).toHaveAttribute('title', fm.path);
     await expect(box.locator('.grdc-line-input')).toHaveValue(String(fm.expected.frontmatterRowLines.area));
   });
 
